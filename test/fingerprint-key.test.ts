@@ -31,3 +31,17 @@ test('teks sangat panjang dipotong agar kunci tidak membengkak', () => {
 test('spasi berlebih tidak mengubah kunci', () => {
   expect(stableKey('  Gagal   memuat\n\tmodul  ')).toBe(stableKey('Gagal memuat modul'))
 })
+
+test('posisi sumber baris:kolom disamarkan seluruhnya', () => {
+  // Kolom sering hanya dua digit sehingga aturan panjang angka tidak
+  // menjangkaunya, padahal baris dan kolom sama-sama bergeser tiap build.
+  expect(stableKey('at bundle.js:12345:67')).toBe(stableKey('at bundle.js:98765:43'))
+})
+
+test('id chunk empat digit tidak membuat temuan baru tiap deploy', () => {
+  expect(stableKey('Failed to load chunk 4821')).toBe(stableKey('Failed to load chunk 9134'))
+})
+
+test('kode status tiga digit tetap membedakan temuan', () => {
+  expect(stableKey('Gagal: HTTP 404')).not.toBe(stableKey('Gagal: HTTP 500'))
+})
