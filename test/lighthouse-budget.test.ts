@@ -1,12 +1,44 @@
 import { test, expect } from 'vitest'
-import { pilihHalaman, polaUrl } from '../lib/lighthouse-budget.ts'
+import { pilihHalaman, polaUrl, petaPola } from '../lib/lighthouse-budget.ts'
 
 const halaman = (url: string, isPinned = 0) => ({ id: 0, url, is_pinned: isPinned })
 
-test('polaUrl mengelompokkan halaman menurut bentuk pathnya', () => {
+test('polaUrl menyamarkan angka dan heks panjang, tidak lebih', () => {
   expect(polaUrl('https://a.test/news/123')).toBe(polaUrl('https://a.test/news/456'))
-  expect(polaUrl('https://a.test/news/abc-panjang')).toBe(polaUrl('https://a.test/news/lain-lagi'))
   expect(polaUrl('https://a.test/news/1')).not.toBe(polaUrl('https://a.test/produk/1'))
+})
+
+test('polaUrl tidak menebak dari tanda hubung', () => {
+  // Menebak dari bentuk string pernah menggabungkan dua halaman berbeda menjadi
+  // satu pola, sehingga salah satunya tidak pernah diukur Lighthouse.
+  expect(polaUrl('https://a.test/store-location')).not.toBe(
+    polaUrl('https://a.test/exhibition-location'),
+  )
+})
+
+test('petaPola menggabungkan slug yang banyak, bukan halaman yang berdiri sendiri', () => {
+  const banyak = Array.from({ length: 60 }, (_, i) => `https://a.test/news/judul-${i}`)
+  const sendiri = [
+    'https://a.test/store-location',
+    'https://a.test/exhibition-location',
+    'https://a.test/warranty',
+  ]
+  const peta = petaPola([...sendiri, ...banyak])
+
+  // Enam puluh berita menyusut menjadi satu pola.
+  expect(new Set(banyak.map((u) => peta.get(u))).size).toBe(1)
+  // Ketiga halaman tersendiri tetap berbeda satu dari yang lain.
+  expect(new Set(sendiri.map((u) => peta.get(u))).size).toBe(3)
+})
+
+test('petaPola memakai frekuensi, jadi dua nilai tidak dianggap identitas', () => {
+  const peta = petaPola(['https://a.test/a/satu', 'https://a.test/a/dua'])
+  expect(peta.get('https://a.test/a/satu')).not.toBe(peta.get('https://a.test/a/dua'))
+})
+
+test('petaPola tetap menyamarkan angka meski jumlahnya sedikit', () => {
+  const peta = petaPola(['https://a.test/news/7'])
+  expect(peta.get('https://a.test/news/7')).toBe('/news/*')
 })
 
 test('polaUrl membedakan kedalaman path', () => {
