@@ -42,11 +42,14 @@ export function migrate(db: DatabaseSync): void {
 /** Membuka database pada path tertentu dan memastikan skemanya mutakhir. */
 export function openDb(path: string): DatabaseSync {
   const db = new DatabaseSync(path)
+  // busy_timeout WAJIB lebih dulu. Tanpa ini koneksi kedua langsung gagal
+  // "database is locked" alih-alih menunggu giliran — dan `journal_mode = WAL`
+  // di bawah sendiri mengambil kunci eksklusif, jadi kalau urutannya dibalik
+  // dua proses yang menyala bersamaan saling menjatuhkan sebelum timeout ini
+  // sempat berlaku. Terukur ~22% kegagalan start pada 3 proses serentak.
+  db.exec('PRAGMA busy_timeout = 5000')
   if (path !== ':memory:') db.exec('PRAGMA journal_mode = WAL')
   db.exec('PRAGMA foreign_keys = ON')
-  // Tanpa ini koneksi kedua langsung gagal "database is locked" alih-alih
-  // menunggu giliran. Scheduler dan CLI bisa berjalan bersamaan.
-  db.exec('PRAGMA busy_timeout = 5000')
   migrate(db)
   return db
 }

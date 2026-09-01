@@ -16,7 +16,12 @@ export async function drainQueue(
   handlers: JobHandlers,
   opts: { concurrency?: number } = {},
 ): Promise<DrainSummary> {
-  const limit = Math.max(1, opts.concurrency ?? 3)
+  // NaN harus ditangkap eksplisit: `size < NaN` selalu false, sehingga nol job
+  // diklaim dan drainQueue mengembalikan {done:0, failed:0} — scan yang
+  // melaporkan sukses tanpa mengerjakan apa pun. Satu parseInt di CLI cukup
+  // untuk memicunya.
+  const requested = Number(opts.concurrency ?? 3)
+  const limit = Number.isFinite(requested) ? Math.max(1, Math.floor(requested)) : 3
   const summary: DrainSummary = { done: 0, failed: 0 }
   const active = new Set<Promise<void>>()
 

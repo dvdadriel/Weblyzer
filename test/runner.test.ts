@@ -2,7 +2,7 @@ import { test, expect, beforeEach } from 'vitest'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb } from '../lib/db.ts'
 import { createRun } from '../lib/repos/runs.ts'
-import { enqueue } from '../lib/queue.ts'
+import { enqueue, countQueued } from '../lib/queue.ts'
 import { drainQueue, type JobHandlers } from '../lib/runner.ts'
 
 let db: DatabaseSync
@@ -79,4 +79,18 @@ test('job dengan tipe tanpa handler ditandai failed, bukan menggantung', async (
     .prepare("SELECT error FROM jobs WHERE status = 'failed'")
     .get() as { error: string }
   expect(failed.error).toContain('tidak-dikenal')
+})
+
+test('concurrency NaN tidak membuat antrian diam-diam terlewat', async () => {
+  const run = createRun(db, 1, 'crawl')
+  for (let n = 0; n < 3; n += 1) enqueue(db, { runId: run.id, type: 'noop', payload: {} })
+
+  // NaN pernah membuat `active.size < limit` selalu false: nol job diklaim dan
+  // drainQueue melaporkan sukses tanpa mengerjakan apa pun.
+  const summary = await drainQueue(db, { noop: async () => {} }, {
+    concurrency: Number.parseInt('bukan-angka', 10),
+  })
+
+  expect(summary).toEqual({ done: 3, failed: 0 })
+  expect(countQueued(db)).toBe(0)
 })
