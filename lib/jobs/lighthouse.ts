@@ -3,11 +3,47 @@ import type { Job } from '../queue.ts'
 import { getSite } from '../repos/sites.ts'
 import { listPages } from '../repos/pages.ts'
 import { reconcile, type NewFinding } from '../findings.ts'
-import { runLighthouse, type LighthouseTarget, type Strategy } from '../scanners/lighthouse.ts'
+import {
+  runLighthouse,
+  type LighthouseResult,
+  type LighthouseTarget,
+  type Strategy,
+} from '../scanners/lighthouse.ts'
 import { pilihHalaman } from '../lighthouse-budget.ts'
 import { analyzeLighthouse } from '../analyzers/lighthouse.ts'
 import { simpanSkor } from '../repos/lighthouse.ts'
 import type { PageIdMap } from '../analyzers/bugs.ts'
+
+/**
+ * Menggabungkan dua pengukuran atas target yang sama, menyisakan hanya audit
+ * yang gagal di keduanya.
+ *
+ * Skor diambil dari pengukuran kedua, bukan dirata-rata: skor adalah pengamatan
+ * bertanggal, dan rata-rata dari dua angka yang berbeda bukan angka yang pernah
+ * benar-benar terjadi.
+ *
+ * Sebuah target dianggap gagal bila salah satu pengukurannya gagal — kalau kita
+ * tidak berhasil melihatnya dua kali, kita tidak tahu keadaannya.
+ */
+export function irisanAudit(
+  pertama: LighthouseResult[],
+  kedua: LighthouseResult[],
+): LighthouseResult[] {
+  const petaKedua = new Map(kedua.map((r) => [`${r.url}\n${r.strategy}`, r]))
+
+  return pertama.map((a) => {
+    const b = petaKedua.get(`${a.url}\n${a.strategy}`)
+    if (b === undefined) return a
+    if (a.error !== undefined) return a
+    if (b.error !== undefined) return b
+
+    const idKedua = new Set(b.audits.map((x) => x.id))
+    return {
+      ...b,
+      audits: a.audits.filter((x) => idKedua.has(x.id)),
+    }
+  })
+}
 
 /**
  * Mengukur Lighthouse untuk halaman yang dipilih anggaran, menyimpan skornya,
@@ -41,7 +77,20 @@ export async function lighthouseHandler(job: Job, db: DatabaseSync): Promise<voi
   }
 
   // Port debugging dialokasikan runner itu sendiri: satu tempat, bukan dua.
-  const hasil = await runLighthouse(targets)
+  //
+  // Diukur dua kali, dan hanya audit yang gagal di KEDUA pengukuran yang
+  // dilaporkan. Alasannya terbukti di lapangan: homepage springair.co.id
+  // melaporkan "tidak ada <main>" pada satu pengukuran dan tidak pada
+  // berikutnya — audit itu struktural, tetapi strukturnya sendiri bergantung
+  // waktu karena isinya dirender klien. Menambal per-audit tidak menutup
+  // kelasnya; audit apa pun bisa berkedip di halaman semacam itu.
+  //
+  // Harganya dua kali lipat waktu (mode sample: ~2,2 menit, bukan 1,1). Itu
+  // pertukaran yang benar: temuan yang berkedip menandai dirinya "sudah
+  // diperbaiki" tanpa ada yang diperbaiki, dan itu satu-satunya hal yang
+  // membuat alat ini lebih berguna daripada membuka DevTools sendiri.
+  const [pertama, kedua] = [await runLighthouse(targets), await runLighthouse(targets)]
+  const hasil = irisanAudit(pertama, kedua)
 
   const gagalDiukur: NewFinding[] = []
   const pageIds: PageIdMap = {}
