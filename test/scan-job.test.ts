@@ -140,3 +140,66 @@ test('situs tidak dikenal menggagalkan job dengan pesan jelas', async () => {
   }
   expect(failed.error).toContain('999')
 })
+
+test('pemindaian penuh mengisi tiga kategori', async () => {
+  const server = await startFixtureServer('rusak-konsol')
+  try {
+    const site = createSite(db, { name: 'Berisik', base_url: server.url, max_pages: 5 })
+    const summary = await jalankan(site.id)
+    expect(summary).toEqual({ done: 1, failed: 0 })
+
+    const kategori = db
+      .prepare('SELECT DISTINCT category FROM findings ORDER BY category')
+      .all() as { category: string }[]
+    expect(kategori.map((k) => k.category)).toEqual(['bugs', 'console', 'security'])
+  } finally {
+    await server.close()
+  }
+})
+
+test('only=security hanya merekonsiliasi kategori security', async () => {
+  const server = await startFixtureServer('rusak-konsol')
+  try {
+    const site = createSite(db, { name: 'Berisik', base_url: server.url, max_pages: 5 })
+    await jalankan(site.id, 'security')
+
+    const kategori = db
+      .prepare('SELECT DISTINCT category FROM findings')
+      .all() as { category: string }[]
+    expect(kategori.map((k) => k.category)).toEqual(['security'])
+  } finally {
+    await server.close()
+  }
+})
+
+test('probe tidak menyentuh jalur sensitif ketika security tidak diminta', async () => {
+  // Server sendiri yang mencatat setiap path yang diminta. Memeriksa "tidak ada
+  // temuan security" saja tidak membuktikan apa pun — itu benar bahkan bila
+  // sembilan permintaan tetap ditembakkan.
+  const { createServer } = await import('node:http')
+  const diminta: string[] = []
+  const server = createServer((req, res) => {
+    diminta.push(req.url ?? '')
+    res.writeHead(200, { 'content-type': 'text/html' })
+    res.end('<!doctype html><title>Situs</title><h1>Halaman biasa dengan cukup teks di sini</h1>')
+  })
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
+  const port = (server.address() as { port: number }).port
+
+  try {
+    const site = createSite(db, {
+      name: 'Sederhana',
+      base_url: `http://127.0.0.1:${port}`,
+      max_pages: 2,
+    })
+    await jalankan(site.id, 'bugs')
+    expect(diminta.some((p) => p.startsWith('/.env'))).toBe(false)
+    expect(diminta.some((p) => p.startsWith('/.git'))).toBe(false)
+
+    diminta.length = 0
+    await jalankan(site.id, 'security')
+    expect(diminta.some((p) => p.startsWith('/.env'))).toBe(true)
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()))
+  }
+})

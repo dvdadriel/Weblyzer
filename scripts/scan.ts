@@ -11,7 +11,7 @@ const HANDLERS = { scan: scanHandler }
 const USAGE = `Penggunaan:
   npm run scan -- add-site <nama> <url>      Menambahkan situs
   npm run scan -- list                       Menampilkan semua situs
-  npm run scan -- scan <site-id> [kategori]  Memindai situs (kategori: bugs|console)
+  npm run scan -- scan <site-id> [kategori]  Memindai situs (kategori: bugs|console|security)
   npm run scan -- pages <site-id>            Menampilkan halaman tersimpan
   npm run scan -- findings <site-id>         Menampilkan temuan terbuka`
 
@@ -60,8 +60,8 @@ async function main(): Promise<number> {
         return 1
       }
       const only = args[1]
-      if (only !== undefined && only !== 'bugs' && only !== 'console') {
-        console.error(`Kategori tidak dikenal: ${only}. Pilih bugs atau console.`)
+      if (only !== undefined && only !== 'bugs' && only !== 'console' && only !== 'security') {
+        console.error(`Kategori tidak dikenal: ${only}. Pilih bugs, console, atau security.`)
         return 1
       }
 
