@@ -192,3 +192,25 @@ test('redirect dicatat dengan rantainya dan finalUrl', async () => {
     await new Promise<void>((r) => server.close(() => r()))
   }
 })
+
+test('merekam header Set-Cookie apa adanya, termasuk bila ada beberapa', async () => {
+  const { createServer } = await import('node:http')
+  const server = createServer((_req, res) => {
+    res.writeHead(200, {
+      'content-type': 'text/html',
+      'set-cookie': ['sesi=abc; Path=/', 'pilihan=gelap; Path=/; SameSite=Lax'],
+    })
+    res.end('<!doctype html><title>Kue</title><h1>Halaman dengan dua cookie di sini</h1>')
+  })
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
+  const port = (server.address() as { port: number }).port
+
+  try {
+    const [page] = await visit(`http://127.0.0.1:${port}`, { maxPages: 1 })
+    expect(page!.setCookies).toHaveLength(2)
+    expect(page!.setCookies.some((c) => c.startsWith('sesi='))).toBe(true)
+    expect(page!.setCookies.some((c) => c.includes('SameSite=Lax'))).toBe(true)
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()))
+  }
+})

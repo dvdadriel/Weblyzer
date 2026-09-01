@@ -40,6 +40,10 @@ export type PageVisit = {
   failedRequests: FailedRequest[]
   resources: ResourceResult[]
   responseHeaders: Record<string, string>
+  /** Header Set-Cookie apa adanya. `headers()` menggabungkan beberapa nilai
+   *  menjadi satu string, sehingga flag per cookie tidak lagi bisa dibedakan —
+   *  karena itu diambil dari headersArray(). */
+  setCookies: string[]
   /** Pesan kegagalan navigasi, bila ada. */
   error?: string
 }
@@ -142,6 +146,7 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
       let textLength = 0
       let mediaCount = 0
       let responseHeaders: Record<string, string> = {}
+      let setCookies: string[] = []
       let error: string | undefined
 
       try {
@@ -173,6 +178,9 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
           finalUrl = normalizeUrl(response.url())
           redirects = await redirectChain(response)
           responseHeaders = response.headers()
+          setCookies = (await response.headersArray())
+            .filter((h) => h.name.toLowerCase() === 'set-cookie')
+            .map((h) => h.value)
         }
         links = await page.$$eval('a[href]', (anchors) =>
           anchors.map((a) => (a as HTMLAnchorElement).href),
@@ -228,6 +236,7 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
         failedRequests,
         resources,
         responseHeaders,
+        setCookies,
         ...(error === undefined ? {} : { error }),
       })
 

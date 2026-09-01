@@ -18,6 +18,7 @@ function pageVisit(patch: Partial<PageVisit> = {}): PageVisit {
     failedRequests: [],
     resources: [],
     responseHeaders: {},
+    setCookies: [],
     ...patch,
   }
 }
