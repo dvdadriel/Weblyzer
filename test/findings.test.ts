@@ -129,3 +129,62 @@ test('severity dan judul diperbarui saat temuan muncul lagi', () => {
   expect(row.severity).toBe('critical')
   expect(row.title).toBe('judul baru')
 })
+
+test('url dan rule yang sama boleh muncul di dua kategori berbeda', () => {
+  const run1 = newRun()
+  reconcile(db, 1, run1, 'seo', [bug('https://a.test/x', 'document-title')])
+  const run2 = newRun()
+  const result = reconcile(db, 1, run2, 'lighthouse', [bug('https://a.test/x', 'document-title')])
+
+  expect(result).toEqual({ opened: 1, reopened: 0, stillOpen: 0, fixed: 0 })
+
+  const rows = db
+    .prepare('SELECT category, status FROM findings ORDER BY category')
+    .all() as { category: string; status: string }[]
+  expect(rows).toHaveLength(2)
+  expect(rows.map((r) => r.category)).toEqual(['lighthouse', 'seo'])
+  expect(rows.every((r) => r.status === 'open')).toBe(true)
+})
+
+test('memperbarui satu kategori tidak menimpa baris kategori lain', () => {
+  reconcile(db, 1, newRun(), 'seo', [
+    { ...bug('https://a.test/x', 'document-title'), severity: 'low', title: 'judul seo' },
+  ])
+  reconcile(db, 1, newRun(), 'lighthouse', [
+    { ...bug('https://a.test/x', 'document-title'), severity: 'critical', title: 'judul lh' },
+  ])
+  reconcile(db, 1, newRun(), 'lighthouse', [
+    { ...bug('https://a.test/x', 'document-title'), severity: 'high', title: 'judul lh baru' },
+  ])
+
+  const seo = db
+    .prepare("SELECT severity, title, status FROM findings WHERE category = 'seo'")
+    .get() as { severity: string; title: string; status: string }
+  expect(seo.severity).toBe('low')
+  expect(seo.title).toBe('judul seo')
+  expect(seo.status).toBe('open')
+})
+
+test('duplikat dalam satu batch memakai severity tertinggi, bukan yang pertama datang', () => {
+  const result = reconcile(db, 1, newRun(), 'bugs', [
+    { ...bug('https://a.test/x'), severity: 'low', title: 'yang rendah' },
+    { ...bug('https://a.test/x'), severity: 'critical', title: 'yang kritis' },
+    { ...bug('https://a.test/x'), severity: 'medium', title: 'yang sedang' },
+  ])
+  expect(result).toEqual({ opened: 1, reopened: 0, stillOpen: 0, fixed: 0 })
+
+  const row = db
+    .prepare('SELECT severity, title FROM findings')
+    .get() as { severity: string; title: string }
+  expect(row.severity).toBe('critical')
+  expect(row.title).toBe('yang kritis')
+})
+
+test('urutan duplikat tidak mempengaruhi hasil', () => {
+  reconcile(db, 1, newRun(), 'bugs', [
+    { ...bug('https://a.test/x'), severity: 'critical', title: 'kritis' },
+    { ...bug('https://a.test/x'), severity: 'low', title: 'rendah' },
+  ])
+  const row = db.prepare('SELECT severity FROM findings').get() as { severity: string }
+  expect(row.severity).toBe('critical')
+})

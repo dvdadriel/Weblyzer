@@ -31,6 +31,33 @@ export function fingerprintOf(url: string, rule: string, key = ''): string {
   return createHash('sha256').update(`${url}\n${rule}\n${key}`).digest('hex').slice(0, 16)
 }
 
+/** Urutan keparahan, paling parah lebih dulu. Dipakai untuk memilih pemenang duplikat. */
+const SEVERITY_RANK: Record<Severity, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  info: 4,
+}
+
+/**
+ * Menggabungkan duplikat dalam satu batch: bila url+rule+key sama muncul lebih
+ * dari sekali, yang dipertahankan adalah severity tertinggi — bukan yang pertama
+ * datang. Urutan kedatangan hanyalah artefak urutan DOM/crawl, jadi hasilnya
+ * tidak boleh bergantung padanya.
+ */
+function dedupeBySeverity(incoming: NewFinding[]): { fp: string; finding: NewFinding }[] {
+  const best = new Map<string, { fp: string; finding: NewFinding }>()
+  for (const f of incoming) {
+    const fp = fingerprintOf(f.url, f.rule, f.key ?? '')
+    const current = best.get(fp)
+    const lebihParah =
+      current === undefined || SEVERITY_RANK[f.severity] < SEVERITY_RANK[current.finding.severity]
+    if (lebihParah) best.set(fp, { fp, finding: f })
+  }
+  return [...best.values()]
+}
+
 /**
  * Menyelaraskan temuan tersimpan dengan hasil satu scan.
  *
@@ -49,15 +76,18 @@ export function reconcile(
   category: string,
   incoming: NewFinding[],
 ): ReconcileResult {
-  const priorRows = db
-    .prepare('SELECT fingerprint, status FROM findings WHERE site_id = ? AND category = ?')
-    .all(siteId, category) as { fingerprint: string; status: FindingStatus }[]
-  const prior = new Map(priorRows.map((r) => [r.fingerprint, r.status]))
-
   const result: ReconcileResult = { opened: 0, reopened: 0, stillOpen: 0, fixed: 0 }
+  const deduped = dedupeBySeverity(incoming)
 
-  db.exec('BEGIN')
+  // BEGIN IMMEDIATE, bukan BEGIN biasa: kunci tulis diambil sejak awal sehingga
+  // pembacaan `prior` di bawah tidak bisa disusul penulisan koneksi lain.
+  db.exec('BEGIN IMMEDIATE')
   try {
+    const priorRows = db
+      .prepare('SELECT fingerprint, status FROM findings WHERE site_id = ? AND category = ?')
+      .all(siteId, category) as { fingerprint: string; status: FindingStatus }[]
+    const prior = new Map(priorRows.map((r) => [r.fingerprint, r.status]))
+
     db.prepare(
       `UPDATE findings SET status = 'fixed'
        WHERE site_id = ? AND category = ? AND status = 'open'`,
@@ -73,13 +103,11 @@ export function reconcile(
        SET page_id = ?, severity = ?, title = ?, detail_json = ?,
            last_seen_run = ?,
            status = CASE WHEN status = 'ignored' THEN 'ignored' ELSE 'open' END
-       WHERE site_id = ? AND fingerprint = ?`,
+       WHERE site_id = ? AND category = ? AND fingerprint = ?`,
     )
 
     const seen = new Set<string>()
-    for (const f of incoming) {
-      const fp = fingerprintOf(f.url, f.rule, f.key ?? '')
-      if (seen.has(fp)) continue
+    for (const { fp, finding: f } of deduped) {
       seen.add(fp)
 
       const detail = JSON.stringify(f.detail ?? {})
@@ -100,7 +128,7 @@ export function reconcile(
         )
         result.opened += 1
       } else {
-        refresh.run(f.pageId, f.severity, f.title, detail, runId, siteId, fp)
+        refresh.run(f.pageId, f.severity, f.title, detail, runId, siteId, category, fp)
         if (previous === 'open') result.stillOpen += 1
         else if (previous === 'fixed') result.reopened += 1
       }

@@ -50,7 +50,7 @@ CREATE TABLE findings (
   status         TEXT    NOT NULL DEFAULT 'open',
   first_seen_run INTEGER NOT NULL,
   last_seen_run  INTEGER NOT NULL,
-  UNIQUE(site_id, fingerprint)
+  UNIQUE(site_id, category, fingerprint)
 );
 
 CREATE INDEX idx_findings_lookup ON findings(site_id, category, status);
