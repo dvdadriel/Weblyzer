@@ -3,16 +3,17 @@ import { createSite, listSites, getSite } from '../lib/repos/sites.ts'
 import { createRun, finishRun } from '../lib/repos/runs.ts'
 import { enqueue, requeueInterrupted } from '../lib/queue.ts'
 import { drainQueue } from '../lib/runner.ts'
-import { crawlHandler } from '../lib/jobs/crawl.ts'
+import { scanHandler } from '../lib/jobs/scan.ts'
 import { listPages } from '../lib/repos/pages.ts'
 
-const HANDLERS = { crawl: crawlHandler }
+const HANDLERS = { scan: scanHandler }
 
 const USAGE = `Penggunaan:
-  npm run scan -- add-site <nama> <url>   Menambahkan situs
-  npm run scan -- list                    Menampilkan semua situs
-  npm run scan -- crawl <site-id>         Menjalankan crawl untuk satu situs
-  npm run scan -- pages <site-id>         Menampilkan halaman tersimpan`
+  npm run scan -- add-site <nama> <url>      Menambahkan situs
+  npm run scan -- list                       Menampilkan semua situs
+  npm run scan -- scan <site-id> [kategori]  Memindai situs (kategori: bugs|console)
+  npm run scan -- pages <site-id>            Menampilkan halaman tersimpan
+  npm run scan -- findings <site-id>         Menampilkan temuan terbuka`
 
 async function main(): Promise<number> {
   const [command, ...args] = process.argv.slice(2)
@@ -51,23 +52,32 @@ async function main(): Promise<number> {
       return 0
     }
 
-    case 'crawl': {
+    case 'scan': {
       const siteId = Number(args[0])
       const site = getSite(db, siteId)
       if (!site) {
         console.error(`Situs ${args[0]} tidak ditemukan.`)
         return 1
       }
+      const only = args[1]
+      if (only !== undefined && only !== 'bugs' && only !== 'console') {
+        console.error(`Kategori tidak dikenal: ${only}. Pilih bugs atau console.`)
+        return 1
+      }
 
       // Hanya perintah yang memang menjalankan job yang boleh mengubah antrian.
       // Bila ini dijalankan pada setiap perintah, `list` di terminal lain akan
       // mengembalikan job yang sedang berjalan menjadi 'queued' dan proses
-      // ketiga dapat mengklaim ulang crawl yang masih berlangsung.
+      // ketiga dapat mengklaim ulang pemindaian yang masih berlangsung.
       requeueInterrupted(db)
 
-      const run = createRun(db, site.id, 'crawl')
-      enqueue(db, { runId: run.id, type: 'crawl', payload: { siteId: site.id } })
-      console.log(`Run ${run.id}: crawl ${site.base_url} ...`)
+      const run = createRun(db, site.id, 'full')
+      enqueue(db, {
+        runId: run.id,
+        type: 'scan',
+        payload: only === undefined ? { siteId: site.id } : { siteId: site.id, only },
+      })
+      console.log(`Run ${run.id}: memindai ${site.base_url} ...`)
 
       const summary = await drainQueue(db, HANDLERS, { concurrency: 1 })
 
@@ -84,20 +94,50 @@ async function main(): Promise<number> {
       const ownFailed = Number(own.failed ?? 0)
       finishRun(db, run.id, ownFailed > 0 ? 'failed' : 'done')
 
-      const findings = db
-        .prepare(
-          `SELECT severity, COUNT(*) AS n FROM findings
-           WHERE site_id = ? AND status = 'open' GROUP BY severity`,
-        )
-        .all(site.id) as { severity: string; n: number }[]
+      if (ownFailed > 0) {
+        const err = db
+          .prepare("SELECT error FROM jobs WHERE run_id = ? AND status = 'failed' LIMIT 1")
+          .get(run.id) as { error: string } | undefined
+        console.error(`Gagal: ${err?.error ?? 'tidak diketahui'}`)
+        return 1
+      }
 
       console.log(
         `Selesai — run ini: ${Number(own.total) - ownFailed} job berhasil, ${ownFailed} gagal.`,
       )
       console.log(`Antrian global terkuras: ${summary.done} berhasil, ${summary.failed} gagal.`)
       console.log(`Halaman tersimpan: ${listPages(db, site.id).length}`)
-      for (const f of findings) console.log(`  ${f.severity}: ${f.n}`)
-      return ownFailed > 0 ? 1 : 0
+
+      const rekap = db
+        .prepare(
+          `SELECT category, severity, COUNT(*) AS n FROM findings
+           WHERE site_id = ? AND status = 'open'
+           GROUP BY category, severity ORDER BY category, severity`,
+        )
+        .all(site.id) as { category: string; severity: string; n: number }[]
+      for (const r of rekap) console.log(`  ${r.category}/${r.severity}: ${r.n}`)
+      return 0
+    }
+
+    case 'findings': {
+      const siteId = Number(args[0])
+      const site = getSite(db, siteId)
+      if (!site) {
+        console.error(`Situs ${args[0]} tidak ditemukan.`)
+        return 1
+      }
+      const rows = db
+        .prepare(
+          `SELECT category, severity, rule, title FROM findings
+           WHERE site_id = ? AND status = 'open'
+           ORDER BY category,
+                    CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1
+                                  WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END`,
+        )
+        .all(site.id) as { category: string; severity: string; rule: string; title: string }[]
+      for (const r of rows) console.log(`${r.severity}\t${r.category}\t${r.rule}\t${r.title}`)
+      console.log(`${rows.length} temuan terbuka.`)
+      return 0
     }
 
     default:
