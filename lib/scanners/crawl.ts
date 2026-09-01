@@ -28,7 +28,12 @@ export function normalizeUrl(raw: string): string {
 }
 
 export async function crawl(baseUrl: string, opts: CrawlOptions = {}): Promise<CrawledPage[]> {
-  const maxPages = Math.max(1, Math.floor(opts.maxPages ?? 200))
+  // max_pages berasal dari kolom SQLite tanpa validasi, dan afinitas INTEGER
+  // menyimpan nilai non-numerik apa adanya. `Math.floor('abc')` adalah NaN,
+  // `results.length < NaN` selalu false, dan crawl mengembalikan [] — situs sehat
+  // yang terlihat mati. Tangkap NaN eksplisit, sama seperti runner.ts.
+  const requested = Number(opts.maxPages ?? 200)
+  const maxPages = Number.isFinite(requested) ? Math.max(1, Math.floor(requested)) : 200
   const timeoutMs = opts.timeoutMs ?? 20_000
   const origin = new URL(baseUrl).origin
 
@@ -37,7 +42,7 @@ export async function crawl(baseUrl: string, opts: CrawlOptions = {}): Promise<C
 
   try {
     const context = await browser.newContext()
-    const page = await context.newPage()
+    let page = await context.newPage()
 
     const queue: string[] = [normalizeUrl(baseUrl)]
     const seen = new Set<string>(queue)
@@ -58,6 +63,16 @@ export async function crawl(baseUrl: string, opts: CrawlOptions = {}): Promise<C
         // Halaman gagal dimuat tetap dicatat dengan status 0 agar terlihat di laporan,
         // bukan hilang diam-diam.
         statusCode = 0
+        links = []
+
+        // Navigasi yang gagal meninggalkan page dengan navigasi tertunda ke
+        // chrome-error://chromewebdata/ dan tidak pernah pulih sendiri: setiap
+        // goto berikutnya dibatalkan, sehingga satu halaman rusak mengubah
+        // seluruh situs menjadi status 0 palsu. Membuang page dan membuat yang
+        // baru adalah satu-satunya pemulihan yang terbukti — goto ke
+        // about:blank TIDAK cukup.
+        await page.close().catch(() => {})
+        page = await context.newPage()
       }
 
       results.push({ url, statusCode, loadMs: Date.now() - startedAt, links })
@@ -66,10 +81,13 @@ export async function crawl(baseUrl: string, opts: CrawlOptions = {}): Promise<C
         let normalized: string
         try {
           normalized = normalizeUrl(href)
+          // Awalan string bukan pemeriksaan origin: "https://a.test" juga
+          // menjadi awalan dari a.test.evil.com, a.test.co, dan a.test-b.com.
+          // Origin yang diurai membandingkan skema, host, dan port sesungguhnya.
+          if (new URL(normalized).origin !== origin) continue
         } catch {
           continue
         }
-        if (!normalized.startsWith(origin)) continue
         if (seen.has(normalized)) continue
         seen.add(normalized)
         queue.push(normalized)

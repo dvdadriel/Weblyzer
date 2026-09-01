@@ -16,6 +16,19 @@ export async function crawlHandler(job: Job, db: DatabaseSync): Promise<void> {
   if (!site) throw new Error(`Situs ${siteId} tidak ditemukan`)
 
   const pages = await crawl(site.base_url, { maxPages: site.max_pages })
+
+  // Crawl tidak pernah melempar: situs yang mati mengembalikan satu entri
+  // berstatus 0 tanpa tautan. Merekonsiliasi hasil kosong itu akan menandai
+  // SEMUA temuan lama sebagai "sudah diperbaiki" sambil melaporkan sukses —
+  // kebalikan dari yang sebenarnya terjadi. Lebih baik menggagalkan job.
+  const root = pages[0]
+  if (!root || root.statusCode === 0) {
+    throw new Error(
+      `Situs tidak terjangkau: ${site.base_url} — crawl dibatalkan agar temuan lama ` +
+        `tidak salah ditandai sudah diperbaiki`,
+    )
+  }
+
   const findings: NewFinding[] = []
 
   for (const page of pages) {

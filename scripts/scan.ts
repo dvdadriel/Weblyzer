@@ -17,7 +17,6 @@ const USAGE = `Penggunaan:
 async function main(): Promise<number> {
   const [command, ...args] = process.argv.slice(2)
   const db = getDb()
-  requeueInterrupted(db)
 
   switch (command) {
     case 'add-site': {
@@ -40,6 +39,12 @@ async function main(): Promise<number> {
 
     case 'pages': {
       const siteId = Number(args[0])
+      const site = getSite(db, siteId)
+      if (!site) {
+        console.error(`Situs ${args[0]} tidak ditemukan.`)
+        return 1
+      }
+
       const pages = listPages(db, siteId)
       for (const p of pages) console.log(`${p.status_code}\t${p.load_ms}ms\t${p.url}`)
       console.log(`${pages.length} halaman.`)
@@ -54,12 +59,30 @@ async function main(): Promise<number> {
         return 1
       }
 
+      // Hanya perintah yang memang menjalankan job yang boleh mengubah antrian.
+      // Bila ini dijalankan pada setiap perintah, `list` di terminal lain akan
+      // mengembalikan job yang sedang berjalan menjadi 'queued' dan proses
+      // ketiga dapat mengklaim ulang crawl yang masih berlangsung.
+      requeueInterrupted(db)
+
       const run = createRun(db, site.id, 'crawl')
       enqueue(db, { runId: run.id, type: 'crawl', payload: { siteId: site.id } })
       console.log(`Run ${run.id}: crawl ${site.base_url} ...`)
 
       const summary = await drainQueue(db, HANDLERS, { concurrency: 1 })
-      finishRun(db, run.id, summary.failed > 0 ? 'failed' : 'done')
+
+      // drainQueue menguras antrian GLOBAL, jadi job sisa dari run lama ikut
+      // terhitung di summary. Status run ini harus ditentukan oleh job milik
+      // run ini sendiri — bukan oleh pekerjaan orang lain.
+      const own = db
+        .prepare(
+          `SELECT COUNT(*) AS total,
+                  SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
+           FROM jobs WHERE run_id = ?`,
+        )
+        .get(run.id) as { total: number; failed: number | null }
+      const ownFailed = Number(own.failed ?? 0)
+      finishRun(db, run.id, ownFailed > 0 ? 'failed' : 'done')
 
       const findings = db
         .prepare(
@@ -68,10 +91,13 @@ async function main(): Promise<number> {
         )
         .all(site.id) as { severity: string; n: number }[]
 
-      console.log(`Selesai — ${summary.done} job berhasil, ${summary.failed} gagal.`)
+      console.log(
+        `Selesai — run ini: ${Number(own.total) - ownFailed} job berhasil, ${ownFailed} gagal.`,
+      )
+      console.log(`Antrian global terkuras: ${summary.done} berhasil, ${summary.failed} gagal.`)
       console.log(`Halaman tersimpan: ${listPages(db, site.id).length}`)
       for (const f of findings) console.log(`  ${f.severity}: ${f.n}`)
-      return summary.failed > 0 ? 1 : 0
+      return ownFailed > 0 ? 1 : 0
     }
 
     default:

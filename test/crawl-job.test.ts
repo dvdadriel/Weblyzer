@@ -81,3 +81,53 @@ test('job gagal dengan pesan jelas bila situs tidak ditemukan', async () => {
   }
   expect(failed.error).toContain('999')
 })
+
+test('situs tidak terjangkau membuat job gagal, bukan menandai temuan sudah diperbaiki', async () => {
+  const server = await startFixtureServer('basic')
+  const site = createSite(db, { name: 'Fixture', base_url: server.url, max_pages: 20 })
+
+  const run1 = createRun(db, site.id, 'crawl')
+  enqueue(db, { runId: run1.id, type: 'crawl', payload: { siteId: site.id } })
+  await drainQueue(db, { crawl: crawlHandler }, { concurrency: 1 })
+
+  const before = db
+    .prepare("SELECT COUNT(*) AS n FROM findings WHERE status = 'open'")
+    .get() as { n: number }
+  expect(Number(before.n)).toBe(1)
+
+  await server.close() // situs kini mati
+
+  const run2 = createRun(db, site.id, 'crawl')
+  enqueue(db, { runId: run2.id, type: 'crawl', payload: { siteId: site.id } })
+  const summary = await drainQueue(db, { crawl: crawlHandler }, { concurrency: 1 })
+
+  expect(summary).toEqual({ done: 0, failed: 1 })
+
+  const after = db
+    .prepare("SELECT COUNT(*) AS n FROM findings WHERE status = 'open'")
+    .get() as { n: number }
+  expect(Number(after.n)).toBe(1) // masih open, TIDAK ditandai fixed
+
+  const failed = db.prepare("SELECT error FROM jobs WHERE status = 'failed'").get() as {
+    error: string
+  }
+  expect(failed.error).toContain('tidak terjangkau')
+})
+
+test('max_pages yang bukan angka tidak menghasilkan crawl kosong', async () => {
+  const server = await startFixtureServer('basic')
+  try {
+    const site = createSite(db, { name: 'F', base_url: server.url })
+    db.prepare("UPDATE sites SET max_pages = 'abc' WHERE id = ?").run(site.id)
+
+    const run = createRun(db, site.id, 'crawl')
+    enqueue(db, { runId: run.id, type: 'crawl', payload: { siteId: site.id } })
+    const summary = await drainQueue(db, { crawl: crawlHandler }, { concurrency: 1 })
+
+    expect(summary).toEqual({ done: 1, failed: 0 })
+    const pages = db.prepare('SELECT COUNT(*) AS n FROM pages').get() as { n: number }
+    expect(Number(pages.n)).toBeGreaterThanOrEqual(4)
+  } finally {
+    await server.close()
+  }
+})
