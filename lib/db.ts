@@ -25,7 +25,15 @@ export function migrate(db: DatabaseSync): void {
       db.prepare('INSERT INTO schema_migrations (name) VALUES (?)').run(file)
       db.exec('COMMIT')
     } catch (err) {
-      db.exec('ROLLBACK')
+      // ROLLBACK sendiri bisa melempar bila file migrasi memuat COMMIT-nya
+      // sendiri sehingga tidak ada lagi transaksi aktif. Kalau itu dibiarkan,
+      // error rollback menggantikan penyebab aslinya dan migrasi jadi mustahil
+      // didiagnosis. Penyebab asli selalu menang.
+      try {
+        db.exec('ROLLBACK')
+      } catch {
+        // sengaja diabaikan
+      }
       throw err
     }
   }
@@ -36,6 +44,9 @@ export function openDb(path: string): DatabaseSync {
   const db = new DatabaseSync(path)
   if (path !== ':memory:') db.exec('PRAGMA journal_mode = WAL')
   db.exec('PRAGMA foreign_keys = ON')
+  // Tanpa ini koneksi kedua langsung gagal "database is locked" alih-alih
+  // menunggu giliran. Scheduler dan CLI bisa berjalan bersamaan.
+  db.exec('PRAGMA busy_timeout = 5000')
   migrate(db)
   return db
 }
