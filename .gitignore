@@ -5,3 +5,10 @@ data.db-wal
 data.db-shm
 test-results/
 *.log
+.claude-flow/
+.claude/
+docs/
+ruvector.db
+.claude/
+.claude-flow/
+docs/
