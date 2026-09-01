@@ -5,15 +5,19 @@ import { enqueue, requeueInterrupted } from '../lib/queue.ts'
 import { drainQueue } from '../lib/runner.ts'
 import { scanHandler } from '../lib/jobs/scan.ts'
 import { listPages } from '../lib/repos/pages.ts'
+import { lighthouseHandler } from '../lib/jobs/lighthouse.ts'
+import { skorTerakhir } from '../lib/repos/lighthouse.ts'
 
-const HANDLERS = { scan: scanHandler }
+const HANDLERS = { scan: scanHandler, lighthouse: lighthouseHandler }
 
 const USAGE = `Penggunaan:
   npm run scan -- add-site <nama> <url>      Menambahkan situs
   npm run scan -- list                       Menampilkan semua situs
   npm run scan -- scan <site-id> [kategori]  Memindai situs (kategori: bugs|console|security)
   npm run scan -- pages <site-id>            Menampilkan halaman tersimpan
-  npm run scan -- findings <site-id>         Menampilkan temuan terbuka`
+  npm run scan -- findings <site-id>         Menampilkan temuan terbuka
+  npm run scan -- lighthouse <site-id>       Mengukur skor Lighthouse
+  npm run scan -- scores <site-id>           Menampilkan skor terakhir`
 
 async function main(): Promise<number> {
   const [command, ...args] = process.argv.slice(2)
@@ -140,6 +144,82 @@ async function main(): Promise<number> {
         console.log(`${r.severity}\t${r.category}\t${r.rule}\t${judul}`)
       }
       console.log(`${rows.length} temuan terbuka.`)
+      return 0
+    }
+
+    case 'lighthouse': {
+      const siteId = Number(args[0])
+      const site = getSite(db, siteId)
+      if (!site) {
+        console.error(`Situs ${args[0]} tidak ditemukan.`)
+        return 1
+      }
+
+      requeueInterrupted(db)
+
+      const run = createRun(db, site.id, 'lighthouse')
+      enqueue(db, { runId: run.id, type: 'lighthouse', payload: { siteId: site.id } })
+      console.log(
+        `Run ${run.id}: mengukur ${site.base_url} (mode ${site.lighthouse_mode}, ` +
+          `${site.lighthouse_strategy}) — sekitar 11 detik per halaman ...`,
+      )
+
+      const summary = await drainQueue(db, HANDLERS, { concurrency: 1 })
+
+      const own = db
+        .prepare(
+          `SELECT COUNT(*) AS total,
+                  SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
+           FROM jobs WHERE run_id = ?`,
+        )
+        .get(run.id) as { total: number; failed: number | null }
+      const ownFailed = Number(own.failed ?? 0)
+      finishRun(db, run.id, ownFailed > 0 ? 'failed' : 'done')
+
+      if (ownFailed > 0) {
+        const err = db
+          .prepare("SELECT error FROM jobs WHERE run_id = ? AND status = 'failed' LIMIT 1")
+          .get(run.id) as { error: string } | undefined
+        console.error(`Gagal: ${err?.error ?? 'tidak diketahui'}`)
+        return 1
+      }
+
+      console.log(
+        `Selesai — run ini: ${Number(own.total) - ownFailed} job berhasil, ${ownFailed} gagal.`,
+      )
+      console.log(`Antrian global terkuras: ${summary.done} berhasil, ${summary.failed} gagal.`)
+
+      const skor = skorTerakhir(db, site.id)
+      console.log(`${skor.length} pengukuran tersimpan.`)
+
+      const rekap = db
+        .prepare(
+          `SELECT severity, COUNT(*) AS n FROM findings
+           WHERE site_id = ? AND category = 'lighthouse' AND status = 'open'
+           GROUP BY severity ORDER BY severity`,
+        )
+        .all(site.id) as { severity: string; n: number }[]
+      for (const r of rekap) console.log(`  lighthouse/${r.severity}: ${r.n}`)
+      return 0
+    }
+
+    case 'scores': {
+      const siteId = Number(args[0])
+      const site = getSite(db, siteId)
+      if (!site) {
+        console.error(`Situs ${args[0]} tidak ditemukan.`)
+        return 1
+      }
+      const rows = skorTerakhir(db, site.id)
+      if (rows.length === 0) {
+        console.log('Belum ada pengukuran. Jalankan: npm run scan -- lighthouse ' + site.id)
+        return 0
+      }
+      console.log('perf\ta11y\tbest\tseo\tstrategy\turl')
+      for (const r of rows) {
+        console.log(`${r.perf}\t${r.a11y}\t${r.best_practices}\t${r.seo}\t${r.strategy}\t${r.url}`)
+      }
+      console.log(`${rows.length} pengukuran.`)
       return 0
     }
 
