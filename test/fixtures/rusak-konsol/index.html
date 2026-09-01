@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <title>Halaman Berisik</title>
+  </head>
+  <body>
+    <h1>Halaman Berisik</h1>
+    <p>Halaman ini sengaja memancarkan error dan warning.</p>
+    <img src="/gambar-hilang.png" alt="Gambar hilang" />
+    <script>
+      console.warn('peringatan pertama')
+      console.error('kesalahan pertama')
+      fetch('/api-hilang.json')
+    </script>
+    <script>
+      // Lemparan sinkron, bukan di dalam setTimeout: `pageerror` dijamin
+      // terpancar saat parsing, sebelum navigasi selesai. Dengan setTimeout
+      // test-nya bergantung pada balapan waktu dan akan berkedip.
+      throw new Error('meledak setelah muat')
+    </script>
+  </body>
+</html>
