@@ -1,5 +1,4 @@
 import type { DatabaseSync } from 'node:sqlite'
-import { createServer } from 'node:net'
 import type { Job } from '../queue.ts'
 import { getSite } from '../repos/sites.ts'
 import { listPages } from '../repos/pages.ts'
@@ -19,14 +18,6 @@ import type { PageIdMap } from '../analyzers/bugs.ts'
  * `drainQueue` menjalankan tiga job sekaligus secara bawaan, jadi dua situs
  * yang diukur pada malam yang sama sudah cukup.
  */
-async function portBebas(): Promise<number> {
-  const server = createServer()
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
-  const { port } = server.address() as { port: number }
-  await new Promise<void>((r) => server.close(() => r()))
-  return port
-}
-
 /**
  * Mengukur Lighthouse untuk halaman yang dipilih anggaran, menyimpan skornya,
  * lalu merekonsiliasi audit binary sebagai temuan.
@@ -58,7 +49,8 @@ export async function lighthouseHandler(job: Job, db: DatabaseSync): Promise<voi
     for (const strategy of strategies) targets.push({ url: h.url, strategy })
   }
 
-  const hasil = await runLighthouse(targets, { port: await portBebas() })
+  // Port debugging dialokasikan runner itu sendiri: satu tempat, bukan dua.
+  const hasil = await runLighthouse(targets)
 
   const pageIds: PageIdMap = {}
   const idPerUrl = new Map(dipilih.map((h) => [h.url, h.id]))

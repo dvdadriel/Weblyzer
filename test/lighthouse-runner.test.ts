@@ -81,3 +81,24 @@ test('daftar kosong tidak menyalakan browser', async () => {
   const hasil = await runLighthouse([])
   expect(hasil).toEqual([])
 })
+
+test('dua pengukuran serentak dalam satu proses tidak saling menjatuhkan', async () => {
+  // Lighthouse menyimpan performance.mark() global per proses, jadi port
+  // debugging berbeda tidak cukup. Tanpa serialisasi, salah satu panggilan
+  // gagal dengan "performance mark has not been set" dan pengukurannya hilang
+  // tanpa suara — dan scheduler nanti berjalan dengan concurrency 3.
+  const server = await serverDengan((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html' })
+    res.end(HALAMAN)
+  })
+  try {
+    const [a, b] = await Promise.all([
+      runLighthouse([{ url: server.url, strategy: 'mobile' }]),
+      runLighthouse([{ url: server.url, strategy: 'mobile' }]),
+    ])
+    expect(a[0]!.error).toBeUndefined()
+    expect(b[0]!.error).toBeUndefined()
+  } finally {
+    await server.close()
+  }
+}, 180_000)

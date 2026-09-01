@@ -1,3 +1,4 @@
+import { createServer } from 'node:net'
 import { chromium, type Browser } from 'playwright'
 import lighthouse from 'lighthouse'
 
@@ -44,6 +45,55 @@ function persen(nilai: number | null | undefined): number {
 }
 
 /**
+ * Meminta port bebas dari sistem operasi.
+ *
+ * Port debugging bersifat global se-mesin, jadi angka tetap seperti 9222 membuat
+ * dua pengukuran yang berjalan bersamaan menempel ke browser yang sama dan gagal
+ * dengan "An internal Chrome error occurred". Itu bukan masalah test saja:
+ * `drainQueue` berjalan dengan concurrency 3, sehingga dua situs yang diukur di
+ * malam yang sama akan bertabrakan.
+ *
+ * ponytail: socket probe ditutup sebelum Chromium mengikatnya, jadi ada celah
+ * TOCTOU kecil. Sistem operasi praktis tidak pernah memberikan port ephemeral
+ * yang sama dua kali berdekatan; kalau kelak terbukti bertabrakan, jalur
+ * peningkatannya adalah menahan socket tetap terbuka dan menyerahkan
+ * file descriptor-nya, atau mencoba ulang sekali dengan port baru.
+ */
+async function portBebas(): Promise<number> {
+  const server = createServer()
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
+  const { port } = server.address() as { port: number }
+  await new Promise<void>((r) => server.close(() => r()))
+  return port
+}
+
+/**
+ * Rantai antrian se-proses. Lighthouse menyimpan `performance.mark()` secara
+ * global **per proses**, jadi port debugging yang berbeda tidak cukup: dua
+ * panggilan `runLighthouse` yang berjalan bersamaan tetap saling menimpa dan
+ * salah satunya gagal dengan "The 'start lh:runner:gather' performance mark has
+ * not been set" — kehilangan pengukuran tanpa suara.
+ *
+ * Terukur: dua panggilan serentak menghasilkan satu skor 100 dan satu error.
+ * Ini penting di produksi, bukan cuma di test — `drainQueue` berjalan dengan
+ * concurrency 3, sehingga dua situs yang diukur di malam yang sama akan kena.
+ *
+ * Antrian, bukan penolakan: pemanggil kedua menunggu, tidak kehilangan
+ * pekerjaannya.
+ */
+let rantai: Promise<unknown> = Promise.resolve()
+
+function berbaris<T>(kerja: () => Promise<T>): Promise<T> {
+  const hasil = rantai.then(kerja, kerja)
+  // Rantai tidak boleh putus karena satu kegagalan.
+  rantai = hasil.then(
+    () => undefined,
+    () => undefined,
+  )
+  return hasil
+}
+
+/**
  * Menjalankan Lighthouse untuk sederet target, **berurutan**.
  *
  * Berurutan bukan pilihan gaya: Lighthouse memakai `performance.mark()` global,
@@ -60,8 +110,14 @@ export async function runLighthouse(
   opts: { port?: number } = {},
 ): Promise<LighthouseResult[]> {
   if (targets.length === 0) return []
+  return berbaris(() => jalankanBerurutan(targets, opts))
+}
 
-  const port = opts.port ?? 9222
+async function jalankanBerurutan(
+  targets: LighthouseTarget[],
+  opts: { port?: number },
+): Promise<LighthouseResult[]> {
+  const port = opts.port ?? (await portBebas())
   const hasil: LighthouseResult[] = []
   const browser: Browser = await chromium.launch({
     args: [`--remote-debugging-port=${port}`],
