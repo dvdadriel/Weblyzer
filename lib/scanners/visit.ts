@@ -40,9 +40,13 @@ export type PageVisit = {
   failedRequests: FailedRequest[]
   resources: ResourceResult[]
   responseHeaders: Record<string, string>
-  /** Header Set-Cookie apa adanya. `headers()` menggabungkan beberapa nilai
-   *  menjadi satu string, sehingga flag per cookie tidak lagi bisa dibedakan —
-   *  karena itu diambil dari headersArray(). */
+  /** Header Set-Cookie apa adanya, satu entri per cookie.
+   *
+   *  Diambil dari `headersArray()` karena `headers()` **tidak memuat Set-Cookie
+   *  sama sekali** — bukan menggabungkannya, melainkan menghilangkannya
+   *  (terverifikasi: `responseHeaders['set-cookie']` adalah undefined pada
+   *  respons yang jelas mengirim dua cookie). Jadi ini satu-satunya sumbernya,
+   *  dan bentuk array-nya sekaligus menjaga flag tiap cookie tetap terpisah. */
   setCookies: string[]
   /** Pesan kegagalan navigasi, bila ada. */
   error?: string
