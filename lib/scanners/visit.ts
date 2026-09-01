@@ -31,6 +31,7 @@ export type PageVisit = {
   title: string
   /** Panjang teks terlihat, untuk mengenali halaman yang termuat tapi kosong. */
   textLength: number
+  mediaCount: number
   console: ConsoleEntry[]
   pageErrors: string[]
   failedRequests: FailedRequest[]
@@ -52,6 +53,10 @@ export type VisitOptions = {
  */
 export function normalizeUrl(raw: string): string {
   const url = new URL(raw)
+  // Skema non-khusus (mailto:, javascript:, about:) tidak punya host, dan
+  // menyusunnya kembali menghasilkan string ngawur alih-alih error. Memilih
+  // melempar supaya pemanggil berikutnya mendapat kesalahan yang bisa ditangkap.
+  if (url.host === '') throw new Error(`URL tanpa host: ${raw}`)
   url.hash = ''
   url.searchParams.sort()
   const path = url.pathname === '/' ? '/' : url.pathname.replace(/\/+$/, '')
@@ -106,6 +111,7 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
       const pageErrors: string[] = []
       const failedRequests: FailedRequest[] = []
       const resources: ResourceResult[] = []
+      const resourceSeen = new Set<string>()
 
       const onConsole = (msg: { type: () => string; text: () => string }) => {
         const type = msg.type()
@@ -127,12 +133,16 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
         url: () => string
         status: () => number
         request: () => { resourceType: () => string }
-      }) =>
+      }) => {
+        const identitas = `${res.url()}\n${res.status()}`
+        if (resourceSeen.has(identitas)) return
+        resourceSeen.add(identitas)
         resources.push({
           url: res.url(),
           status: res.status(),
           resourceType: res.request().resourceType(),
         })
+      }
 
       page.on('console', onConsole)
       page.on('pageerror', onPageError)
@@ -145,6 +155,7 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
       let links: string[] = []
       let title = ''
       let textLength = 0
+      let mediaCount = 0
       let responseHeaders: Record<string, string> = {}
       let error: string | undefined
 
@@ -159,6 +170,19 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
         // waitUntil:'load' langsung akan membuat satu request menggantung
         // menggagalkan seluruh halaman dan melaporkannya critical palsu.
         await page.waitForLoadState('load', { timeout: 5_000 }).catch(() => {})
+        // `load` menyala saat jaringan senyap, sementara halaman yang dirender
+        // klien baru menuliskan isinya beberapa saat kemudian. Tanpa jeda ini
+        // setiap rute React/Vue terukur 0 karakter dan aturan blank-page akan
+        // mengarang temuan. Halaman yang isinya sudah ada kembali seketika,
+        // jadi biayanya hanya dibayar halaman yang benar-benar kosong.
+        // Argumen kedua `waitForFunction` adalah `arg` untuk fungsi halaman,
+        // bukan opsi; menaruh `{ timeout }` di sana membuat batas waktunya
+        // jatuh ke default 30 detik dan setiap halaman pendek menggantung.
+        await page
+          .waitForFunction(() => (document.body?.innerText.trim().length ?? 0) >= 50, undefined, {
+            timeout: 1_500,
+          })
+          .catch(() => {})
         if (response) {
           statusCode = response.status()
           finalUrl = normalizeUrl(response.url())
@@ -169,6 +193,7 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
           anchors.map((a) => (a as HTMLAnchorElement).href),
         )
         title = await page.title()
+        mediaCount = await page.$$eval('img, video, iframe, canvas, picture', (els) => els.length)
         textLength = await page.evaluate(() => document.body?.innerText.trim().length ?? 0)
       } catch (err) {
         // Navigasi yang gagal meninggalkan page dengan navigasi tertunda ke
@@ -177,7 +202,18 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
         // seluruh situs menjadi status 0 palsu. Membuang page dan membuat yang
         // baru adalah satu-satunya pemulihan yang terbukti.
         error = err instanceof Error ? err.message : String(err)
-        statusCode = 0
+        // Status sesungguhnya sudah tertangkap di `resources` sebelum navigasi
+        // kehabisan waktu. Membuangnya berarti melaporkan halaman hidup sebagai
+        // tidak terjangkau — temuan critical yang dikarang.
+        //
+        // Hop 3xx dikecualikan: pada redirect berputar seluruh entri document
+        // adalah 302, dan memungutnya akan menutupi bahwa tidak ada dokumen yang
+        // pernah tiba — aturan redirect-loop bergantung pada status 0. Yang
+        // dicari adalah dokumen terakhir yang sungguh terkirim.
+        const dokumen = resources.findLast(
+          (r) => r.resourceType === 'document' && (r.status < 300 || r.status >= 400),
+        )
+        statusCode = dokumen?.status ?? 0
         links = []
         page.off('console', onConsole)
         page.off('pageerror', onPageError)
@@ -201,6 +237,7 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
         links,
         title,
         textLength,
+        mediaCount,
         console: consoleEntries,
         pageErrors,
         failedRequests,

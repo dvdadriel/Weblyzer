@@ -12,6 +12,7 @@ function pageVisit(patch: Partial<PageVisit> = {}): PageVisit {
     links: [],
     title: 'Judul',
     textLength: 500,
+    mediaCount: 0,
     console: [],
     pageErrors: [],
     failedRequests: [],

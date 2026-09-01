@@ -48,14 +48,26 @@ export function analyzeBugs(visits: PageVisit[], pageIds: PageIdMap = {}): NewFi
         title: `HTTP ${v.statusCode} pada ${v.url}`,
         detail: { statusCode: v.statusCode, loadMs: v.loadMs },
       })
-    } else if (v.textLength < TEKS_MINIMAL) {
+    } else if (v.error !== undefined) {
+      // Statusnya sehat, jadi halamannya hidup — yang gagal adalah
+      // penyelesaian navigasinya. Melaporkannya "tidak terjangkau" adalah
+      // karangan, tapi mendiamkannya juga salah: sesuatu menggantung.
+      findings.push({
+        url: v.url,
+        pageId,
+        severity: 'medium',
+        rule: 'load-timeout',
+        title: `Halaman termuat tetapi tidak pernah selesai: ${v.url}`,
+        detail: { statusCode: v.statusCode, loadMs: v.loadMs, error: v.error },
+      })
+    } else if (v.textLength < TEKS_MINIMAL && v.mediaCount === 0) {
       findings.push({
         url: v.url,
         pageId,
         severity: 'high',
         rule: 'blank-page',
         title: `Halaman termuat tetapi nyaris kosong: ${v.url}`,
-        detail: { textLength: v.textLength, title: v.title },
+        detail: { textLength: v.textLength, title: v.title, mediaCount: v.mediaCount },
       })
     }
 

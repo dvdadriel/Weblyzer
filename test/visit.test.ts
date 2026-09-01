@@ -72,6 +72,64 @@ test('mencatat teks terlihat agar halaman kosong dapat dikenali', async () => {
   }
 })
 
+test('isi yang dirender setelah load tetap terukur', async () => {
+  const server = await startFixtureServer('spa')
+  try {
+    const [page] = await visit(server.url, { maxPages: 1 })
+    expect(page!.textLength).toBeGreaterThanOrEqual(50)
+  } finally {
+    await server.close()
+  }
+})
+
+test('mencatat jumlah media agar halaman gambar-saja tidak dianggap kosong', async () => {
+  const server = await startFixtureServer('rusak-konsol')
+  try {
+    const [page] = await visit(server.url, { maxPages: 1 })
+    expect(page!.mediaCount).toBeGreaterThanOrEqual(1)
+  } finally {
+    await server.close()
+  }
+})
+
+test('resource yang dirujuk dua kali hanya tercatat sekali', async () => {
+  const server = await startFixtureServer('kembar')
+  try {
+    const [page] = await visit(server.url, { maxPages: 1 })
+    const hilang = page!.resources.filter((r) => r.url.endsWith('/hilang.png'))
+    expect(hilang).toHaveLength(1)
+  } finally {
+    await server.close()
+  }
+})
+
+test('URL tanpa host ditolak alih-alih dikembalikan ngawur', () => {
+  for (const raw of ['mailto:a@b.test', 'javascript:void 0', 'about:blank']) {
+    expect(() => normalizeUrl(raw)).toThrow(/tanpa host/)
+  }
+})
+
+test('status dokumen dipulihkan ketika navigasi kehabisan waktu', async () => {
+  const { createServer } = await import('node:http')
+  const server = createServer((req, res) => {
+    if (req.url === '/menggantung.js') return // sengaja tidak pernah menjawab
+    res.writeHead(200, { 'content-type': 'text/html' })
+    res.end(
+      '<!doctype html><title>Hidup</title><script src="/menggantung.js"></script><h1>Halaman ini hidup</h1>',
+    )
+  })
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
+  const port = (server.address() as { port: number }).port
+
+  try {
+    const [page] = await visit(`http://127.0.0.1:${port}`, { maxPages: 1, timeoutMs: 3_000 })
+    expect(page!.error).toBeDefined()
+    expect(page!.statusCode).toBe(200) // bukan 0
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()))
+  }
+})
+
 test('navigasi yang melempar dicatat dengan error dan tidak menular', async () => {
   const { createServer } = await import('node:http')
   const server = createServer((req, res) => {

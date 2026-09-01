@@ -12,6 +12,7 @@ function pageVisit(patch: Partial<PageVisit> = {}): PageVisit {
     links: [],
     title: 'Judul',
     textLength: 500,
+    mediaCount: 0,
     console: [],
     pageErrors: [],
     failedRequests: [],
@@ -99,6 +100,36 @@ test('halaman 200 yang nyaris tanpa teks dilaporkan sebagai blank-page', () => {
 test('halaman error tidak ikut dilaporkan sebagai blank-page', () => {
   const findings = analyzeBugs([pageVisit({ statusCode: 404, textLength: 0 })])
   expect(findings.map((f) => f.rule)).toEqual(['http-error'])
+})
+
+test('halaman gambar-saja tidak dilaporkan sebagai blank-page', () => {
+  const findings = analyzeBugs([pageVisit({ textLength: 0, mediaCount: 4 })])
+  expect(findings).toEqual([])
+})
+
+test('halaman tanpa teks dan tanpa media tetap blank-page', () => {
+  const findings = analyzeBugs([pageVisit({ textLength: 0, mediaCount: 0 })])
+  expect(findings.map((f) => f.rule)).toEqual(['blank-page'])
+})
+
+test('halaman 200 yang navigasinya kehabisan waktu dilaporkan load-timeout, bukan gagal dimuat', () => {
+  const findings = analyzeBugs([
+    pageVisit({
+      statusCode: 200,
+      textLength: 0,
+      error: 'page.goto: Timeout 20000ms exceeded',
+    }),
+  ])
+  expect(findings.map((f) => f.rule)).toEqual(['load-timeout'])
+  expect(findings[0]!.severity).toBe('medium')
+})
+
+test('halaman yang sungguh tidak terjangkau tetap critical', () => {
+  const findings = analyzeBugs([
+    pageVisit({ statusCode: 0, error: 'page.goto: net::ERR_CONNECTION_REFUSED' }),
+  ])
+  expect(findings.map((f) => f.rule)).toEqual(['http-error'])
+  expect(findings[0]!.severity).toBe('critical')
 })
 
 test('setiap temuan membawa pageId bila dipetakan', () => {
