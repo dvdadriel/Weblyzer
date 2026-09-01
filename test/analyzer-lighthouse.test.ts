@@ -97,3 +97,19 @@ test('temuan membawa pageId bila dipetakan', () => {
 test('daftar kosong menghasilkan temuan kosong', () => {
   expect(analyzeLighthouse([])).toEqual([])
 })
+
+test('audit yang mengamati kejadian, bukan struktur, tidak dilaporkan', () => {
+  // errors-in-console bertipe binary tetapi bergantung pada apa yang terjadi
+  // saat halaman dimuat: terukur berkedip 22 -> 23 di dua run berurutan. Dan
+  // analyzer console sudah melaporkannya per pesan, jauh lebih berguna.
+  const findings = analyzeLighthouse([
+    hasil({
+      audits: [
+        { id: 'errors-in-console', title: 'Browser errors were logged', score: 0, displayMode: 'binary' },
+        binary('image-alt'),
+      ],
+    }),
+  ])
+  expect(findings.map((f) => f.detail)).toHaveLength(1)
+  expect(findings[0]!.key).toContain('image-alt')
+})

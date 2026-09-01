@@ -13,7 +13,27 @@ import type { PageIdMap } from './bugs.ts'
  * berurutan. Menjadikannya temuan berarti riwayat "sudah diperbaiki" penuh
  * kebohongan setiap malam. Skornya sendiri disimpan di tabel `lighthouse`,
  * tempat fluktuasi memang wajar karena itu pengukuran bertanggal.
+ *
+ * Ditambah satu pengecualian yang ditemukan dari pemakaian nyata: `binary` saja
+ * tidak cukup, karena beberapa audit binary mengamati **perilaku runtime**
+ * alih-alih struktur halaman. Lihat `DIAMATI_DI_TEMPAT_LAIN`.
  */
+/**
+ * Audit binary yang tetap dilewati, karena mengamati perilaku saat halaman
+ * dimuat — bukan struktur halaman — sehingga hasilnya berubah antar muat.
+ *
+ * `errors-in-console`: terukur berkedip di pemakaian nyata (22 → 23 temuan di
+ * dua pengukuran berurutan springair.co.id, tanpa apa pun berubah di situs).
+ * Dan aturan ini duplikat: analyzer `console` sudah melaporkan error konsol
+ * per pesan dengan kunci yang distabilkan, sedangkan Lighthouse hanya bilang
+ * "ada error" tanpa menyebut isinya.
+ *
+ * Syarat masuk daftar ini: audit harus mengamati kejadian, bukan struktur, DAN
+ * sudah terlihat berkedip atau sudah dilaporkan lebih baik di kategori lain.
+ * Bukan tempat menyembunyikan audit yang merepotkan.
+ */
+const DIAMATI_DI_TEMPAT_LAIN = new Set(['errors-in-console'])
+
 export function analyzeLighthouse(
   results: LighthouseResult[],
   pageIds: PageIdMap = {},
@@ -28,6 +48,7 @@ export function analyzeLighthouse(
 
     for (const audit of r.audits) {
       if (audit.displayMode !== 'binary') continue
+      if (DIAMATI_DI_TEMPAT_LAIN.has(audit.id)) continue
       findings.push({
         url: r.url,
         pageId: pageIds[r.url] ?? null,
