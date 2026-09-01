@@ -1,10 +1,21 @@
 import type { NewFinding } from '../findings.ts'
 import type { PageVisit } from '../scanners/visit.ts'
+import { normalizeUrl } from '../url.ts'
 
 /** Peta URL halaman ke `pages.id`, agar temuan dapat merujuk barisnya. */
 export type PageIdMap = Record<string, number>
 
 const TEKS_MINIMAL = 50
+
+/** Apakah URL resource ini adalah dokumen halaman itu sendiri (bukan iframe)? */
+function sendiri(resourceUrl: string, v: PageVisit): boolean {
+  try {
+    const n = normalizeUrl(resourceUrl)
+    return n === v.url || n === v.finalUrl
+  } catch {
+    return false
+  }
+}
 
 /**
  * Menilai hasil kunjungan sebagai bug fungsional — hal yang rusak bagi
@@ -84,6 +95,12 @@ export function analyzeBugs(visits: PageVisit[], pageIds: PageIdMap = {}): NewFi
 
     for (const r of v.resources) {
       if (r.status < 400) continue
+      // Respons dokumen milik halaman ini sendiri sudah dilaporkan sebagai
+      // http-error di atas. Melaporkannya kembali sebagai resource rusak
+      // membuat satu halaman 500 muncul dua kali dengan dua nama berbeda.
+      // Dibandingkan setelah dinormalisasi karena urutan parameter query pada
+      // URL request tidak sama dengan bentuk tersimpan halaman.
+      if (r.resourceType === 'document' && sendiri(r.url, v)) continue
       findings.push({
         url: v.url,
         pageId,

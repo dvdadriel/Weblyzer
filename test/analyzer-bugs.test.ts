@@ -132,6 +132,30 @@ test('halaman yang sungguh tidak terjangkau tetap critical', () => {
   expect(findings[0]!.severity).toBe('critical')
 })
 
+test('respons dokumen halaman itu sendiri tidak dilaporkan dua kali', () => {
+  const findings = analyzeBugs([
+    pageVisit({
+      url: 'https://a.test/x?a=1&b=2',
+      finalUrl: 'https://a.test/x?a=1&b=2',
+      statusCode: 500,
+      resources: [
+        // Urutan query pada URL request berbeda dari bentuk tersimpan.
+        { url: 'https://a.test/x?b=2&a=1', status: 500, resourceType: 'document' },
+      ],
+    }),
+  ])
+  expect(findings.map((f) => f.rule)).toEqual(['http-error'])
+})
+
+test('iframe yang rusak tetap dilaporkan sebagai broken-resource', () => {
+  const findings = analyzeBugs([
+    pageVisit({
+      resources: [{ url: 'https://a.test/sisipan', status: 404, resourceType: 'document' }],
+    }),
+  ])
+  expect(findings.map((f) => f.rule)).toEqual(['broken-resource'])
+})
+
 test('setiap temuan membawa pageId bila dipetakan', () => {
   const findings = analyzeBugs([pageVisit({ statusCode: 404 })], {
     'https://a.test/x': 42,

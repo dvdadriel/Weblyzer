@@ -42,6 +42,12 @@ export function analyzeConsole(visits: PageVisit[], pageIds: PageIdMap = {}): Ne
     }
 
     for (const entry of v.console) {
+      // Chromium memancarkan pesan ini sendiri untuk setiap subresource yang
+      // gagal. Aturan broken-resource sudah melaporkan fakta yang sama beserta
+      // URL dan status-nya sebagai field terstruktur, sedangkan pesan ini bahkan
+      // tidak menyebut URL-nya. Menyimpan keduanya berarti satu gambar rusak
+      // muncul di dua tab.
+      if (entry.text.startsWith('Failed to load resource')) continue
       tambah({
         url: v.url,
         pageId,
@@ -53,7 +59,28 @@ export function analyzeConsole(visits: PageVisit[], pageIds: PageIdMap = {}): Ne
       })
     }
 
+    // Permintaan pihak ketiga (beacon analytics, pixel iklan) gagal atau
+    // diblokir sesuai selera jaringan dan pemblokir, bukan karena ada yang
+    // rusak di situs ini. Melaporkannya bukan cuma bising: statusnya berubah
+    // antar run, sehingga temuan ditandai "sudah diperbaiki" tanpa ada yang
+    // diperbaiki, dan riwayat open/fixed kehilangan artinya.
+    let originHalaman: string | null = null
+    try {
+      originHalaman = new URL(v.url).origin
+    } catch {
+      originHalaman = null
+    }
+
     for (const req of v.failedRequests) {
+      if (originHalaman !== null) {
+        let originReq: string
+        try {
+          originReq = new URL(req.url).origin
+        } catch {
+          continue
+        }
+        if (originReq !== originHalaman) continue
+      }
       tambah({
         url: v.url,
         pageId,

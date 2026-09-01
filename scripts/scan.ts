@@ -135,7 +135,10 @@ async function main(): Promise<number> {
                                   WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END`,
         )
         .all(site.id) as { category: string; severity: string; rule: string; title: string }[]
-      for (const r of rows) console.log(`${r.severity}\t${r.category}\t${r.rule}\t${r.title}`)
+      for (const r of rows) {
+        const judul = r.title.length > 110 ? `${r.title.slice(0, 107)}...` : r.title
+        console.log(`${r.severity}\t${r.category}\t${r.rule}\t${judul}`)
+      }
       console.log(`${rows.length} temuan terbuka.`)
       return 0
     }

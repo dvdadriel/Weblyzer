@@ -106,6 +106,55 @@ test('halaman yang gagal dimuat tidak dilaporkan konsolnya', () => {
   expect(findings).toEqual([])
 })
 
+test('gaung Chromium tentang resource gagal tidak diulang di tab konsol', () => {
+  const findings = analyzeConsole([
+    pageVisit({
+      console: [
+        {
+          level: 'error',
+          text: 'Failed to load resource: the server responded with a status of 500 ()',
+        },
+        { level: 'error', text: 'Kesalahan sungguhan dari situs' },
+      ],
+    }),
+  ])
+  expect(findings).toHaveLength(1)
+  expect(findings[0]!.title).toContain('Kesalahan sungguhan')
+})
+
+test('permintaan pihak ketiga yang gagal tidak dilaporkan', () => {
+  const findings = analyzeConsole([
+    pageVisit({
+      url: 'https://a.test/x',
+      failedRequests: [
+        {
+          url: 'https://analytics.google.com/g/collect?v=2',
+          resourceType: 'fetch',
+          failure: 'net::ERR_ABORTED',
+        },
+        {
+          url: 'https://connect.facebook.net/log/error',
+          resourceType: 'fetch',
+          failure: 'net::ERR_BLOCKED_BY_ORB',
+        },
+      ],
+    }),
+  ])
+  expect(findings).toEqual([])
+})
+
+test('permintaan situs sendiri yang gagal tetap dilaporkan', () => {
+  const findings = analyzeConsole([
+    pageVisit({
+      url: 'https://a.test/x',
+      failedRequests: [
+        { url: 'https://a.test/api/data.json', resourceType: 'fetch', failure: 'net::ERR_FAILED' },
+      ],
+    }),
+  ])
+  expect(findings.map((f) => f.rule)).toEqual(['failed-request'])
+})
+
 test('temuan membawa pageId bila dipetakan', () => {
   const findings = analyzeConsole([pageVisit({ pageErrors: ['boom'] })], {
     'https://a.test/x': 7,

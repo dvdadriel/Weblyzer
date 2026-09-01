@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <title>Permintaan Kembar</title>
+  </head>
+  <body>
+    <h1>Satu URL diminta dua kali tanpa cache, agar dua respons benar-benar terjadi</h1>
+    <script>
+      fetch('/dua-kali.json', { cache: 'reload' })
+      fetch('/dua-kali.json', { cache: 'reload' })
+    </script>
+  </body>
+</html>

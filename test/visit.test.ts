@@ -92,12 +92,12 @@ test('mencatat jumlah media agar halaman gambar-saja tidak dianggap kosong', asy
   }
 })
 
-test('resource yang dirujuk dua kali hanya tercatat sekali', async () => {
-  const server = await startFixtureServer('kembar')
+test('URL yang benar-benar diminta dua kali hanya tercatat sekali', async () => {
+  const server = await startFixtureServer('kembar-fetch')
   try {
     const [page] = await visit(server.url, { maxPages: 1 })
-    const hilang = page!.resources.filter((r) => r.url.endsWith('/hilang.png'))
-    expect(hilang).toHaveLength(1)
+    const dua = page!.resources.filter((r) => r.url.endsWith('/dua-kali.json'))
+    expect(dua).toHaveLength(1)
   } finally {
     await server.close()
   }
