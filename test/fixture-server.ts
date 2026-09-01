@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http'
 import { readFile } from 'node:fs/promises'
-import { join, dirname, normalize } from 'node:path'
+import { join, dirname, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { AddressInfo } from 'node:net'
 
@@ -32,9 +32,11 @@ export async function startFixtureServer(name: string): Promise<FixtureServer> {
     let pathname = decodeURIComponent(requested.pathname)
     if (pathname.endsWith('/')) pathname += 'index.html'
 
-    // Menahan path traversal: file yang disajikan harus berada di dalam folder fixture.
+    // Menahan path traversal: file yang disajikan harus berada di dalam folder
+    // fixture. Pembandingnya diberi pemisah di ujung supaya folder bersaudara
+    // yang awalannya sama — "basic" vs "basic-lain" — tidak ikut lolos.
     const filePath = normalize(join(root, pathname))
-    if (!filePath.startsWith(root)) {
+    if (filePath !== root && !filePath.startsWith(root + sep)) {
       res.writeHead(403).end('Forbidden')
       return
     }
