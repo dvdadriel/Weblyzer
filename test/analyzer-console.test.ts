@@ -161,3 +161,24 @@ test('temuan membawa pageId bila dipetakan', () => {
   })
   expect(findings[0]!.pageId).toBe(7)
 })
+
+test('peringatan dari lingkungan headless tidak dilaporkan', () => {
+  // Kemunculannya bergantung GPU mesin, jadi kalau dilaporkan temuannya
+  // berkedip antar scan dan hitungan "sudah diperbaiki" jadi berbohong.
+  const findings = analyzeConsole([
+    pageVisit({
+      console: [
+        { level: 'warning', text: 'No available adapters.' },
+        { level: 'warning', text: 'WebGL: CONTEXT_LOST_WEBGL' },
+      ],
+    }),
+  ])
+  expect(findings).toEqual([])
+})
+
+test('peringatan yang memang salah situsnya tetap dilaporkan', () => {
+  const findings = analyzeConsole([
+    pageVisit({ console: [{ level: 'warning', text: "Unrecognized feature: 'web-share'." }] }),
+  ])
+  expect(findings.map((f) => f.rule)).toEqual(['console-warning'])
+})

@@ -11,6 +11,23 @@ import type { PageIdMap } from './bugs.ts'
  * kebisingan dari halaman error Chromium, bukan dari situs yang diaudit.
  * Kegagalannya sendiri sudah dilaporkan analyzer bug.
  */
+/**
+ * Pesan yang berasal dari lingkungan browser headless, bukan dari situs yang
+ * diaudit. Bahayanya bukan kebisingan tapi ketidakstabilan: kemunculannya
+ * bergantung pada GPU yang tersedia di mesin, sehingga temuan yang sama
+ * ditandai `fixed` lalu dibuka lagi antar scan tanpa ada yang berubah di situs
+ * — dan hitungan "berapa bug yang diperbaiki" ikut berbohong.
+ *
+ * Daftar ini akan bertambah. Syarat masuk cuma satu: pesannya harus mustahil
+ * diperbaiki oleh pemilik situs. Peringatan seperti `Unrecognized feature:`
+ * TIDAK termasuk — itu memang deklarasi permissions-policy milik situsnya.
+ */
+const POLA_LINGKUNGAN = [/^No available adapters/, /^WebGL: /, /^GPU stall/] as const
+
+function dariLingkungan(text: string): boolean {
+  return POLA_LINGKUNGAN.some((pola) => pola.test(text))
+}
+
 export function analyzeConsole(visits: PageVisit[], pageIds: PageIdMap = {}): NewFinding[] {
   const findings: NewFinding[] = []
 
@@ -48,6 +65,7 @@ export function analyzeConsole(visits: PageVisit[], pageIds: PageIdMap = {}): Ne
       // tidak menyebut URL-nya. Menyimpan keduanya berarti satu gambar rusak
       // muncul di dua tab.
       if (entry.text.startsWith('Failed to load resource')) continue
+      if (dariLingkungan(entry.text)) continue
       tambah({
         url: v.url,
         pageId,
