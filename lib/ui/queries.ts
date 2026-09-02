@@ -1,0 +1,149 @@
+import type { DatabaseSync } from 'node:sqlite'
+import type { Severity } from '../findings.ts'
+
+/**
+ * Tiga keadaan yang mudah tertukar dan wajib dibedakan di setiap layar berdata.
+ * `bersih` dan `gagal` sama-sama menghasilkan nol temuan, tetapi artinya
+ * berlawanan: yang satu berarti tidak ada yang rusak, yang lain berarti kita
+ * tidak tahu. Menyamakannya adalah bug yang sudah tiga kali muncul di lapisan
+ * data proyek ini.
+ */
+export type Keadaan = 'belum-dipindai' | 'bersih' | 'gagal' | 'ada-temuan'
+
+export type RingkasanSitus = {
+  id: number
+  nama: string
+  base_url: string
+  keadaan: Keadaan
+  totalTerbuka: number
+  terbuka: Record<Severity, number>
+  terakhirDipindai: string | null
+  pesanGagal: string | null
+}
+
+export type BarisTemuan = {
+  id: number
+  category: string
+  severity: Severity
+  rule: string
+  title: string
+  detail_json: string
+  status: string
+  url: string | null
+  first_seen_run: number
+  last_seen_run: number
+}
+
+const NOL: Record<Severity, number> = {
+  critical: 0, high: 0, medium: 0, low: 0, info: 0,
+}
+
+function runTerakhir(db: DatabaseSync, siteId: number) {
+  return db
+    .prepare(
+      `SELECT status, error, finished_at FROM runs
+       WHERE site_id = ? AND finished_at IS NOT NULL
+       ORDER BY id DESC LIMIT 1`,
+    )
+    .get(siteId) as { status: string; error: string | null; finished_at: string } | undefined
+}
+
+export function ringkasanSitus(db: DatabaseSync): RingkasanSitus[] {
+  const situs = db
+    .prepare('SELECT id, name, base_url FROM sites ORDER BY id')
+    .all() as { id: number; name: string; base_url: string }[]
+
+  return situs.map((s) => {
+    const hitungan = db
+      .prepare(
+        `SELECT severity, COUNT(*) AS n FROM findings
+         WHERE site_id = ? AND status = 'open' GROUP BY severity`,
+      )
+      .all(s.id) as { severity: Severity; n: number }[]
+
+    const terbuka = { ...NOL }
+    for (const h of hitungan) terbuka[h.severity] = Number(h.n)
+    const totalTerbuka = Object.values(terbuka).reduce((a, b) => a + b, 0)
+
+    const run = runTerakhir(db, s.id)
+    let keadaan: Keadaan
+    if (run === undefined) keadaan = 'belum-dipindai'
+    else if (run.status === 'failed') keadaan = 'gagal'
+    else if (totalTerbuka > 0) keadaan = 'ada-temuan'
+    else keadaan = 'bersih'
+
+    return {
+      id: s.id,
+      nama: s.name,
+      base_url: s.base_url,
+      keadaan,
+      totalTerbuka,
+      terbuka,
+      terakhirDipindai: run?.finished_at ?? null,
+      pesanGagal: run?.status === 'failed' ? (run.error ?? 'Pemindaian gagal') : null,
+    }
+  })
+}
+
+/** Urutan severity untuk ORDER BY. Paling parah dulu — itu urutan kerja. */
+const URUTAN = `CASE f.severity
+  WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2
+  WHEN 'low' THEN 3 ELSE 4 END`
+
+export function temuanKategori(
+  db: DatabaseSync,
+  siteId: number,
+  category: string,
+  status: 'open' | 'ignored' | 'fixed' = 'open',
+): BarisTemuan[] {
+  return db
+    .prepare(
+      `SELECT f.id, f.category, f.severity, f.rule, f.title, f.detail_json, f.status,
+              p.url AS url, f.first_seen_run, f.last_seen_run
+       FROM findings f
+       LEFT JOIN pages p ON p.id = f.page_id
+       WHERE f.site_id = ? AND f.category = ? AND f.status = ?
+       ORDER BY ${URUTAN}, f.rule, p.url`,
+    )
+    .all(siteId, category, status) as unknown as BarisTemuan[]
+}
+
+export function keadaanKategori(db: DatabaseSync, siteId: number, category: string): Keadaan {
+  const run = runTerakhir(db, siteId)
+  if (run === undefined) return 'belum-dipindai'
+  if (run.status === 'failed') return 'gagal'
+
+  const n = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM findings
+       WHERE site_id = ? AND category = ? AND status = 'open'`,
+    )
+    .get(siteId, category) as { n: number }
+  return Number(n.n) > 0 ? 'ada-temuan' : 'bersih'
+}
+
+export function skorSitus(db: DatabaseSync, siteId: number) {
+  return db
+    .prepare(
+      `SELECT p.url, l.strategy, l.perf, l.a11y, l.best_practices, l.seo
+       FROM lighthouse l JOIN pages p ON p.id = l.page_id
+       WHERE p.site_id = ?
+         AND l.id = (SELECT MAX(l2.id) FROM lighthouse l2
+                     WHERE l2.page_id = l.page_id AND l2.strategy = l.strategy)
+       ORDER BY p.url, l.strategy`,
+    )
+    .all(siteId) as unknown as {
+    url: string
+    strategy: string
+    perf: number | null
+    a11y: number | null
+    best_practices: number | null
+    seo: number | null
+  }[]
+}
+
+export function situs(db: DatabaseSync, siteId: number) {
+  return db
+    .prepare('SELECT id, name, base_url FROM sites WHERE id = ?')
+    .get(siteId) as { id: number; name: string; base_url: string } | undefined
+}
