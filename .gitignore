@@ -6,6 +6,10 @@ data.db-shm
 test-results/
 *.log
 
+# Dibuat ulang oleh `next build`, tidak perlu diversikan
+next-env.d.ts
+*.tsbuildinfo
+
 # Lokal, tidak diversikan
 .claude/
 .claude-flow/
