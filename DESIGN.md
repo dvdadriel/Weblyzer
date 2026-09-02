@@ -57,7 +57,18 @@ Warna severity duduk di rentang lightness sempit (50–54%), jadi pembedanya hue
 
 ### Aturan warna
 
-- **Severity tidak pernah disampaikan lewat warna saja.** Selalu berpasangan dengan penanda tekstual: `[!!]` critical dan high, `[! ]` medium dan low, `[ok]` fixed, `[--]` ignored. Ini menjaga keterbacaan bagi pengguna buta warna, saat di-print, dan di screenshot hitam-putih.
+- **Severity tidak pernah disampaikan lewat warna saja.** Setiap tingkat punya penanda tekstualnya sendiri:
+
+  | severity | penanda |
+  |---|---|
+  | critical | `[!!]` |
+  | high | `[!]` |
+  | medium | `[~]` |
+  | low | `[.]` |
+  | fixed | `[ok]` |
+  | ignored | `[--]` |
+
+  Enam penanda untuk enam tingkat, bukan empat. Versi pertama memakai `[!!]` untuk critical *dan* high, dan `[! ]` untuk medium *dan* low — artinya penandanya menandai kelompok, bukan tingkat, sementara teksnya mengklaim menandai tingkat. Bobot visualnya menurun berurutan (`!!` → `!` → `~` → `.`), jadi urutannya terbaca tanpa warna, saat di-print, dan di screenshot hitam-putih.
 - **Aksen = `--ink`.** Aksi utama, tab aktif, cincin fokus. Tidak ada warna aksen kelima; palet ini sudah punya cukup suara.
 - **Warna jenuh tidak pernah untuk keadaan nonaktif.** Tab yang tidak aktif memakai `--ink-2` pada bobot lebih ringan, bukan versi pudar dari warna aktifnya.
 - **`--surface` adalah satu-satunya lapisan kedua.** Panel, header tabel, baris terpilih. Tidak ada lapisan ketiga; kalau butuh, susunannya yang salah.

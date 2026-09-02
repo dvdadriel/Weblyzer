@@ -70,7 +70,7 @@ Semua yang ditampilkan berasal dari pengukuran, bukan simpulan. Ketika lapisan A
 ## Accessibility & Inclusion
 
 - **WCAG 2.2 AA.** Teks isi ≥4.5:1, teks besar ≥3:1. Palet earth-tone di latar krem adalah titik paling rawan gagal — tiap pasangan warna diverifikasi, bukan dikira-kira.
-- **Severity tidak pernah disampaikan lewat warna saja.** Selalu berpasangan dengan penanda tekstual (`[!!]`, `[! ]`, `[ok]`) supaya tetap terbaca oleh pengguna buta warna, saat di-print, dan di screenshot hitam-putih.
+- **Severity tidak pernah disampaikan lewat warna saja.** Setiap tingkat punya penanda tekstualnya sendiri (`[!!]` `[!]` `[~]` `[.]` `[ok]` `[--]`) supaya urutannya terbaca oleh pengguna buta warna, saat di-print, dan di screenshot hitam-putih.
 - **Tabel adalah `<table>` semantik** dengan header sungguhan. Data padat adalah inti aplikasi ini; screen reader harus bisa menavigasinya per kolom.
 - **Fokus keyboard terlihat jelas** di setiap elemen interaktif. Alur utama — pilih situs, pindah tab, buka temuan, tandai abaikan — harus bisa diselesaikan tanpa mouse.
 - **`prefers-reduced-motion` dihormati.** Satu-satunya gerakan yang direncanakan adalah indikator pemindaian berjalan; itu pun punya alternatif statis.

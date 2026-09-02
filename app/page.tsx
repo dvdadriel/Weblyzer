@@ -1,7 +1,9 @@
 const SEVERITY = ['critical', 'high', 'medium', 'low', 'fixed', 'ignored'] as const
+// Enam penanda untuk enam tingkat. Bobot visualnya menurun berurutan, jadi
+// urutannya terbaca tanpa warna. Lihat DESIGN.md "Aturan warna".
 const PENANDA: Record<string, string> = {
-  critical: '[!!]', high: '[!!]', medium: '[! ]',
-  low: '[! ]', fixed: '[ok]', ignored: '[--]',
+  critical: '[!!]', high: '[!]', medium: '[~]',
+  low: '[.]', fixed: '[ok]', ignored: '[--]',
 }
 
 export default function Page() {
