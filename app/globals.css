@@ -7,13 +7,15 @@
   --line:      oklch(35.6% 0.056 162 / 0.22);
   --line-kuat: oklch(35.6% 0.056 162 / 0.45);
 
-  /* Severity — semuanya sudah diverifikasi >= 4.5:1 di atas --bg */
-  --sev-critical: oklch(49.9% 0.147 33);   /* 5.47:1 */
-  --sev-high:     oklch(53.8% 0.122 58);   /* 4.50:1 */
-  --sev-medium:   oklch(52.9% 0.108 93);   /* 4.50:1 */
-  --sev-low:      oklch(51.7% 0.074 126);  /* 4.61:1 */
-  --sev-fixed:    oklch(35.6% 0.056 162);  /* 9.12:1 */
-  --sev-ignored:  oklch(52.7% 0.032 49);   /* 4.57:1 */
+  /* Severity — diukur terhadap --surface, latar paling ketat tempat lencana
+     ini muncul (baris tabel yang di-hover). Lolos --surface berarti lolos --bg.
+                                            di --surface / di --bg  */
+  --sev-critical: oklch(49.9% 0.147 33);   /* 4.60:1 / 5.47:1 */
+  --sev-high:     oklch(49.7% 0.120 57);   /* 4.50:1 / 5.36:1 */
+  --sev-medium:   oklch(48.8% 0.100 91);   /* 4.50:1 / 5.36:1 */
+  --sev-low:      oklch(48.2% 0.075 127);  /* 4.50:1 / 5.36:1 */
+  --sev-fixed:    oklch(35.6% 0.056 162);  /* 7.66:1 / 9.12:1 */
+  --sev-ignored:  oklch(48.8% 0.031 50);   /* 4.55:1 / 5.41:1 */
 
   --s-1: 0.5rem;  --s-2: 0.75rem; --s-3: 1rem;   --s-4: 1.5rem;
   --s-5: 2rem;    --s-6: 3rem;    --s-7: 4rem;
