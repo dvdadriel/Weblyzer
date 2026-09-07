@@ -6,7 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { getDb } from '../lib/db.ts'
 import { createSite } from '../lib/repos/sites.ts'
 import { runAktif } from '../lib/ui/queries.ts'
-import { pilihPenyedia } from '../lib/ai/penyedia.ts'
+import { pilihPenyedia, PENYEDIA } from '../lib/ai/penyedia.ts'
+import { ujiPenyedia } from '../lib/ai/jalankan.ts'
 import type { IdPenyedia } from '../lib/ai/penyedia.ts'
 
 /**
@@ -170,5 +171,47 @@ export async function simpanPenyedia(id: string): Promise<HasilAksi> {
     return { error: err instanceof Error ? err.message : String(err) }
   }
   revalidatePath('/model')
+  return null
+}
+
+/**
+ * Menguji penyedia dengan benar-benar memanggil CLI-nya.
+ *
+ * Tidak dijalankan saat halaman dimuat, dan itu keputusan: satu uji butuh
+ * beberapa detik per penyedia, jadi memuat halaman konfigurasi akan terasa
+ * macet. Yang dijalankan otomatis cuma `--version` yang instan — dan justru
+ * karena itu tidak cukup, tombol ini ada.
+ */
+export async function ujiKoneksi(id: string): Promise<{ ok: boolean; pesan: string }> {
+  if (!PENYEDIA.some((p) => p.id === id)) {
+    return { ok: false, pesan: `penyedia tidak dikenal: ${id}` }
+  }
+  return ujiPenyedia(id as IdPenyedia)
+}
+
+/**
+ * Menjalankan ulang ringkasan tanpa memindai ulang.
+ *
+ * Terpisah dari `jalankanScan` karena memang pekerjaan yang berbeda: crawl
+ * ulang situs 141 halaman butuh menit-menitan, sedangkan meringkas temuan yang
+ * sudah ada butuh beberapa detik. Menyatukan keduanya berarti menunggu crawl
+ * hanya untuk memperbaiki ringkasan yang gagal.
+ */
+export async function ulangiRingkasan(siteId: number, path: string): Promise<HasilAksi> {
+  if (runAktif(getDb(), siteId)) {
+    return { error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
+  }
+
+  const anak = spawn(
+    process.execPath,
+    [join(process.cwd(), 'scripts/scan.ts'), 'ringkasan', String(siteId)],
+    { detached: true, stdio: 'ignore', cwd: process.cwd() },
+  )
+  anak.unref()
+
+  if (!(await tungguRun(siteId))) {
+    return { error: 'Peringkasan gagal dijalankan. Periksa log server.' }
+  }
+  revalidatePath(path)
   return null
 }

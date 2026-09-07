@@ -1,6 +1,14 @@
 import type { DatabaseSync } from 'node:sqlite'
 
-export type RunType = 'crawl' | 'bugs' | 'console' | 'security' | 'lighthouse' | 'seo' | 'full'
+export type RunType =
+  | 'crawl'
+  | 'bugs'
+  | 'console'
+  | 'security'
+  | 'lighthouse'
+  | 'seo'
+  | 'ringkasan'
+  | 'full'
 export type RunStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
 export type AiStatus = 'ok' | 'failed' | 'skipped' | 'not_needed'
 

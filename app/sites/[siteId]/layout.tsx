@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation'
 import { db } from '../../../lib/ui/db.ts'
-import { situs } from '../../../lib/ui/queries.ts'
+import { situs, ringkasanAi, statusAi } from '../../../lib/ui/queries.ts'
 import { Tab } from '../../../components/Tab.tsx'
 import { Ikon } from '../../../components/Ikon.tsx'
+import { RingkasanAi } from '../../../components/RingkasanAi.tsx'
 import Link from 'next/link'
 
 export default async function SiteLayout({
@@ -33,6 +34,17 @@ export default async function SiteLayout({
         <span className="kartu-url">{s.base_url}</span>
       </div>
       <Tab siteId={s.id} />
+
+      {/* Di layout, bukan di halaman kategori: ringkasannya membahas seluruh
+          situs, jadi menampilkannya per tab berarti empat salinan dari satu
+          teks yang sama. Di sini ia muncul sekali, di atas tab mana pun. */}
+      <RingkasanAi
+        isi={ringkasanAi(db(), s.id)}
+        status={statusAi(db(), s.id)}
+        siteId={s.id}
+        path={`/sites/${s.id}/bugs`}
+      />
+
       {children}
     </>
   )

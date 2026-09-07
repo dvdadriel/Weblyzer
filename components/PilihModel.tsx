@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { simpanPenyedia } from '../app/actions.ts'
+import { simpanPenyedia, ujiKoneksi } from '../app/actions.ts'
 import type { Ketersediaan } from '../lib/ai/penyedia.ts'
 
 /**
@@ -23,6 +23,9 @@ export function PilihModel({
   const [galat, setGalat] = useState<string | null>(null)
   const [tersimpan, setTersimpan] = useState(false)
   const [menunggu, mulai] = useTransition()
+  // Hasil uji per penyedia, bukan satu untuk semua: dua penyedia bisa gagal
+  // karena alasan berbeda, dan satu slot akan menimpa yang satunya.
+  const [uji, setUji] = useState<Record<string, { ok: boolean; pesan: string } | 'jalan'>>({})
 
   function pilih(v: string) {
     setNilai(v)
@@ -46,7 +49,9 @@ export function PilihModel({
       <fieldset className="model-set" disabled={menunggu}>
         <legend className="model-legend">Penyedia</legend>
 
-        {tersedia.map((p) => (
+        {tersedia.map((p) => {
+          const hasilUji = uji[p.id]
+          return (
           <label key={p.id} className="model-baris" data-mati={!p.ada || undefined}>
             <input
               type="radio"
@@ -60,6 +65,26 @@ export function PilihModel({
 
             {p.ada && <span className="model-versi">{p.versi}</span>}
 
+            {/* Di luar `fieldset` yang dimatikan? Tidak — tombolnya memang ikut
+                mati selagi penyimpanan berjalan, dan itu benar: dua pemanggilan
+                CLI bersamaan tidak menambah informasi apa pun. */}
+            {p.ada && (
+              <button
+                type="button"
+                className="model-uji"
+                onClick={(e) => {
+                  // Label membungkus radio, jadi klik apa pun di dalamnya akan
+                  // ikut memilih penyedia. Tombol uji tidak boleh mengubah
+                  // pilihan — menguji bukan memilih.
+                  e.preventDefault()
+                  setUji((u) => ({ ...u, [p.id]: 'jalan' }))
+                  void ujiKoneksi(p.id).then((h) => setUji((u) => ({ ...u, [p.id]: h })))
+                }}
+              >
+                Uji
+              </button>
+            )}
+
             {/* Tiga keadaan yang berbeda artinya, dan dibedakan: terpasang,
                 tidak terpasang, dan terpasang tapi tidak menjawab. Yang
                 terakhir paling mudah disalahartikan sebagai yang kedua. */}
@@ -69,8 +94,23 @@ export function PilihModel({
               </span>
             )}
             {p.galat !== null && <span className="model-galat">{p.galat}</span>}
+
+            {/* Hasil uji ditulis mentah, termasuk saat gagal. Inilah bedanya
+                antara "Gemini tidak jalan" dan "Gemini butuh GEMINI_API_KEY" —
+                yang pertama tidak bisa ditindaklanjuti, yang kedua bisa. */}
+            {hasilUji === 'jalan' && (
+              <span className="model-hasil" role="status">
+                menguji…
+              </span>
+            )}
+            {hasilUji !== undefined && hasilUji !== 'jalan' && (
+              <span className={hasilUji.ok ? 'model-hasil ok' : 'model-hasil gagal'} role="status">
+                {hasilUji.ok ? `Menjawab: ${hasilUji.pesan}` : hasilUji.pesan}
+              </span>
+            )}
           </label>
-        ))}
+          )
+        })}
 
         <label className="model-baris">
           <input

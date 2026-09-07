@@ -6,9 +6,15 @@ import { drainQueue } from '../lib/runner.ts'
 import { scanHandler } from '../lib/jobs/scan.ts'
 import { listPages } from '../lib/repos/pages.ts'
 import { lighthouseHandler } from '../lib/jobs/lighthouse.ts'
+import { ringkasanHandler } from '../lib/jobs/ringkasan.ts'
+import { penyediaTerpilih } from '../lib/ai/penyedia.ts'
 import { skorTerakhir } from '../lib/repos/lighthouse.ts'
 
-const HANDLERS = { scan: scanHandler, lighthouse: lighthouseHandler }
+const HANDLERS = {
+  scan: scanHandler,
+  lighthouse: lighthouseHandler,
+  ringkasan: ringkasanHandler,
+}
 
 const USAGE = `Penggunaan:
   npm run scan -- add-site <nama> <url>      Menambahkan situs
@@ -86,6 +92,13 @@ async function main(): Promise<number> {
         type: 'scan',
         payload: only === undefined ? { siteId: site.id } : { siteId: site.id, only },
       })
+
+      // Ringkasan ikut diantrikan hanya bila ada penyedia terpilih. Antrian
+      // dikuras berurutan, jadi job ini pasti jalan setelah pemindaiannya —
+      // dan membaca temuan yang baru saja direkonsiliasi, bukan yang lama.
+      if (penyediaTerpilih(db) !== null) {
+        enqueue(db, { runId: run.id, type: 'ringkasan', payload: { siteId: site.id } })
+      }
       console.log(`Run ${run.id}: memindai ${site.base_url} ...`)
 
       const summary = await drainQueue(db, HANDLERS, { concurrency: 1 })
@@ -125,6 +138,49 @@ async function main(): Promise<number> {
         )
         .all(site.id) as { category: string; severity: string; n: number }[]
       for (const r of rekap) console.log(`  ${r.category}/${r.severity}: ${r.n}`)
+      return 0
+    }
+
+    case 'ringkasan': {
+      const siteId = Number(args[0])
+      const site = getSite(db, siteId)
+      if (!site) {
+        console.error(`Situs ${args[0]} tidak ditemukan.`)
+        return 1
+      }
+      const penyedia = penyediaTerpilih(db)
+      if (penyedia === null) {
+        console.error('Belum ada penyedia AI yang dipilih. Buka halaman /model dulu.')
+        return 1
+      }
+
+      requeueInterrupted(db)
+
+      // Tipe `ringkasan`, bukan `full` maupun `seo`. `full` akan membuat
+      // `waktuScanKategori` melaporkan keempat kategori baru dipindai padahal
+      // tidak ada yang dipindai, dan `seo` adalah milik fitur SEO yang belum
+      // dibangun — menyerobotnya sekarang berarti tabrakan nanti.
+      const run = createRun(db, site.id, 'ringkasan')
+      enqueue(db, { runId: run.id, type: 'ringkasan', payload: { siteId: site.id } })
+      console.log(`Run ${run.id}: meringkas ${site.name} dengan ${penyedia} ...`)
+
+      await drainQueue(db, HANDLERS, { concurrency: 1 })
+      finishRun(db, run.id, 'done')
+
+      const r = db
+        .prepare(
+          `SELECT ru.ai_status, ru.ai_error, rp.content
+           FROM runs ru LEFT JOIN reports rp ON rp.run_id = ru.id
+           WHERE ru.id = ?`,
+        )
+        .get(run.id) as { ai_status: string; ai_error: string | null; content: string | null }
+
+      if (r.ai_status !== 'ok') {
+        console.error(`AI ${r.ai_status}: ${r.ai_error ?? 'tanpa pesan'}`)
+        return 1
+      }
+      console.log('')
+      console.log(r.content)
       return 0
     }
 

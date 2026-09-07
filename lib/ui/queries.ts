@@ -19,6 +19,9 @@ export type RingkasanSitus = {
   terbuka: Record<Severity, number>
   terakhirDipindai: string | null
   pesanGagal: string | null
+  /** Status AI run terakhir. Dibawa terpisah dari `keadaan` karena AI yang
+   *  gagal TIDAK membuat pemindaiannya gagal — temuannya tetap sah. */
+  aiGagal: boolean
 }
 
 export type BarisTemuan = {
@@ -48,13 +51,15 @@ function runTerakhir(db: DatabaseSync, siteId: number) {
       //
       // Detik dibuang: pertanyaannya "kapan terakhir dipindai", dan presisi
       // detik cuma menambah dua angka yang tidak pernah dipakai.
-      `SELECT status, error,
+      `SELECT status, error, ai_status,
               strftime('%Y-%m-%d %H:%M', finished_at, 'localtime') AS finished_at
        FROM runs
        WHERE site_id = ? AND finished_at IS NOT NULL
        ORDER BY id DESC LIMIT 1`,
     )
-    .get(siteId) as { status: string; error: string | null; finished_at: string } | undefined
+    .get(siteId) as
+    | { status: string; error: string | null; finished_at: string; ai_status: string }
+    | undefined
 }
 
 export function ringkasanSitus(db: DatabaseSync): RingkasanSitus[] {
@@ -90,6 +95,7 @@ export function ringkasanSitus(db: DatabaseSync): RingkasanSitus[] {
       terbuka,
       terakhirDipindai: run?.finished_at ?? null,
       pesanGagal: run?.status === 'failed' ? (run.error ?? 'Pemindaian gagal') : null,
+      aiGagal: run?.ai_status === 'failed',
     }
   }).sort(bandingkan)
 }
@@ -261,4 +267,55 @@ export function waktuScanKategori(
     )
     .get(siteId, category) as { waktu: string } | undefined
   return baris?.waktu ?? null
+}
+
+export type RingkasanAi = {
+  teks: string
+  model: string | null
+  waktu: string | null
+}
+
+/**
+ * Ringkasan AI dari run terakhir yang menghasilkannya.
+ *
+ * Bukan run terakhir begitu saja: pemindaian yang jalan tanpa penyedia
+ * terpilih tidak menghasilkan ringkasan, dan mengembalikan `null` untuk itu
+ * akan menghapus ringkasan yang masih berlaku dari layar.
+ */
+export function ringkasanAi(db: DatabaseSync, siteId: number): RingkasanAi | null {
+  const baris = db
+    .prepare(
+      `SELECT r.content AS teks, r.model_used AS model,
+              strftime('%Y-%m-%d %H:%M', ru.finished_at, 'localtime') AS waktu
+       FROM reports r JOIN runs ru ON ru.id = r.run_id
+       WHERE ru.site_id = ?
+       ORDER BY r.id DESC LIMIT 1`,
+    )
+    .get(siteId) as { teks: string; model: string | null; waktu: string | null } | undefined
+  return baris ? { ...baris } : null
+}
+
+export type StatusAi = {
+  status: string
+  galat: string | null
+  model: string | null
+}
+
+/**
+ * Status AI dari run terakhir yang selesai.
+ *
+ * Dipisah dari `ringkasanAi` karena keduanya menjawab pertanyaan berbeda:
+ * yang satu "apa isi ringkasannya", yang ini "apakah percobaan terakhir
+ * berhasil". Sebuah situs bisa punya ringkasan lama yang bagus DAN percobaan
+ * terbaru yang gagal, dan menggabungkannya akan menyembunyikan kegagalan itu.
+ */
+export function statusAi(db: DatabaseSync, siteId: number): StatusAi | null {
+  const baris = db
+    .prepare(
+      `SELECT ai_status AS status, ai_error AS galat, ai_model AS model FROM runs
+       WHERE site_id = ? AND finished_at IS NOT NULL
+       ORDER BY id DESC LIMIT 1`,
+    )
+    .get(siteId) as { status: string; galat: string | null; model: string | null } | undefined
+  return baris ? { ...baris } : null
 }

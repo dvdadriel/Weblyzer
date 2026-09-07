@@ -503,3 +503,58 @@ code {
 .model-tiada { margin-left: auto; }
 .model-galat { color: var(--sev-critical); font-size: var(--t-mikro); margin-left: auto; }
 .model-status { font-size: var(--t-mikro); color: var(--ink-2); min-height: 1.2em; margin: 0; }
+
+/* ── Ringkasan AI ─────────────────────────────────────────────────────────
+   Diberi permukaan sendiri supaya prosa model tidak berbaur dengan data
+   terukur di halaman yang sama. Pembacanya harus bisa membedakan angka yang
+   diukur dari dugaan yang ditulis. */
+
+.ringkas {
+  margin-top: var(--s-5);
+  padding: var(--s-4);
+  background: var(--surface);
+  border-radius: var(--r-panel);
+}
+.ringkas-label {
+  font-size: var(--t-mikro); color: var(--ink-2);
+  cursor: pointer; list-style: none;
+}
+.ringkas-label::-webkit-details-marker { display: none; }
+.ringkas-label:hover { color: var(--ink); }
+/* Penanda lipat dari kosakata penanda yang sudah ada, bukan ikon panah baru. */
+.ringkas-label::before { content: '[+] '; }
+.ringkas-lipat[open] > .ringkas-label::before { content: '[-] '; }
+.ringkas-lipat[open] > .ringkas-label { margin-bottom: var(--s-3); display: block; }
+.ringkas-aksi { margin: var(--s-3) 0 0; }
+.ringkas-ulang {
+  font: inherit; font-size: var(--t-mikro); color: var(--ink-2);
+  background: none; border: 1px solid var(--line-kuat);
+  border-radius: var(--r-chip); padding: var(--s-1) var(--s-2); cursor: pointer;
+}
+.ringkas-ulang:hover { color: var(--ink); border-color: var(--ink); }
+.ringkas-ulang:disabled { cursor: default; color: var(--sev-ignored); }
+
+/* 68ch: batas prosa di DESIGN.md. Tabel boleh melebar, paragraf tidak. */
+.ringkas-isi { max-width: 68ch; }
+.ringkas-p { margin: 0 0 var(--s-3); font-size: var(--t-data); }
+.ringkas-p:last-child { margin-bottom: 0; }
+.ringkas-isi code { background: var(--bg); }
+
+.ringkas-gagal {
+  margin: 0 0 var(--s-3); font-size: var(--t-data); color: var(--sev-critical);
+  max-width: 68ch;
+}
+/* Pesan CLI apa adanya: dibungkus tapi tidak dipotong, karena justru di sini
+   petunjuknya berada. */
+.ringkas-mentah { font-size: var(--t-mikro); word-break: break-word; }
+.ringkas-lewat, .ringkas-basi {
+  margin: var(--s-3) 0 0; font-size: var(--t-mikro); color: var(--ink-2); max-width: 68ch;
+}
+.ringkas-lewat { margin-top: 0; }
+
+/* Lencana di kartu dashboard. `--sev-high`, bukan critical: ringkasan yang
+   gagal bukan situs yang rusak. */
+.kartu-ai {
+  display: inline-flex; align-items: baseline; gap: var(--s-1);
+  font-size: var(--t-mikro); color: var(--sev-high);
+}

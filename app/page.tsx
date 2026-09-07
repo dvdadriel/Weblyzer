@@ -46,6 +46,17 @@ export default function Dashboard() {
                     Tidak ada yang rusak &middot; {s.terakhirDipindai}
                   </span>
                 )}
+
+                {/* Lencana AI gagal, TERPISAH dari keadaan pemindaian.
+                    Pemindaiannya sendiri berhasil dan temuannya sah; yang
+                    gagal cuma ringkasannya. Menyatukannya dengan `gagal`
+                    akan membuat kartu situs sehat tampak rusak, dan pemakainya
+                    berhenti mempercayai angka yang sebenarnya benar. */}
+                {s.aiGagal && (
+                  <span className="kartu-ai">
+                    <span aria-hidden="true">[!]</span> Ringkasan AI gagal
+                  </span>
+                )}
                 {s.keadaan === 'ada-temuan' && (
                   <span className="kartu-hitungan">
                     {URUT.filter((k) => s.terbuka[k] > 0).map((k) => (
