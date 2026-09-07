@@ -59,16 +59,26 @@ Warna severity duduk di rentang lightness sempit (50–54%), jadi pembedanya hue
 
 - **Severity tidak pernah disampaikan lewat warna saja.** Setiap tingkat punya penanda tekstualnya sendiri:
 
+  **Severity** — lima tingkat, lima penanda:
+
   | severity | penanda |
   |---|---|
   | critical | `[!!]` |
   | high | `[!]` |
   | medium | `[~]` |
   | low | `[.]` |
+  | info | `[i]` |
+
+  **Status** — dipakai di kolom lain, bukan menggantikan severity:
+
+  | status | penanda |
+  |---|---|
   | fixed | `[ok]` |
   | ignored | `[--]` |
 
-  Enam penanda untuk enam tingkat, bukan empat. Versi pertama memakai `[!!]` untuk critical *dan* high, dan `[! ]` untuk medium *dan* low — artinya penandanya menandai kelompok, bukan tingkat, sementara teksnya mengklaim menandai tingkat. Bobot visualnya menurun berurutan (`!!` → `!` → `~` → `.`), jadi urutannya terbaca tanpa warna, saat di-print, dan di screenshot hitam-putih.
+  Kedua daftar dipisah karena versi pertama menggabungkannya jadi satu tabel enam baris, dan itu menyisakan `info` tanpa penanda sementara `[--]` dipakai untuk `ignored`. Memberi `info` penanda `[--]` membuat satu simbol berarti dua hal tergantung konteks — persis kesalahan yang aturan ini ada untuk mencegahnya.
+
+  Bobot visualnya menurun berurutan (`!!` → `!` → `~` → `.` → `i`), jadi urutannya terbaca tanpa warna, saat di-print, dan di screenshot hitam-putih. Versi paling awal bahkan memakai `[!!]` untuk critical *dan* high — penanda yang menandai kelompok sementara teksnya mengklaim menandai tingkat.
 - **Aksen = `--ink`.** Aksi utama, tab aktif, cincin fokus. Tidak ada warna aksen kelima; palet ini sudah punya cukup suara.
 - **Warna jenuh tidak pernah untuk keadaan nonaktif.** Tab yang tidak aktif memakai `--ink-2` pada bobot lebih ringan, bukan versi pudar dari warna aktifnya.
 - **`--surface` adalah satu-satunya lapisan kedua.** Panel, header tabel, baris terpilih. Tidak ada lapisan ketiga; kalau butuh, susunannya yang salah.
@@ -175,8 +185,14 @@ Setiap komponen interaktif punya tujuh keadaan: default, hover, focus, active, d
 ## Layout
 
 - **Header + navigasi tab.** Tanpa sidebar; jumlah situsnya sedikit dan pemilihnya muat di header.
-- Responsif secara struktural, bukan lewat tipografi cair: pemilih situs mengecil jadi dropdown, tabel mengalihkan kolom sekunder ke baris kedua di bawah 720px.
-- Lebar konten maksimum 1180px. Tabel boleh menggulir horizontal di dalam wadahnya sendiri; badan halaman tidak pernah menggulir ke samping.
+- Responsif secara struktural, bukan lewat tipografi cair.
+- **Tabel menggulir horizontal di dalam wadahnya sendiri**, dengan `min-width` supaya kolomnya tidak tergencet. Badan halaman tidak pernah menggulir ke samping.
+
+  Versi pertama berkas ini menuntut dua hal sekaligus — kolom sekunder pindah ke baris kedua di bawah 720px, *dan* tabel boleh menggulir. Keduanya tidak bisa berlaku bersamaan, dan hasilnya di 390px adalah tabel yang gepeng: kolom URL menyusut jadi sepuluh karakter dan header `terlihat` terpotong jadi `terli`.
+
+  Yang dipilih: menggulir. Reflow ke baris kedua memerlukan `display: block` pada elemen tabel, dan itu menghapus semantik tabel di sebagian screen reader — padahal `PRODUCT.md` justru mensyaratkan data padat bisa dinavigasi per kolom. Alat ini juga dipakai di laptop pagi hari; layar sempit itu keadaan sekunder, dan menggulir adalah harga yang wajar untuk membayarnya.
+- Lebar konten maksimum 1180px.
+- **Kolom tabel berlebar tetap** (`table-layout: fixed`). Tanpa itu lebar kolom mengikuti isi, sehingga berpindah tab menggeser setiap kolom — mahal untuk alat yang memang dipakai dengan berpindah-pindah tab.
 - Skala z-index bernama: `dropdown → sticky → backdrop → dialog → toast`. Tidak ada 999.
 
 ## Cara mengetahui ini gagal

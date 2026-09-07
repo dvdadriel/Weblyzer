@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { db } from '../../../../lib/ui/db.ts'
-import { temuanKategori, keadaanKategori } from '../../../../lib/ui/queries.ts'
+import { temuanKategori, keadaanKategori, situs } from '../../../../lib/ui/queries.ts'
 import { TabelTemuan } from '../../../../components/TabelTemuan.tsx'
 import { KeadaanKosong } from '../../../../components/KeadaanKosong.tsx'
 
@@ -20,5 +20,8 @@ export default async function Kategori({
   const keadaan = keadaanKategori(db(), id, kategori)
   if (keadaan !== 'ada-temuan') return <KeadaanKosong keadaan={keadaan} siteId={id} />
 
-  return <TabelTemuan baris={temuanKategori(db(), id, kategori)} />
+  const s = situs(db(), id)
+  return (
+    <TabelTemuan baris={temuanKategori(db(), id, kategori)} baseUrl={s?.base_url ?? ''} />
+  )
 }

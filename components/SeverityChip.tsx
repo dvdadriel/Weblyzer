@@ -1,7 +1,7 @@
 import type { Severity } from '../lib/findings.ts'
 
 const PENANDA: Record<Severity, string> = {
-  critical: '[!!]', high: '[!]', medium: '[~]', low: '[.]', info: '[--]',
+  critical: '[!!]', high: '[!]', medium: '[~]', low: '[.]', info: '[i]',
 }
 
 export function SeverityChip({ severity }: { severity: Severity }) {

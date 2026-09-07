@@ -22,9 +22,14 @@ export function KeadaanKosong({ keadaan, siteId }: { keadaan: Keadaan; siteId: n
     <div className="kosong">
       <p className="kosong-judul">{judul}</p>
       <p className="kosong-teks">{teks}</p>
-      <p className="kosong-teks">
-        <code>npm run scan -- scan {siteId}</code>
-      </p>
+      {/* Perintah pindai hanya muncul ketika memang ada yang perlu dikerjakan.
+          Pada keadaan `bersih` jawabannya adalah "tidak ada", dan mengajak
+          bertindak justru melemahkan jawaban yang sudah selesai itu. */}
+      {keadaan !== 'bersih' && (
+        <p className="kosong-teks">
+          <code>npm run scan -- scan {siteId}</code>
+        </p>
+      )}
     </div>
   )
 }

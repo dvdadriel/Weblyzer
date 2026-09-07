@@ -134,7 +134,17 @@ code {
 }
 
 .tabel-bungkus { overflow-x: auto; margin-top: var(--s-5); }
-.tabel { width: 100%; border-collapse: collapse; font-size: var(--t-data); }
+/* `min-width` supaya tabel menggulir alih-alih tergencet di layar sempit: tanpa
+   itu kolom URL menyusut jadi sepuluh karakter dan header terpotong.
+   `table-layout: fixed` mengunci posisi kolom, jadi berpindah tab tidak
+   menggeser seluruh tabel — mahal untuk alat yang dipakai dengan tab-hopping. */
+.tabel {
+  width: 100%; min-width: 660px; table-layout: fixed;
+  border-collapse: collapse; font-size: var(--t-data);
+}
+.tabel col.k-sev { width: 8.5rem; }
+.tabel col.k-rule { width: 11rem; }
+.tabel col.k-lihat { width: 6rem; }
 .tabel th {
   text-align: left; font-weight: 600;
   padding: var(--s-2) var(--s-3);
