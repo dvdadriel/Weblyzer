@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import type { BarisTemuan } from '../lib/ui/queries.ts'
 import { SeverityChip } from './SeverityChip.tsx'
-import { ubahStatusTemuan } from '../app/actions.ts'
+import { ubahStatusTemuan, periksaTemuan } from '../app/actions.ts'
 import { Ikon } from './Ikon.tsx'
 
 /**
@@ -35,12 +35,22 @@ function BarisDetail({
   b,
   status,
   path,
+  lapor,
 }: {
   b: BarisTemuan
   status: 'open' | 'ignored'
   path: string
+  lapor: (h: { keadaan: string; pesan?: string; error?: string }) => void
 }) {
   const [pending, mulai] = useTransition()
+  const [memeriksa, mulaiPeriksa] = useTransition()
+
+  // Lighthouse tidak punya jalur pemeriksaan per temuan: satu pengukuran ulang
+  // yang jujur berarti mengukur dua kali lalu mengiris hasilnya, dan mesin itu
+  // sudah ada sebagai Scan Lighthouse. Tombol yang selalu menolak lebih buruk
+  // daripada tidak ada tombol, jadi yang muncul penjelasannya.
+  const bisaPeriksa = b.category !== 'lighthouse'
+
   return (
     <tr id={`detail-${b.id}`} className="baris-detail">
       {/* colSpan, bukan `display: block`: reflow lewat display menghapus
@@ -49,18 +59,44 @@ function BarisDetail({
       <td colSpan={4}>
         <p className="detail-judul">{b.title}</p>
         <pre className="detail-json">{rapikan(b.detail_json)}</pre>
-        <button
-          type="button"
-          className="tombol-teks"
-          disabled={pending}
-          onClick={() =>
-            mulai(async () => {
-              await ubahStatusTemuan(b.id, status === 'open' ? 'ignored' : 'open', path)
-            })
-          }
-        >
-          {status === 'open' ? 'Abaikan' : 'Buka Lagi'}
-        </button>
+
+        <p className="detail-aksi">
+          {bisaPeriksa && status === 'open' && (
+            <button
+              type="button"
+              className="tombol-teks"
+              disabled={memeriksa || pending}
+              onClick={() =>
+                mulaiPeriksa(async () => {
+                  lapor(await periksaTemuan(b.id, path))
+                })
+              }
+            >
+              <Ikon nama="scan" />
+              {memeriksa ? 'Memeriksa…' : 'Periksa Lagi'}
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="tombol-teks"
+            disabled={pending || memeriksa}
+            onClick={() =>
+              mulai(async () => {
+                await ubahStatusTemuan(b.id, status === 'open' ? 'ignored' : 'open', path)
+              })
+            }
+          >
+            {status === 'open' ? 'Abaikan' : 'Buka Lagi'}
+          </button>
+
+          {!bisaPeriksa && status === 'open' && (
+            <span className="detail-catatan">
+              Pemeriksaan satu temuan belum ada untuk Lighthouse — jalankan Scan Lighthouse.
+            </span>
+          )}
+        </p>
+
       </td>
     </tr>
   )
@@ -80,9 +116,33 @@ export function TabelTemuan({
   waktuScan: string | null
 }) {
   const [terbuka, setTerbuka] = useState<number | null>(null)
+  // Hasil pemeriksaan disimpan DI SINI, bukan di baris detailnya.
+  //
+  // Saat temuan ternyata sudah beres, `revalidatePath` menghapus barisnya dari
+  // tabel — dan baris detail yang memuat pesannya ikut hilang sebelum pesan itu
+  // sempat terbaca. Terbukti: pengujian browser menunggu pesan itu selama enam
+  // puluh detik dan tidak pernah melihatnya, padahal statusnya di database
+  // sudah `fixed`. Diangkat ke sini, pesannya bertahan setelah barisnya pergi.
+  const [periksaan, setPeriksaan] = useState<
+    { id: number; keadaan: string; pesan?: string; error?: string } | null
+  >(null)
 
   return (
     <div className="tabel-bungkus">
+      {periksaan !== null && (
+        <p
+          className={`detail-hasil ${periksaan.keadaan === 'beres' ? 'beres' : periksaan.keadaan === 'masih-ada' ? 'masih' : 'galat'}`}
+          role="status"
+        >
+          {periksaan.keadaan === 'beres' && 'Sudah beres — temuan itu ditutup dan hilang dari daftar.'}
+          {periksaan.keadaan === 'masih-ada' &&
+            'Masih ada. Belum ada yang berubah di halaman itu.'}
+          {periksaan.keadaan === 'tak-terjangkau' &&
+            `Halamannya tidak bisa dibuka, jadi statusnya tidak diketahui — bukan berarti sudah beres. ${periksaan.pesan ?? ''}`}
+          {periksaan.keadaan === 'tak-didukung' && periksaan.pesan}
+          {(periksaan.keadaan === 'sibuk' || periksaan.keadaan === 'galat') && periksaan.error}
+        </p>
+      )}
       <table className="tabel">
         {/* Urutan mengikuti kolom: severity, aturan, halaman, terlihat.
             Hanya `halaman` yang lentur — dialah yang panjang. */}
@@ -134,7 +194,13 @@ export function TabelTemuan({
               // Dirender hanya saat mengembang: isinya tidak pernah ada di DOM
               // sambil disembunyikan menunggu animasi.
               buka ? (
-                <BarisDetail key={`d-${b.id}`} b={b} status={status} path={path} />
+                <BarisDetail
+                  key={`d-${b.id}`}
+                  b={b}
+                  status={status}
+                  path={path}
+                  lapor={(h) => setPeriksaan({ id: b.id, ...h })}
+                />
               ) : null,
             ]
           })}

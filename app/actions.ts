@@ -8,6 +8,7 @@ import { createSite } from '../lib/repos/sites.ts'
 import { runAktif } from '../lib/ui/queries.ts'
 import { pilihPenyedia, PENYEDIA } from '../lib/ai/penyedia.ts'
 import { ujiPenyedia } from '../lib/ai/jalankan.ts'
+import { recheck } from '../lib/recheck.ts'
 import type { IdPenyedia } from '../lib/ai/penyedia.ts'
 
 /**
@@ -214,4 +215,35 @@ export async function ulangiRingkasan(siteId: number, path: string): Promise<Has
   }
   revalidatePath(path)
   return null
+}
+
+export type HasilPeriksa = { keadaan: string; pesan?: string; error?: string }
+
+/**
+ * Memeriksa ulang satu temuan: apakah yang ini sudah beres?
+ *
+ * Dijalankan di dalam proses server, bukan di-spawn seperti pemindaian —
+ * satu halaman selesai dalam sekitar dua detik (terukur 1,5s pada situs
+ * nyata), jauh di bawah batas waktu server action. Yang perlu di-spawn adalah
+ * crawl 141 halaman, bukan ini.
+ */
+export async function periksaTemuan(findingId: number, path: string): Promise<HasilPeriksa> {
+  // Ditolak selagi pemindaian berjalan: dua Chromium pada satu situs saling
+  // berebut, dan yang kalah melapor gagal seolah halamannya rusak.
+  const situsTemuan = getDb()
+    .prepare('SELECT site_id FROM findings WHERE id = ?')
+    .get(findingId) as { site_id: number } | undefined
+  if (situsTemuan && runAktif(getDb(), situsTemuan.site_id)) {
+    return { keadaan: 'sibuk', error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
+  }
+
+  try {
+    const hasil = await recheck(getDb(), findingId)
+    revalidatePath(path)
+    return hasil.keadaan === 'beres' || hasil.keadaan === 'masih-ada'
+      ? { keadaan: hasil.keadaan }
+      : { keadaan: hasil.keadaan, pesan: 'pesan' in hasil ? hasil.pesan : undefined }
+  } catch (err) {
+    return { keadaan: 'galat', error: err instanceof Error ? err.message : String(err) }
+  }
 }

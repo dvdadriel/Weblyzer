@@ -55,6 +55,15 @@ export type PageVisit = {
 export type VisitOptions = {
   maxPages?: number
   timeoutMs?: number
+  /**
+   * Kunjungi tepat URL-URL ini dan JANGAN ikuti tautannya.
+   *
+   * Dipakai pemeriksaan ulang satu temuan: menjelajah 141 halaman untuk
+   * memastikan satu bug sudah beres adalah tiga menit untuk satu pertanyaan
+   * yang bisa dijawab dalam dua detik. Tautan sengaja tidak diikuti — begitu
+   * diikuti, ini bukan pemeriksaan satu halaman lagi.
+   */
+  hanya?: string[]
 }
 
 /**
@@ -93,7 +102,10 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
     const context = await browser.newContext()
     let page: Page = await context.newPage()
 
-    const queue: string[] = [normalizeUrl(baseUrl)]
+    const targeted = opts.hanya !== undefined && opts.hanya.length > 0
+    const queue: string[] = targeted
+      ? opts.hanya!.map((u) => normalizeUrl(u))
+      : [normalizeUrl(baseUrl)]
     const seen = new Set<string>(queue)
 
     while (queue.length > 0 && results.length < maxPages) {
@@ -243,6 +255,9 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
         setCookies,
         ...(error === undefined ? {} : { error }),
       })
+
+      // Mode tertarget berhenti di sini: yang diminta cuma halaman ini.
+      if (targeted) continue
 
       for (const href of links) {
         let normalized: string

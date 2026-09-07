@@ -558,3 +558,15 @@ code {
   display: inline-flex; align-items: baseline; gap: var(--s-1);
   font-size: var(--t-mikro); color: var(--sev-high);
 }
+
+/* ── Aksi per temuan ─────────────────────────────────────────────────────── */
+
+.detail-aksi { display: flex; gap: var(--s-3); align-items: center; flex-wrap: wrap; margin: 0; }
+.detail-catatan { font-size: var(--t-mikro); color: var(--ink-2); }
+.detail-hasil { margin: var(--s-2) 0 0; font-size: var(--t-mikro); max-width: 68ch; }
+.detail-hasil.beres { color: var(--sev-fixed); }
+.detail-hasil.masih { color: var(--ink-2); }
+/* Tak terjangkau memakai warna critical, dan itu disengaja: keadaan "tidak
+   diketahui" lebih mendesak daripada "masih ada", karena yang satu bisa
+   dikerjakan sedangkan yang lain berarti datanya tidak bisa dipercaya. */
+.detail-hasil.galat { color: var(--sev-critical); }
