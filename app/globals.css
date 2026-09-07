@@ -63,3 +63,46 @@ a { color: inherit; }
     transition-duration: 0.01ms !important;
   }
 }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: var(--s-6) var(--s-4); }
+
+.wordmark { margin-bottom: var(--s-6); }
+.wordmark-teks {
+  font-family: var(--font-mark);
+  font-size: var(--t-mark);
+  letter-spacing: 0.02em;
+}
+
+.kartu-daftar { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+
+.kartu {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  text-decoration: none;
+  background: transparent;
+  transition: background var(--d-cepat) var(--e-out);
+}
+.kartu:hover { background: var(--surface); }
+
+/* Nama dan domain satu baris, bukan dua — lebih rapat tanpa kehilangan apa pun. */
+.kartu-judul { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
+.kartu-nama { font-size: var(--t-judul); font-weight: 600; }
+.kartu-url { font-size: var(--t-data); color: var(--ink-2); }
+
+.kartu-status { font-size: var(--t-data); color: var(--ink-2); }
+.kartu-status.gagal { color: var(--sev-critical); }
+.kartu-status.bersih { color: var(--sev-fixed); }
+.kartu-hitungan { display: flex; gap: var(--s-4); font-size: var(--t-data); font-weight: 500; flex-wrap: wrap; }
+
+.kosong { padding: var(--s-7) var(--s-4); text-align: center; }
+.kosong-judul { font-size: var(--t-sub); font-weight: 600; margin: 0 0 var(--s-2); }
+.kosong-teks { color: var(--ink-2); font-size: var(--t-data); margin: 0; }
+code {
+  background: var(--surface);
+  padding: 0.15em 0.4em;
+  border-radius: var(--r-chip);
+  font-size: 0.95em;
+}
