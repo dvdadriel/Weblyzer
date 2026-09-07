@@ -164,3 +164,77 @@ code {
 .sel-mikro { font-size: var(--t-mikro); color: var(--ink-2); white-space: nowrap; text-align: right; }
 .tabel th:last-child { text-align: right; }
 .tabel-kaki { margin-top: var(--s-3); font-size: var(--t-mikro); color: var(--ink-2); }
+
+/* Tombol yang membuka detail tidak menambah perabot: yang terlihat tetap
+   lencana severity yang sudah ada di sel itu. Yang ditambahkan hanya area
+   klik dan cincin fokus bawaan. */
+.tombol-sev {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.baris-detail td { background: var(--surface); }
+.detail-judul {
+  margin: 0 0 var(--s-2);
+  font-size: var(--t-body);
+  font-weight: 500;
+  max-width: 68ch;
+}
+.detail-json {
+  margin: 0 0 var(--s-3);
+  font-size: var(--t-mikro);
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
+/* Aksi teks polos: aksennya --ink, sama seperti sisa antarmuka. Tidak ada
+   warna kelima hanya untuk satu tombol. */
+.tombol-teks {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: var(--t-data);
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tombol-teks:disabled { color: var(--ink-2); cursor: default; }
+
+/* Saringan status: bentuk tab, satu langkah lebih kecil, tanpa garis wilayah
+   sendiri — dia milik tabel di bawahnya, bukan wilayah baru. */
+.saring {
+  display: flex;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  font-size: var(--t-data);
+}
+.saring-item {
+  padding: var(--s-1) 0;
+  text-decoration: none;
+  color: var(--ink-2);
+  border-bottom: 2px solid transparent;
+}
+.saring-item[aria-current] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+  font-weight: 600;
+}
+.saring-kosong {
+  margin-top: var(--s-5);
+  font-size: var(--t-data);
+  color: var(--ink-2);
+}

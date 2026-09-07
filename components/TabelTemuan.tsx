@@ -1,5 +1,9 @@
+'use client'
+
+import { useState, useTransition } from 'react'
 import type { BarisTemuan } from '../lib/ui/queries.ts'
 import { SeverityChip } from './SeverityChip.tsx'
+import { ubahStatusTemuan } from '../app/actions.ts'
 
 /**
  * Membuang awalan domain dari URL yang ditampilkan.
@@ -13,13 +17,67 @@ function jalur(url: string, baseUrl: string): string {
   return url.startsWith(baseUrl) ? url.slice(baseUrl.length) || '/' : url
 }
 
+/**
+ * `detail_json` datang dari pemindai dan tidak dijamin JSON valid. Kalau tidak
+ * bisa di-parse, teks aslinya ditampilkan apa adanya — pengukuran yang ada
+ * lebih berguna daripada pesan error yang menyembunyikannya.
+ */
+function rapikan(detail: string): string {
+  try {
+    return JSON.stringify(JSON.parse(detail), null, 2)
+  } catch {
+    return detail
+  }
+}
+
+function BarisDetail({
+  b,
+  status,
+  path,
+}: {
+  b: BarisTemuan
+  status: 'open' | 'ignored'
+  path: string
+}) {
+  const [pending, mulai] = useTransition()
+  return (
+    <tr id={`detail-${b.id}`} className="baris-detail">
+      {/* colSpan, bukan `display: block`: reflow lewat display menghapus
+          semantik tabel di sebagian screen reader, dan navigasi per kolom
+          adalah syarat di PRODUCT.md. */}
+      <td colSpan={4}>
+        <p className="detail-judul">{b.title}</p>
+        <pre className="detail-json">{rapikan(b.detail_json)}</pre>
+        <button
+          type="button"
+          className="tombol-teks"
+          disabled={pending}
+          onClick={() =>
+            mulai(async () => {
+              await ubahStatusTemuan(b.id, status === 'open' ? 'ignored' : 'open', path)
+            })
+          }
+        >
+          {status === 'open' ? 'Abaikan' : 'Buka lagi'}
+        </button>
+      </td>
+    </tr>
+  )
+}
+
 export function TabelTemuan({
   baris,
   baseUrl,
+  status = 'open',
+  path,
 }: {
   baris: BarisTemuan[]
   baseUrl: string
+  status?: 'open' | 'ignored'
+  path: string
 }) {
+  const [terbuka, setTerbuka] = useState<number | null>(null)
+
   return (
     <div className="tabel-bungkus">
       <table className="tabel">
@@ -40,22 +98,42 @@ export function TabelTemuan({
           </tr>
         </thead>
         <tbody>
-          {baris.map((b) => (
-            <tr key={b.id}>
-              <td><SeverityChip severity={b.severity} /></td>
-              <td className="sel-rule">{b.rule}</td>
-              <td className="sel-url" title={b.url ?? undefined}>
-                {b.url === null ? b.title : jalur(b.url, baseUrl)}
-              </td>
-              <td className="sel-mikro">
-                run {b.first_seen_run}
-                {b.first_seen_run !== b.last_seen_run && `–${b.last_seen_run}`}
-              </td>
-            </tr>
-          ))}
+          {baris.map((b) => {
+            const buka = terbuka === b.id
+            return [
+              <tr key={b.id}>
+                <td>
+                  <button
+                    type="button"
+                    className="tombol-sev"
+                    aria-expanded={buka}
+                    aria-controls={`detail-${b.id}`}
+                    onClick={() => setTerbuka(buka ? null : b.id)}
+                  >
+                    <SeverityChip severity={b.severity} />
+                  </button>
+                </td>
+                <td className="sel-rule">{b.rule}</td>
+                <td className="sel-url" title={b.url ?? undefined}>
+                  {b.url === null ? b.title : jalur(b.url, baseUrl)}
+                </td>
+                <td className="sel-mikro">
+                  run {b.first_seen_run}
+                  {b.first_seen_run !== b.last_seen_run && `–${b.last_seen_run}`}
+                </td>
+              </tr>,
+              // Dirender hanya saat mengembang: isinya tidak pernah ada di DOM
+              // sambil disembunyikan menunggu animasi.
+              buka ? (
+                <BarisDetail key={`d-${b.id}`} b={b} status={status} path={path} />
+              ) : null,
+            ]
+          })}
         </tbody>
       </table>
-      <p className="tabel-kaki">{baris.length} temuan terbuka.</p>
+      <p className="tabel-kaki">
+        {baris.length} temuan {status === 'open' ? 'terbuka' : 'diabaikan'}.
+      </p>
     </div>
   )
 }
