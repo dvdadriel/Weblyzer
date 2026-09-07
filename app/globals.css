@@ -111,3 +111,46 @@ code {
   border-radius: var(--r-chip);
   font-size: 0.95em;
 }
+
+.tab {
+  display: flex; gap: var(--s-4); margin-top: var(--s-5);
+  border-bottom: 1px solid var(--line-kuat);
+}
+.tab-item {
+  padding: var(--s-2) 0;
+  text-decoration: none;
+  color: var(--ink-2);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab-item[aria-current='page'] {
+  color: var(--ink); border-bottom-color: var(--ink); font-weight: 600;
+}
+
+.chip {
+  display: inline-flex; gap: var(--s-1); align-items: baseline;
+  font-size: var(--t-mikro); font-weight: 500;
+  border-radius: var(--r-chip); white-space: nowrap;
+}
+
+.tabel-bungkus { overflow-x: auto; margin-top: var(--s-5); }
+.tabel { width: 100%; border-collapse: collapse; font-size: var(--t-data); }
+.tabel th {
+  text-align: left; font-weight: 600;
+  padding: var(--s-2) var(--s-3);
+  border-bottom: 1px solid var(--line-kuat);
+  color: var(--ink-2);
+}
+.tabel td {
+  padding: var(--s-2) var(--s-3);
+  border-bottom: 1px solid var(--line);
+  vertical-align: baseline;
+}
+.tabel tbody tr { transition: background var(--d-cepat) var(--e-out); }
+.tabel tbody tr:hover { background: var(--surface); }
+.sel-rule { font-weight: 500; }
+.sel-url { color: var(--ink-2); word-break: break-all; }
+/* Rata kanan: nomor run terbaca sebagai kolom angka, bukan teks menggantung. */
+.sel-mikro { font-size: var(--t-mikro); color: var(--ink-2); white-space: nowrap; text-align: right; }
+.tabel th:last-child { text-align: right; }
+.tabel-kaki { margin-top: var(--s-3); font-size: var(--t-mikro); color: var(--ink-2); }
