@@ -33,6 +33,19 @@ export default async function SiteLayout({
         <h1 className="kartu-nama">{s.name}</h1>
         <span className="kartu-url">{s.base_url}</span>
       </div>
+      {/* Unduhan adalah tautan biasa, bukan tombol dengan JS: browser yang
+          menangani penyimpanannya, dan `<a download>` sudah bekerja tanpa satu
+          baris pun kode klien. Diletakkan di header situs, bukan per tab,
+          karena berkasnya memuat seluruh kategori. */}
+      <p className="unduh">
+        <a className="unduh-tautan" href={`/sites/${s.id}/export`} download>
+          Unduh Excel
+        </a>
+        <span className="unduh-catatan">
+          seluruh kategori, termasuk yang sudah beres dan diabaikan
+        </span>
+      </p>
+
       <Tab siteId={s.id} />
 
       {/* Di layout, bukan di halaman kategori: ringkasannya membahas seluruh

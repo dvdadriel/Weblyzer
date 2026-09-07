@@ -589,3 +589,12 @@ code {
   margin-left: var(--s-1); color: var(--ink-2); font-size: var(--t-mikro);
 }
 .saring-item[aria-current] .saring-hitung { color: var(--ink); }
+
+/* ── Unduh Excel ─────────────────────────────────────────────────────────── */
+
+.unduh {
+  display: flex; gap: var(--s-2); align-items: baseline; flex-wrap: wrap;
+  margin: var(--s-3) 0 0;
+}
+.unduh-tautan { font-size: var(--t-data); color: var(--ink); }
+.unduh-catatan { font-size: var(--t-mikro); color: var(--ink-2); }
