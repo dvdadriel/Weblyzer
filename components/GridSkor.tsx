@@ -40,14 +40,20 @@ function SelSkor({ n }: { n: number | null }) {
 }
 
 export function GridSkor({ baris, baseUrl }: { baris: BarisSkor[]; baseUrl: string }) {
+  /* Kolom yang isinya sama di setiap baris bukan informasi — dia cuma memakan
+     lebar. Situs yang diukur hanya `mobile` menampilkan "mobile" enam kali;
+     6,5rem itu justru lebar yang paling dibutuhkan di layar sempit. Kolomnya
+     muncul begitu ada strategi kedua. */
+  const banyakStrategi = new Set(baris.map((b) => b.strategy)).size > 1
+
   return (
     <div className="tabel-bungkus">
-      <table className="tabel">
+      <table className="tabel grid-skor">
         {/* Hanya `halaman` yang lentur; empat kolom skor berlebar sama supaya
             angkanya berbaris per kolom. */}
         <colgroup>
-          <col />
-          <col className="k-strategy" />
+          <col className="k-halaman" />
+          {banyakStrategi && <col className="k-strategy" />}
           <col className="k-skor" />
           <col className="k-skor" />
           <col className="k-skor" />
@@ -56,7 +62,7 @@ export function GridSkor({ baris, baseUrl }: { baris: BarisSkor[]; baseUrl: stri
         <thead>
           <tr>
             <th scope="col">halaman</th>
-            <th scope="col">strategy</th>
+            {banyakStrategi && <th scope="col">strategy</th>}
             <th scope="col" className="th-skor">perf</th>
             <th scope="col" className="th-skor">a11y</th>
             <th scope="col" className="th-skor">best</th>
@@ -69,7 +75,7 @@ export function GridSkor({ baris, baseUrl }: { baris: BarisSkor[]; baseUrl: stri
               <td className="sel-url" title={b.url}>
                 {jalur(b.url, baseUrl)}
               </td>
-              <td>{b.strategy}</td>
+              {banyakStrategi && <td>{b.strategy}</td>}
               <SelSkor n={b.perf} />
               <SelSkor n={b.a11y} />
               <SelSkor n={b.best_practices} />
@@ -78,7 +84,13 @@ export function GridSkor({ baris, baseUrl }: { baris: BarisSkor[]; baseUrl: stri
           ))}
         </tbody>
       </table>
-      <p className="tabel-kaki">{baris.length} pengukuran.</p>
+      {/* Kalau kolom strategy disembunyikan, strateginya disebut sekali di sini.
+          Menyembunyikan kolom boleh; menghilangkan informasinya tidak — skor
+          mobile dan desktop berbeda jauh. */}
+      <p className="tabel-kaki">
+        {baris.length} pengukuran
+        {banyakStrategi ? '' : ` (${baris[0]?.strategy ?? '-'})`}.
+      </p>
     </div>
   )
 }

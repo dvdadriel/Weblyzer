@@ -246,6 +246,15 @@ code {
 /* Grid skor Lighthouse. Empat kolom skor berlebar sama dan rata kanan supaya
    angkanya berbaris — itulah yang membuat "halaman mana yang bergerak" bisa
    dipindai sekali lihat, yang tidak bisa dijawab satu lingkaran besar. */
+/* `halaman` diberi lebar tetap supaya kolom skor ikut terlihat sebagian di
+   layar sempit. Tanpa ini kolom itu menyerap seluruh viewport: di 390px yang
+   tampak hanya enam path dan nol skor — muatan halaman ini justru yang hilang,
+   dan tidak ada petunjuk bahwa ada yang bisa digulir. */
+.tabel col.k-halaman { width: 15rem; }
+/* Grid skor punya kolom sendiri yang lebih sempit, jadi `min-width` 660px yang
+   diwarisi dari tabel temuan justru membuat kolom skor terdorong ke luar layar.
+   33rem = 15rem halaman + 4x4.5rem skor, tanpa sisa untuk diserap. */
+.grid-skor { min-width: 33rem; }
 .tabel col.k-strategy { width: 6.5rem; }
 .tabel col.k-skor { width: 4.5rem; }
 .tabel th.th-skor, .sel-skor { text-align: right; }
