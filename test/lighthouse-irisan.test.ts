@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { irisanAudit } from '../lib/jobs/lighthouse.ts'
+import { irisanAudit, susunTargets } from '../lib/jobs/lighthouse.ts'
 import type { LighthouseResult } from '../lib/scanners/lighthouse.ts'
 
 const audit = (id: string) => ({ id, title: `Judul ${id}`, score: 0, displayMode: 'binary' })
@@ -66,4 +66,38 @@ test('mobile dan desktop dipasangkan terpisah', () => {
 test('target yang tidak ada di pengukuran kedua dibiarkan apa adanya', () => {
   const [r] = irisanAudit([hasil({ audits: [audit('a')] })], [])
   expect(r!.audits.map((a) => a.id)).toEqual(['a'])
+})
+
+/* ── susunTargets: sakelar mobile/desktop ────────────────────────────────── */
+
+test('strategi mobile menghasilkan satu pengukuran per halaman', () => {
+  expect(susunTargets(['a', 'b'], 'mobile')).toEqual([
+    { url: 'a', strategy: 'mobile' },
+    { url: 'b', strategy: 'mobile' },
+  ])
+})
+
+test('strategi both menghasilkan dua pengukuran per halaman', () => {
+  expect(susunTargets(['a'], 'both')).toEqual([
+    { url: 'a', strategy: 'mobile' },
+    { url: 'a', strategy: 'desktop' },
+  ])
+})
+
+test('both menggandakan jumlah pengukuran, bukan menambah satu', () => {
+  expect(susunTargets(['a', 'b', 'c'], 'both')).toHaveLength(6)
+  expect(susunTargets(['a', 'b', 'c'], 'mobile')).toHaveLength(3)
+})
+
+/**
+ * Kolomnya TEXT bebas di SQLite. Setelan yang salah tulis harus jatuh ke
+ * mobile — kegagalan yang aman — bukan menggagalkan seluruh pengukuran.
+ */
+test('setelan yang tidak dikenal diperlakukan sebagai mobile', () => {
+  expect(susunTargets(['a'], 'bukan-strategi')).toEqual([{ url: 'a', strategy: 'mobile' }])
+  expect(susunTargets(['a'], '')).toEqual([{ url: 'a', strategy: 'mobile' }])
+})
+
+test('tanpa halaman berarti tanpa pengukuran, apa pun strateginya', () => {
+  expect(susunTargets([], 'both')).toEqual([])
 })

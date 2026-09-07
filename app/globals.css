@@ -570,3 +570,22 @@ code {
    diketahui" lebih mendesak daripada "masih ada", karena yang satu bisa
    dikerjakan sedangkan yang lain berarti datanya tidak bisa dipercaya. */
 .detail-hasil.galat { color: var(--sev-critical); }
+
+/* ── Strategi Lighthouse ─────────────────────────────────────────────────── */
+
+.strategi { display: inline-flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.strategi-label {
+  display: inline-flex; align-items: center; gap: var(--s-1);
+  font-size: var(--t-data); cursor: pointer;
+}
+.strategi-label input { accent-color: var(--ink); margin: 0; }
+/* Biaya disebut di sebelah kontrolnya, bukan disembunyikan di dokumentasi:
+   menyalakan desktop menggandakan waktu pengukuran. */
+.strategi-biaya { color: var(--ink-2); font-size: var(--t-mikro); }
+
+/* Hitungan di sub-tab, supaya sub-tab kosong bisa dibedakan dari yang belum
+   pernah diklik. */
+.saring-hitung {
+  margin-left: var(--s-1); color: var(--ink-2); font-size: var(--t-mikro);
+}
+.saring-item[aria-current] .saring-hitung { color: var(--ink); }

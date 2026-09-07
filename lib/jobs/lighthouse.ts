@@ -46,6 +46,28 @@ export function irisanAudit(
 }
 
 /**
+ * Menyusun daftar pengukuran dari halaman terpilih dan setelan strategi situs.
+ *
+ * Dipisah supaya sakelar `both` bisa diuji tanpa menyalakan Chrome: inilah
+ * satu-satunya tempat yang memutuskan desktop ikut diukur atau tidak, dan
+ * kalau ia diam-diam kembali ke mobile saja, seluruh sub-tab Desktop menjadi
+ * kosong tanpa satu pun galat.
+ *
+ * Nilai selain `both` diperlakukan sebagai mobile, bukan dilempar: kolomnya
+ * TEXT bebas di SQLite dan bisa berisi apa saja. Mengukur mobile saja adalah
+ * kegagalan yang aman; melempar akan menggagalkan seluruh pengukuran karena
+ * satu setelan yang salah tulis.
+ */
+export function susunTargets(urls: string[], strategi: string): LighthouseTarget[] {
+  const strategies: Strategy[] = strategi === 'both' ? ['mobile', 'desktop'] : ['mobile']
+  const targets: LighthouseTarget[] = []
+  for (const url of urls) {
+    for (const strategy of strategies) targets.push({ url, strategy })
+  }
+  return targets
+}
+
+/**
  * Mengukur Lighthouse untuk halaman yang dipilih anggaran, menyimpan skornya,
  * lalu merekonsiliasi audit binary sebagai temuan.
  *
@@ -68,13 +90,7 @@ export async function lighthouseHandler(job: Job, db: DatabaseSync): Promise<voi
   const mode = site.lighthouse_mode === 'full' ? 'full' : 'sample'
   const dipilih = pilihHalaman(semua, mode)
 
-  const strategies: Strategy[] =
-    site.lighthouse_strategy === 'both' ? ['mobile', 'desktop'] : ['mobile']
-
-  const targets: LighthouseTarget[] = []
-  for (const h of dipilih) {
-    for (const strategy of strategies) targets.push({ url: h.url, strategy })
-  }
+  const targets = susunTargets(dipilih.map((h) => h.url), site.lighthouse_strategy)
 
   // Port debugging dialokasikan runner itu sendiri: satu tempat, bukan dua.
   //

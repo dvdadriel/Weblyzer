@@ -200,9 +200,20 @@ export function skorSitus(db: DatabaseSync, siteId: number) {
 }
 
 export function situs(db: DatabaseSync, siteId: number) {
-  return db
-    .prepare('SELECT id, name, base_url FROM sites WHERE id = ?')
-    .get(siteId) as { id: number; name: string; base_url: string } | undefined
+  const baris = db
+    .prepare(
+      'SELECT id, name, base_url, lighthouse_strategy, lighthouse_mode FROM sites WHERE id = ?',
+    )
+    .get(siteId) as
+    | {
+        id: number
+        name: string
+        base_url: string
+        lighthouse_strategy: string
+        lighthouse_mode: string
+      }
+    | undefined
+  return baris ? { ...baris } : undefined
 }
 
 /**

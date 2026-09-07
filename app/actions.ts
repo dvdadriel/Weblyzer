@@ -247,3 +247,22 @@ export async function periksaTemuan(findingId: number, path: string): Promise<Ha
     return { keadaan: 'galat', error: err instanceof Error ? err.message : String(err) }
   }
 }
+
+/**
+ * Menyalakan atau mematikan pengukuran desktop untuk sebuah situs.
+ *
+ * Biayanya nyata dan karena itu jadi pilihan, bukan bawaan: setiap halaman
+ * diukur dua kali per strategi (mekanisme irisan yang mematikan flapping),
+ * jadi menyalakan desktop menggandakan waktu Lighthouse. Terukur 21 detik
+ * untuk dua strategi pada satu halaman.
+ */
+export async function aturStrategi(siteId: number, keduanya: boolean): Promise<HasilAksi> {
+  if (runAktif(getDb(), siteId)) {
+    return { error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
+  }
+  getDb()
+    .prepare('UPDATE sites SET lighthouse_strategy = ? WHERE id = ?')
+    .run(keduanya ? 'both' : 'mobile', siteId)
+  revalidatePath(`/sites/${siteId}/lighthouse`)
+  return null
+}
