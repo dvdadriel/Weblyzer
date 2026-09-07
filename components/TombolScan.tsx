@@ -1,10 +1,32 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { jalankanScan } from '../app/actions.ts'
 
 export type Kategori = 'bugs' | 'console' | 'security' | 'lighthouse'
+
+/**
+ * Label tombol per kategori. Tunggal dan huruf besar, berpasangan dengan label
+ * tab — DESIGN.md mensyaratkan nama aksi yang sama sepanjang alur, dan kata
+ * "scan" karena itu ikut dipakai di baris keadaan berjalan di bawah.
+ */
+const LABEL: Record<Kategori, string> = {
+  bugs: 'Scan Bug',
+  console: 'Scan Console',
+  security: 'Scan Security',
+  lighthouse: 'Scan Lighthouse',
+}
+
+/**
+ * Jeda penyegaran otomatis selagi pemindaian berjalan.
+ *
+ * Pemindaian berlangsung menit-menitan, jadi lima detik sudah terasa seketika
+ * tanpa membanjiri server: tiap siklus hanya satu kueri SQLite lokal. Yang
+ * digantinya bukan kenyamanan tapi kebingungan — tanpa ini satu-satunya cara
+ * mengetahui pemindaian sudah selesai adalah menekan tombol.
+ */
+const JEDA_SEGARKAN_MS = 5000
 
 /**
  * Menjalankan pemindaian kategori ini, atau melaporkan bahwa satu pemindaian
@@ -35,24 +57,31 @@ export function TombolScan({
   const [menunggu, mulai] = useTransition()
   const router = useRouter()
 
+  // Halaman memeriksa dirinya sendiri selagi pemindaian berjalan, lalu berhenti
+  // begitu selesai: `berjalan` menjadi null, efeknya dibersihkan, dan tidak ada
+  // timer yang menggantung. Inilah "notifikasi" yang dimiliki alat ini —
+  // layarnya berganti sendiri ke hasil.
+  useEffect(() => {
+    if (!berjalan) return
+    const timer = setInterval(() => router.refresh(), JEDA_SEGARKAN_MS)
+    return () => clearInterval(timer)
+  }, [berjalan, router])
+
   if (berjalan) {
     return (
       <p className="jalan" role="status">
         <span className="jalan-tanda" aria-hidden="true">
           [..]
         </span>
-        {/* "situs ini", bukan kategori dan bukan tipe run: tombolnya memang mati
-            di SEMUA tab karena satu crawl memakai satu browser. Tanpa kata itu,
-            menekan "security" lalu menemukan tombol mati di "bugs" terbaca
-            seperti kerusakan. Tipe run internal (`full`) sengaja tidak disebut —
-            itu nama cara sistem dibangun, bukan nama yang dikenali pemakai. */}
-        Memindai situs ini sejak {berjalan.mulai}.{' '}
-        <button
-          className="jalan-segarkan"
-          type="button"
-          onClick={() => router.refresh()}
-        >
-          periksa lagi
+        {/* "situs ini", bukan kategori: tombolnya memang mati di SEMUA tab
+            karena satu crawl memakai satu browser. Tanpa kata itu, menekan
+            Scan Security lalu menemukan tombol mati di Bug terbaca seperti
+            kerusakan. Tipe run internal (`full`) sengaja tidak disebut — itu
+            nama cara sistem dibangun, bukan nama yang dikenali pemakai. */}
+        Scan situs ini berjalan sejak {berjalan.mulai}. Halaman ini akan
+        berganti sendiri saat selesai.{' '}
+        <button className="jalan-segarkan" type="button" onClick={() => router.refresh()}>
+          Periksa Sekarang
         </button>
       </p>
     )
@@ -71,7 +100,7 @@ export function TombolScan({
           })
         }
       >
-        {menunggu ? 'memulai' : `jalankan scan ${kategori}`}
+        {menunggu ? 'Memulai…' : LABEL[kategori]}
       </button>
 
       {galat && (

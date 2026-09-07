@@ -58,7 +58,7 @@ function BarisDetail({
             })
           }
         >
-          {status === 'open' ? 'Abaikan' : 'Buka lagi'}
+          {status === 'open' ? 'Abaikan' : 'Buka Lagi'}
         </button>
       </td>
     </tr>
@@ -91,10 +91,10 @@ export function TabelTemuan({
         </colgroup>
         <thead>
           <tr>
-            <th scope="col">severity</th>
-            <th scope="col">aturan</th>
-            <th scope="col">halaman</th>
-            <th scope="col">terlihat</th>
+            <th scope="col">Severity</th>
+            <th scope="col">Aturan</th>
+            <th scope="col">Halaman</th>
+            <th scope="col">Terlihat</th>
           </tr>
         </thead>
         <tbody>

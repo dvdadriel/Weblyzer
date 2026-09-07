@@ -21,12 +21,12 @@ export function TambahSitus() {
 
   return (
     <details className="tambah">
-      <summary className="tambah-pemicu">+ tambah situs</summary>
+      <summary className="tambah-pemicu">+ Tambah Situs</summary>
 
       <form action={kirim} className="tambah-form">
         <p className="tambah-baris">
           <label className="tambah-label" htmlFor="nama">
-            nama
+            Nama
           </label>
           {/* `defaultValue` dari state, bukan string kosong: lihat catatan di
               `HasilAksi`. Simpan yang gagal tidak boleh menghapus apa yang
@@ -43,7 +43,7 @@ export function TambahSitus() {
 
         <p className="tambah-baris">
           <label className="tambah-label" htmlFor="url">
-            alamat
+            Alamat
           </label>
           {/* `type="url"` memberi keyboard yang benar di ponsel, tapi validasi
               sebenarnya tetap di server: `normalizeBaseUrl` yang memutuskan,
@@ -62,7 +62,7 @@ export function TambahSitus() {
 
         <p className="tambah-aksi">
           <button className="tombol" type="submit" disabled={menunggu}>
-            {menunggu ? 'menyimpan' : 'simpan situs'}
+            {menunggu ? 'Menyimpan…' : 'Simpan Situs'}
           </button>
         </p>
 

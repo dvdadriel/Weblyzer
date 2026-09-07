@@ -3,6 +3,7 @@ import { db } from '../lib/ui/db.ts'
 import { ringkasanSitus } from '../lib/ui/queries.ts'
 import { Wordmark } from '../components/Wordmark.tsx'
 import { TambahSitus } from '../components/TambahSitus.tsx'
+import { HapusSitus } from '../components/HapusSitus.tsx'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +24,12 @@ export default function Dashboard() {
       ) : (
         <ul className="kartu-daftar">
           {situs.map((s) => (
-            <li key={s.id}>
+            /* Tombol hapus berada DI LUAR tautan: `<button>` di dalam `<a>`
+               adalah HTML tak sah, dan browser menanganinya berbeda-beda —
+               sebagian mengaktifkan tautannya juga, jadi menekan Hapus bisa
+               ikut berpindah halaman. Kartunya jadi pembungkus posisi, dan
+               tautannya mengisi seluruh area kecuali sudut tombol. */
+            <li key={s.id} className="kartu-bungkus">
               <Link href={`/sites/${s.id}/bugs`} className="kartu">
                 <span className="kartu-judul">
                   <span className="kartu-nama">{s.nama}</span>
@@ -55,6 +61,8 @@ export default function Dashboard() {
                   </span>
                 )}
               </Link>
+
+              <HapusSitus siteId={s.id} nama={s.nama} jumlahTemuan={s.totalTerbuka} />
             </li>
           ))}
         </ul>

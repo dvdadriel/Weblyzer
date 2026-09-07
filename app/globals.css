@@ -366,3 +366,53 @@ code {
 }
 .jalan-segarkan:hover { border-bottom-color: var(--ink); }
 .jalan-galat { font-size: var(--t-data); color: var(--sev-critical); }
+
+/* ── Hapus situs ──────────────────────────────────────────────────────────
+   Tombolnya berada di luar tautan kartu (HTML tak sah kalau di dalam), jadi
+   posisinya diatur di sini: kartu mengisi seluruh baris, tombol duduk di sudut
+   kanan atas di atasnya. */
+
+.kartu-bungkus { position: relative; }
+.hapus {
+  position: absolute; top: var(--s-3); right: var(--s-3);
+  z-index: var(--z-dropdown);
+}
+.hapus-pemicu, .hapus-batal {
+  font: inherit; font-size: var(--t-mikro);
+  color: var(--ink-2); background: none;
+  border: 1px solid transparent; border-radius: var(--r-chip);
+  padding: var(--s-1) var(--s-2); cursor: pointer;
+}
+/* Aksi merusak tidak diberi warna merah sampai ada niat: sebuah daftar dengan
+   dua belas tombol merah membaca sebagai peringatan, bukan sebagai kontrol.
+   Merahnya muncul saat hover, dan panel konfirmasinya yang membawa bobotnya. */
+.hapus-pemicu:hover { color: var(--sev-critical); border-color: var(--sev-critical); }
+.hapus-batal:hover { color: var(--ink); }
+
+/* Panel konfirmasi keluar dari posisi absolut dan masuk ke aliran normal,
+   mendorong kartu di bawahnya. Versi pertama tetap absolut dan hasilnya
+   menutupi kartu berikutnya: tombol Hapus milik kartu tetangga menembus di
+   atas panel, dan stempel waktu kartu ini sendiri ikut tertutup. Sebuah
+   konfirmasi yang menyembunyikan data yang sedang ditanyakan adalah lelucon
+   yang buruk. */
+.hapus-tanya {
+  position: static;
+  margin: 0 var(--s-3) var(--s-3);
+  padding: var(--s-3);
+  background: var(--bg);
+  border: 1px solid var(--sev-critical);
+  border-radius: var(--r-panel);
+}
+.hapus-teks {
+  margin: 0 0 var(--s-3);
+  font-size: var(--t-data); color: var(--ink);
+}
+.hapus-aksi { display: flex; gap: var(--s-2); align-items: center; margin: 0; }
+.tombol-bahaya {
+  background: var(--sev-critical); border-color: var(--sev-critical);
+}
+.tombol-bahaya:hover { background: oklch(43% 0.147 33); }
+.tombol-bahaya:active { background: var(--sev-critical); }
+.hapus-galat {
+  margin: var(--s-2) 0 0; font-size: var(--t-mikro); color: var(--sev-critical);
+}

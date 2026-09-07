@@ -61,12 +61,12 @@ export function GridSkor({ baris, baseUrl }: { baris: BarisSkor[]; baseUrl: stri
         </colgroup>
         <thead>
           <tr>
-            <th scope="col">halaman</th>
-            {banyakStrategi && <th scope="col">strategy</th>}
-            <th scope="col" className="th-skor">perf</th>
-            <th scope="col" className="th-skor">a11y</th>
-            <th scope="col" className="th-skor">best</th>
-            <th scope="col" className="th-skor">seo</th>
+            <th scope="col">Halaman</th>
+            {banyakStrategi && <th scope="col">Strategy</th>}
+            <th scope="col" className="th-skor">Perf</th>
+            <th scope="col" className="th-skor">A11y</th>
+            <th scope="col" className="th-skor">Best</th>
+            <th scope="col" className="th-skor">SEO</th>
           </tr>
         </thead>
         <tbody>

@@ -127,3 +127,29 @@ async function tungguRun(siteId: number): Promise<boolean> {
   }
   return false
 }
+
+/**
+ * Menghapus situs beserta seluruh riwayatnya.
+ *
+ * Satu `DELETE` sudah cukup: skema memasang `ON DELETE CASCADE` dari `sites`
+ * ke `runs`, `pages`, dan `findings`, lalu dari `runs`/`pages` ke `jobs` dan
+ * `lighthouse` — dan `PRAGMA foreign_keys = ON` dipasang di `openDb`. Menyapu
+ * tabel satu per satu di sini berarti urutan penghapusan kedua yang harus
+ * ikut benar setiap kali skemanya berubah.
+ *
+ * Tidak ada undo, dan itu disengaja: membangun tempat sampah untuk alat satu
+ * pemakai adalah tabel plus penyaring di setiap kueri. Yang dipasang sebagai
+ * gantinya adalah konfirmasi yang menyebut jumlah yang akan hilang.
+ */
+export async function hapusSitus(siteId: number): Promise<HasilAksi> {
+  // Menghapus situs yang sedang dipindai akan menarik baris dari bawah proses
+  // pekerja yang masih menulis: crawl-nya lalu gagal di tengah dengan galat
+  // foreign key yang tidak menjelaskan apa pun. Ditolak dengan alasan jelas.
+  if (runAktif(getDb(), siteId)) {
+    return { error: 'Situs ini sedang dipindai. Tunggu sampai selesai, lalu hapus.' }
+  }
+
+  getDb().prepare('DELETE FROM sites WHERE id = ?').run(siteId)
+  revalidatePath('/')
+  return null
+}

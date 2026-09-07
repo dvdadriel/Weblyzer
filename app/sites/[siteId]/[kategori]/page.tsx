@@ -42,14 +42,14 @@ export default async function Kategori({
         className="saring-item"
         aria-current={status === 'open' ? 'true' : undefined}
       >
-        terbuka
+        Terbuka
       </Link>
       <Link
         href={`${path}?status=ignored`}
         className="saring-item"
         aria-current={status === 'ignored' ? 'true' : undefined}
       >
-        diabaikan
+        Diabaikan
       </Link>
     </nav>
   )
