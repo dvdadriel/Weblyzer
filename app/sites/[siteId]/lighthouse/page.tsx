@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 function Kosong({ judul, teks, perintah }: { judul: string; teks: string; perintah: string }) {
   return (
     <div className="kosong">
-      <p className="kosong-judul">{judul}</p>
+      <h2 className="kosong-judul">{judul}</h2>
       <p className="kosong-teks">{teks}</p>
       <p className="kosong-teks">
         <code>{perintah}</code>

@@ -156,6 +156,25 @@ test('permintaan situs sendiri yang gagal tetap dilaporkan', () => {
   expect(findings.map((f) => f.rule)).toEqual(['failed-request'])
 })
 
+test('permintaan yang dibatalkan tidak dilaporkan meski satu origin', () => {
+  // Prefetch yang masih terbang saat crawler pindah halaman berakhir sebagai
+  // ERR_ABORTED. URL-nya membawa cache-buster, jadi tiap batal mendapat
+  // fingerprint baru dan riwayat open/fixed kehilangan artinya.
+  const findings = analyzeConsole([
+    pageVisit({
+      url: 'https://a.test/x',
+      failedRequests: [
+        {
+          url: 'https://a.test/y?_rsc=5CB68i4pnAek',
+          resourceType: 'fetch',
+          failure: 'net::ERR_ABORTED',
+        },
+      ],
+    }),
+  ])
+  expect(findings).toEqual([])
+})
+
 test('temuan membawa pageId bila dipetakan', () => {
   const findings = analyzeConsole([pageVisit({ pageErrors: ['boom'] })], {
     'https://a.test/x': 7,

@@ -107,7 +107,13 @@ export function TabelTemuan({
                     type="button"
                     className="tombol-sev"
                     aria-expanded={buka}
-                    aria-controls={`detail-${b.id}`}
+                    // Hanya saat terbuka: baris detail baru ada di DOM ketika
+                    // mengembang, dan `aria-controls` yang menunjuk id yang
+                    // tidak ada adalah referensi rusak — screen reader
+                    // menawarkan "lompat ke elemen terkait" lalu tidak sampai
+                    // ke mana pun. `aria-expanded` tetap selalu ada; itulah
+                    // yang mengumumkan keadaannya.
+                    aria-controls={buka ? `detail-${b.id}` : undefined}
                     onClick={() => setTerbuka(buka ? null : b.id)}
                   >
                     <SeverityChip severity={b.severity} />

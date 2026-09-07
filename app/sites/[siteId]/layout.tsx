@@ -18,10 +18,13 @@ export default async function SiteLayout({
   return (
     <main className="wrap">
       <Wordmark />
-      <p className="kartu-judul">
-        <span className="kartu-nama">{s.name}</span>
+      {/* `div`, bukan `p`: sebuah heading tidak boleh berada di dalam `<p>`, dan
+          nama situs memang judul halaman ini. Kelasnya sama, jadi tampilannya
+          tidak berubah — yang berubah cuma DOM-nya jadi jujur. */}
+      <div className="kartu-judul">
+        <h1 className="kartu-nama">{s.name}</h1>
         <span className="kartu-url">{s.base_url}</span>
-      </p>
+      </div>
       <Tab siteId={s.id} />
       {children}
     </main>

@@ -70,6 +70,10 @@ a { color: inherit; }
 .wordmark-teks {
   font-family: var(--font-mark);
   font-size: var(--t-mark);
+  /* Dinyatakan, tidak diwarisi: di dashboard elemen ini adalah `<h1>`, yang
+     mewarisi bobot 600 dari aturan heading di atas. DESIGN.md menyebut wordmark
+     Space Mono 700, dan 700 adalah satu-satunya face yang dimuat. */
+  font-weight: 700;
   letter-spacing: 0.02em;
 }
 
@@ -123,6 +127,12 @@ code {
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
 }
+/* Keadaan hover. DESIGN.md mensyaratkan tujuh keadaan di tiap kontrol; tab dan
+   saringan sebelumnya tidak punya satu pun tanda bahwa dia bisa diklik sampai
+   kursornya sudah di sana dan tidak terjadi apa-apa. Yang berubah cuma tinta
+   naik ke `--ink` — aksen yang sudah dipakai untuk keadaan aktif, bukan warna
+   kelima, dan bukan versi pudar dari warna aktifnya. */
+.tab-item:hover, .saring-item:hover { color: var(--ink); }
 .tab-item[aria-current='page'] {
   color: var(--ink); border-bottom-color: var(--ink); font-weight: 600;
 }
@@ -216,6 +226,9 @@ code {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* Sudah bergaris bawah dan sudah `--ink`, jadi hover tidak punya warna untuk
+   dinaiki tanpa menambah warna kelima. Yang ditebalkan garisnya. */
+.tombol-teks:hover:not(:disabled) { text-decoration-thickness: 2px; }
 .tombol-teks:disabled { color: var(--ink-2); cursor: default; }
 
 /* Saringan status: bentuk tab, satu langkah lebih kecil, tanpa garis wilayah

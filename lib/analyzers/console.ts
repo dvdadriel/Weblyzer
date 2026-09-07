@@ -90,6 +90,20 @@ export function analyzeConsole(visits: PageVisit[], pageIds: PageIdMap = {}): Ne
     }
 
     for (const req of v.failedRequests) {
+      // Permintaan yang dibatalkan bukan permintaan yang gagal. Chromium
+      // melaporkan ERR_ABORTED ketika klien sendiri membatalkan — dan crawler
+      // ini membatalkan terus-menerus: setiap prefetch yang masih terbang saat
+      // halaman ditinggalkan berakhir di sini. Tidak ada yang rusak, jadi tidak
+      // ada yang bisa diperbaiki pemilik situs.
+      //
+      // Yang membuatnya wajib disaring, bukan cuma bising: URL-nya membawa
+      // cache-buster (`?_rsc=…` pada Next.js), jadi tiap batal mendapat
+      // fingerprint baru. Diukur pada aplikasi ini sendiri: dua scan berurutan
+      // tanpa satu baris kode berubah menghasilkan 49 fingerprint berbeda, 11
+      // di antaranya ditandai `fixed`. Itu persis angka yang berbohong yang
+      // dilarang PRODUCT.md — dan alasan situs pihak ketiga di bawah disaring.
+      if (/ERR_ABORTED/.test(req.failure)) continue
+
       if (originHalaman !== null) {
         let originReq: string
         try {

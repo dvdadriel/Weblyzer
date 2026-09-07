@@ -12,11 +12,11 @@ export default function Dashboard() {
 
   return (
     <main className="wrap">
-      <Wordmark />
+      <Wordmark judul />
 
       {situs.length === 0 ? (
         <div className="kosong">
-          <p className="kosong-judul">Belum ada situs.</p>
+          <h2 className="kosong-judul">Belum ada situs.</h2>
           <p className="kosong-teks">
             Tambahkan lewat terminal:{' '}
             <code>npm run scan -- add-site Nama https://situs.com</code>

@@ -20,7 +20,9 @@ export function KeadaanKosong({ keadaan, siteId }: { keadaan: Keadaan; siteId: n
   const { judul, teks } = ISI[keadaan]
   return (
     <div className="kosong">
-      <p className="kosong-judul">{judul}</p>
+      {/* `--t-sub` adalah "judul bagian" di DESIGN.md, dan layar kosong adalah
+          hasil paling sering — justru di sini heading sungguhan paling berguna. */}
+      <h2 className="kosong-judul">{judul}</h2>
       <p className="kosong-teks">{teks}</p>
       {/* Perintah pindai hanya muncul ketika memang ada yang perlu dikerjakan.
           Pada keadaan `bersih` jawabannya adalah "tidak ada", dan mengajak
