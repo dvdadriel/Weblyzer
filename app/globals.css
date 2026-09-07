@@ -242,3 +242,14 @@ code {
   font-size: var(--t-data);
   color: var(--ink-2);
 }
+
+/* Grid skor Lighthouse. Empat kolom skor berlebar sama dan rata kanan supaya
+   angkanya berbaris — itulah yang membuat "halaman mana yang bergerak" bisa
+   dipindai sekali lihat, yang tidak bisa dijawab satu lingkaran besar. */
+.tabel col.k-strategy { width: 6.5rem; }
+.tabel col.k-skor { width: 4.5rem; }
+.tabel th.th-skor, .sel-skor { text-align: right; }
+.sel-skor { font-weight: 500; font-variant-numeric: tabular-nums; }
+/* Skor yang tidak ada ditulis `—`, bukan 0, dan memakai tinta kedua supaya
+   tidak terbaca sebagai salah satu pita warna. */
+.sel-kosong { color: var(--ink-2); font-weight: 400; }

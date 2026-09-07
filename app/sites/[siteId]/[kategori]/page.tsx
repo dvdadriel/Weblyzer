@@ -8,7 +8,7 @@ import { KeadaanKosong } from '../../../../components/KeadaanKosong.tsx'
 
 export const dynamic = 'force-dynamic'
 
-const KATEGORI = ['bugs', 'console', 'security', 'lighthouse']
+const KATEGORI = ['bugs', 'console', 'security']
 
 /**
  * `node:sqlite` mengembalikan baris berprototipe null, dan React menolak
