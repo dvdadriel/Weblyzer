@@ -95,7 +95,12 @@ a { color: inherit; }
 .kartu-status { font-size: var(--t-data); color: var(--ink-2); }
 .kartu-status.gagal { color: var(--sev-critical); }
 .kartu-status.bersih { color: var(--sev-fixed); }
-.kartu-hitungan { display: flex; gap: var(--s-4); font-size: var(--t-data); font-weight: 500; flex-wrap: wrap; }
+.kartu-hitungan {
+  display: flex; gap: var(--s-4); row-gap: var(--s-2);
+  font-size: var(--t-data); font-weight: 500; flex-wrap: wrap; align-items: baseline;
+}
+/* Didorong ke kanan supaya hitungan severity tetap memimpin baris. */
+.kartu-waktu { margin-left: auto; font-weight: 400; color: var(--ink-2); font-size: var(--t-mikro); }
 
 .kosong { padding: var(--s-7) var(--s-4); text-align: center; }
 .kosong-judul { font-size: var(--t-sub); font-weight: 600; margin: 0 0 var(--s-2); }

@@ -82,7 +82,39 @@ export function ringkasanSitus(db: DatabaseSync): RingkasanSitus[] {
       terakhirDipindai: run?.finished_at ?? null,
       pesanGagal: run?.status === 'failed' ? (run.error ?? 'Pemindaian gagal') : null,
     }
-  })
+  }).sort(bandingkan)
+}
+
+/**
+ * Urutan daftar situs: yang butuh perhatian dulu.
+ *
+ * Pertanyaan yang dijawab layar ini setiap pagi adalah "apa yang rusak
+ * semalam?", jadi mengurutkan menurut `id` membuat situs bersih bisa duduk di
+ * atas situs dengan delapan temuan critical. Dengan dua belas situs, itu
+ * berarti memindai daftar untuk menemukan yang penting — melawan tujuan
+ * layarnya.
+ *
+ * `gagal` di paling atas, di atas `ada-temuan`: pemindaian yang gagal membuat
+ * seluruh angka situs itu tidak bisa dipercaya, bukan cuma menambah satu
+ * masalah. Kita tidak tahu keadaannya, dan itu lebih mendesak daripada
+ * masalah yang sudah diketahui.
+ */
+const PERINGKAT: Record<Keadaan, number> = {
+  gagal: 0,
+  'ada-temuan': 1,
+  'belum-dipindai': 2,
+  bersih: 3,
+}
+
+function bandingkan(a: RingkasanSitus, b: RingkasanSitus): number {
+  const k = PERINGKAT[a.keadaan] - PERINGKAT[b.keadaan]
+  if (k !== 0) return k
+  // Dalam kelompok yang sama, yang paling parah dulu.
+  for (const s of ['critical', 'high', 'medium', 'low'] as const) {
+    const d = b.terbuka[s] - a.terbuka[s]
+    if (d !== 0) return d
+  }
+  return a.nama.localeCompare(b.nama)
 }
 
 /** Urutan severity untuk ORDER BY. Paling parah dulu — itu urutan kerja. */

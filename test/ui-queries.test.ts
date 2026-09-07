@@ -96,3 +96,39 @@ test('keadaan kategori membedakan belum-dipindai, bersih, dan gagal', () => {
 test('daftar kosong tidak melempar', () => {
   expect(ringkasanSitus(db)).toEqual([])
 })
+
+test('situs yang butuh perhatian diurutkan lebih dulu', () => {
+  // Pertanyaan pagi hari adalah "apa yang rusak semalam?". Mengurutkan menurut
+  // id membuat situs bersih bisa duduk di atas situs dengan delapan critical.
+  const bersih = createSite(db, { name: 'Bersih', base_url: 'https://bersih.test' })
+  finishRun(db, createRun(db, bersih.id, 'full').id, 'done')
+
+  const belum = createSite(db, { name: 'Belum', base_url: 'https://belum.test' })
+
+  const rusak = createSite(db, { name: 'Rusak', base_url: 'https://rusak.test' })
+  const runRusak = createRun(db, rusak.id, 'full')
+  reconcile(db, rusak.id, runRusak.id, 'bugs', [
+    { url: 'https://rusak.test/x', pageId: null, severity: 'critical', rule: 'http-error', title: 'x' },
+  ])
+  finishRun(db, runRusak.id, 'done')
+
+  const gagal = createSite(db, { name: 'Gagal', base_url: 'https://gagal.test' })
+  finishRun(db, createRun(db, gagal.id, 'full').id, 'failed', 'tidak terjangkau')
+
+  expect(ringkasanSitus(db).map((r) => r.nama)).toEqual(['Gagal', 'Rusak', 'Belum', 'Bersih'])
+})
+
+test('dalam kelompok yang sama, yang paling parah dulu', () => {
+  const buat = (nama: string, severity: 'critical' | 'low') => {
+    const s = createSite(db, { name: nama, base_url: `https://${nama.toLowerCase()}.test` })
+    const r = createRun(db, s.id, 'full')
+    reconcile(db, s.id, r.id, 'bugs', [
+      { url: `https://${nama.toLowerCase()}.test/x`, pageId: null, severity, rule: 'http-error', title: 'x' },
+    ])
+    finishRun(db, r.id, 'done')
+  }
+  buat('Ringan', 'low')
+  buat('Parah', 'critical')
+
+  expect(ringkasanSitus(db).map((r) => r.nama)).toEqual(['Parah', 'Ringan'])
+})

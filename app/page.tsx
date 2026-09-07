@@ -50,6 +50,10 @@ export default function Dashboard() {
                         {s.terbuka[k]} {k}
                       </span>
                     ))}
+                    {/* Stempel waktu ikut di sini, bukan cuma di kartu bersih:
+                        delapan critical dari semalam berbeda artinya dengan
+                        delapan critical dari tiga minggu lalu. */}
+                    <span className="kartu-waktu">dipindai {s.terakhirDipindai}</span>
                   </span>
                 )}
               </Link>
