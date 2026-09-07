@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { tambahSitus } from '../app/actions.ts'
+import { Ikon } from './Ikon.tsx'
 
 /**
  * Form tambah situs, disembunyikan di balik `<details>`.
@@ -21,7 +22,10 @@ export function TambahSitus() {
 
   return (
     <details className="tambah">
-      <summary className="tambah-pemicu">+ Tambah Situs</summary>
+      <summary className="tambah-pemicu">
+        <Ikon nama="tambah" />
+        Tambah Situs
+      </summary>
 
       <form action={kirim} className="tambah-form">
         <p className="tambah-baris">

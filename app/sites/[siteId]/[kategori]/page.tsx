@@ -1,7 +1,13 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '../../../../lib/ui/db.ts'
-import { temuanKategori, keadaanKategori, situs, runAktif } from '../../../../lib/ui/queries.ts'
+import {
+  temuanKategori,
+  keadaanKategori,
+  situs,
+  runAktif,
+  waktuScanKategori,
+} from '../../../../lib/ui/queries.ts'
 import type { BarisTemuan } from '../../../../lib/ui/queries.ts'
 import { TabelTemuan } from '../../../../components/TabelTemuan.tsx'
 import { KeadaanKosong } from '../../../../components/KeadaanKosong.tsx'
@@ -58,6 +64,7 @@ export default async function Kategori({
   const baseUrl = s?.base_url ?? ''
 
   const berjalan = runAktif(db(), id) ?? null
+  const waktuScan = waktuScanKategori(db(), id, kategori)
   const tombol = (
     <TombolScan
       siteId={id}
@@ -77,7 +84,13 @@ export default async function Kategori({
           // pemindaian, sementara pertanyaan di sini murni soal saringan.
           <p className="saring-kosong">Belum ada temuan yang diabaikan di kategori ini.</p>
         ) : (
-          <TabelTemuan baris={diabaikan} baseUrl={baseUrl} status="ignored" path={path} />
+          <TabelTemuan
+            baris={diabaikan}
+            baseUrl={baseUrl}
+            status="ignored"
+            path={path}
+            waktuScan={waktuScan}
+          />
         )}
       </>
     )
@@ -103,6 +116,7 @@ export default async function Kategori({
         baseUrl={baseUrl}
         status="open"
         path={path}
+        waktuScan={waktuScan}
       />
     </>
   )

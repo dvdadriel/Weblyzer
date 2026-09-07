@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { IBM_Plex_Mono, Space_Mono } from 'next/font/google'
 import './globals.css'
+import { Navbar } from '../components/Navbar.tsx'
 
 const ui = IBM_Plex_Mono({
   subsets: ['latin'],
@@ -26,7 +27,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id" className={`${ui.variable} ${mark.variable}`}>
-      <body>{children}</body>
+      {/* Navbar di layout, bukan di tiap halaman: itu yang membuat jalan
+          kembali ke index tidak pernah hilang di halaman mana pun. */}
+      <body>
+        <Navbar />
+        <main className="wrap">{children}</main>
+      </body>
     </html>
   )
 }

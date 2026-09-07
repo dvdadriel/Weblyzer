@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
 import { jalankanScan } from '../app/actions.ts'
+import { Ikon } from './Ikon.tsx'
 
 export type Kategori = 'bugs' | 'console' | 'security' | 'lighthouse'
 
@@ -16,6 +17,19 @@ const LABEL: Record<Kategori, string> = {
   console: 'Scan Console',
   security: 'Scan Security',
   lighthouse: 'Scan Lighthouse',
+}
+
+/**
+ * Nama kategori dari tipe run yang tersimpan, untuk menyebut pemindaian yang
+ * sedang berjalan. `full` muncul hanya dari pemindaian lewat CLI tanpa argumen
+ * kategori; dari UI selalu satu kategori.
+ */
+const NAMA_RUN: Record<string, string> = {
+  bugs: 'Scan Bug',
+  console: 'Scan Console',
+  security: 'Scan Security',
+  lighthouse: 'Scan Lighthouse',
+  full: 'Scan lengkap',
 }
 
 /**
@@ -51,7 +65,7 @@ export function TombolScan({
   siteId: number
   kategori: Kategori
   path: string
-  berjalan: { mulai: string } | null
+  berjalan: { type: string; mulai: string } | null
 }) {
   const [galat, setGalat] = useState<string | null>(null)
   const [menunggu, mulai] = useTransition()
@@ -73,14 +87,22 @@ export function TombolScan({
         <span className="jalan-tanda" aria-hidden="true">
           [..]
         </span>
-        {/* "situs ini", bukan kategori: tombolnya memang mati di SEMUA tab
-            karena satu crawl memakai satu browser. Tanpa kata itu, menekan
-            Scan Security lalu menemukan tombol mati di Bug terbaca seperti
-            kerusakan. Tipe run internal (`full`) sengaja tidak disebut — itu
-            nama cara sistem dibangun, bukan nama yang dikenali pemakai. */}
-        Scan situs ini berjalan sejak {berjalan.mulai}. Halaman ini akan
-        berganti sendiri saat selesai.{' '}
+        <span>
+          {/* Kategori yang berjalan disebut namanya. Versi sebelumnya menulis
+              "Scan situs ini" untuk semua kategori, dan itu terbaca seolah
+              keempat tab sedang ditimpa sekaligus — padahal `scanHandler`
+              hanya merekonsiliasi kategori yang diminta. */}
+          {NAMA_RUN[berjalan.type] ?? 'Scan'} berjalan sejak {berjalan.mulai}. Halaman
+          ini akan berganti sendiri saat selesai.
+          {/* Kenapa tab LAIN ikut mati, bukan cuma yang sedang dipindai.
+              Tanpa alasannya, tombol mati di tab yang tidak diminta terbaca
+              sebagai kerusakan. */}
+          {NAMA_RUN[berjalan.type] !== LABEL[kategori] && (
+            <> Tab ini ikut menunggu karena satu penjelajahan memakai satu browser.</>
+          )}
+        </span>
         <button className="jalan-segarkan" type="button" onClick={() => router.refresh()}>
+          <Ikon nama="segarkan" />
           Periksa Sekarang
         </button>
       </p>
@@ -100,6 +122,7 @@ export function TombolScan({
           })
         }
       >
+        <Ikon nama="scan" />
         {menunggu ? 'Memulai…' : LABEL[kategori]}
       </button>
 

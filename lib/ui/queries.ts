@@ -226,12 +226,39 @@ export function runAktif(db: DatabaseSync, siteId: number) {
       // yang ditanya pemakai adalah "sejak kapan" menurut jamnya sendiri.
       // Dikerjakan di server juga menghindari selisih hidrasi — jam server dan
       // jam browser tidak wajib sama.
-      `SELECT id, strftime('%H:%M', started_at, 'localtime') AS mulai FROM runs
+      `SELECT id, type, strftime('%H:%M', started_at, 'localtime') AS mulai FROM runs
        WHERE site_id = ?
          AND status IN ('queued', 'running')
          AND started_at > datetime('now', ?)
        ORDER BY id DESC LIMIT 1`,
     )
-    .get(siteId, AMBANG_MACET) as { id: number; mulai: string } | undefined
+    .get(siteId, AMBANG_MACET) as { id: number; type: string; mulai: string } | undefined
   return baris ? { ...baris } : undefined
+}
+
+/**
+ * Kapan kategori ini terakhir dipindai, menurut jam pemakai.
+ *
+ * Pertanyaannya adalah "yang saya lihat ini masih berlaku atau tidak" — dan
+ * kolom `terlihat run 2–10` tidak menjawabnya: nomor run bukan waktu, dan
+ * tidak ada di layar yang menerjemahkannya.
+ *
+ * `type = 'full'` ikut dihitung karena pemindaian lewat CLI tanpa argumen
+ * kategori memang menyentuh kategori ini juga. Mengabaikannya akan melaporkan
+ * "belum pernah" untuk data yang jelas ada.
+ */
+export function waktuScanKategori(
+  db: DatabaseSync,
+  siteId: number,
+  category: string,
+): string | null {
+  const baris = db
+    .prepare(
+      `SELECT strftime('%Y-%m-%d %H:%M', finished_at, 'localtime') AS waktu FROM runs
+       WHERE site_id = ? AND type IN (?, 'full')
+         AND status = 'done' AND finished_at IS NOT NULL
+       ORDER BY id DESC LIMIT 1`,
+    )
+    .get(siteId, category) as { waktu: string } | undefined
+  return baris?.waktu ?? null
 }

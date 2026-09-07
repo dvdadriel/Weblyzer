@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { openDb } from '../lib/db.ts'
 import { createSite } from '../lib/repos/sites.ts'
-import { runAktif } from '../lib/ui/queries.ts'
+import { runAktif, waktuScanKategori } from '../lib/ui/queries.ts'
 
 function siap() {
   const db = openDb(':memory:')
@@ -10,11 +10,20 @@ function siap() {
 }
 
 /** Menyisipkan run dengan `started_at` relatif terhadap sekarang. */
-function run(db: ReturnType<typeof openDb>, siteId: number, status: string, geser: string) {
-  db.prepare(
-    `INSERT INTO runs (site_id, type, trigger, status, started_at)
-     VALUES (?, 'full', 'manual', ?, datetime('now', ?))`,
-  ).run(siteId, status, geser)
+function run(
+  db: ReturnType<typeof openDb>,
+  siteId: number,
+  status: string,
+  geser: string,
+  type = 'full',
+) {
+  // `finished_at` diisi hanya untuk run yang selesai, sama seperti finishRun.
+  const selesai = status === 'done' ? "datetime('now', ?)" : 'NULL'
+  const sql = `INSERT INTO runs (site_id, type, trigger, status, started_at, finished_at)
+               VALUES (?, ?, 'manual', ?, datetime('now', ?), ${selesai})`
+  const args: unknown[] = [siteId, type, status, geser]
+  if (status === 'done') args.push(geser)
+  db.prepare(sql).run(...(args as never[]))
 }
 
 test('tidak ada run berarti tombol boleh muncul', () => {
@@ -75,4 +84,50 @@ test('hasilnya objek biasa, bukan prototipe null', () => {
   const { db, siteId } = siap()
   run(db, siteId, 'queued', '-10 seconds')
   expect(Object.getPrototypeOf(runAktif(db, siteId)!)).toBe(Object.prototype)
+})
+
+/* ── waktuScanKategori ──────────────────────────────────────────────────── */
+
+test('kategori yang belum pernah dipindai tidak melaporkan waktu', () => {
+  const { db, siteId } = siap()
+  expect(waktuScanKategori(db, siteId, 'bugs')).toBeNull()
+})
+
+test('run yang belum selesai belum menghasilkan waktu', () => {
+  const { db, siteId } = siap()
+  run(db, siteId, 'queued', '-1 minute', 'bugs')
+  expect(waktuScanKategori(db, siteId, 'bugs')).toBeNull()
+})
+
+test('waktunya lokal dan tanpa detik', () => {
+  const { db, siteId } = siap()
+  run(db, siteId, 'done', '-5 minutes', 'bugs')
+  expect(waktuScanKategori(db, siteId, 'bugs')).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+})
+
+/**
+ * Pemindaian lewat CLI tanpa argumen kategori bertipe `full` dan memang
+ * menyentuh kategori ini. Mengabaikannya akan melaporkan "belum pernah" untuk
+ * data yang jelas ada di tabel.
+ */
+test('run full ikut dihitung sebagai pemindaian kategori', () => {
+  const { db, siteId } = siap()
+  run(db, siteId, 'done', '-5 minutes', 'full')
+  expect(waktuScanKategori(db, siteId, 'bugs')).not.toBeNull()
+})
+
+test('kategori lain tidak dianggap memindai kategori ini', () => {
+  const { db, siteId } = siap()
+  run(db, siteId, 'done', '-5 minutes', 'security')
+  expect(waktuScanKategori(db, siteId, 'bugs')).toBeNull()
+  expect(waktuScanKategori(db, siteId, 'security')).not.toBeNull()
+})
+
+test('run gagal tidak dilaporkan sebagai waktu pemindaian', () => {
+  const { db, siteId } = siap()
+  db.prepare(
+    `INSERT INTO runs (site_id, type, trigger, status, started_at, finished_at)
+     VALUES (?, 'bugs', 'manual', 'failed', datetime('now'), datetime('now'))`,
+  ).run(siteId)
+  expect(waktuScanKategori(db, siteId, 'bugs')).toBeNull()
 })

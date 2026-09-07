@@ -66,7 +66,6 @@ a { color: inherit; }
 
 .wrap { max-width: 1180px; margin: 0 auto; padding: var(--s-6) var(--s-4); }
 
-.wordmark { margin-bottom: var(--s-6); }
 .wordmark-teks {
   font-family: var(--font-mark);
   font-size: var(--t-mark);
@@ -105,6 +104,14 @@ a { color: inherit; }
 }
 /* Didorong ke kanan supaya hitungan severity tetap memimpin baris. */
 .kartu-waktu { margin-left: auto; font-weight: 400; color: var(--ink-2); font-size: var(--t-mikro); }
+
+.halaman-judul { font-size: var(--t-judul); margin: 0 0 var(--s-4); }
+.halaman-teks { font-size: var(--t-data); color: var(--ink-2); max-width: 60ch; margin: 0 0 var(--s-5); }
+.halaman-catatan {
+  font-size: var(--t-mikro); color: var(--ink-2);
+  max-width: 60ch; margin: var(--s-5) 0 0;
+  padding-top: var(--s-3); border-top: 1px solid var(--line);
+}
 
 .kosong { padding: var(--s-7) var(--s-4); text-align: center; }
 .kosong-judul { font-size: var(--t-sub); font-weight: 600; margin: 0 0 var(--s-2); }
@@ -416,3 +423,83 @@ code {
 .hapus-galat {
   margin: var(--s-2) 0 0; font-size: var(--t-mikro); color: var(--sev-critical);
 }
+
+/* ── Navbar ───────────────────────────────────────────────────────────────
+   Chrome global. Logo di kiri sebagai tautan ke index, dua tab di kanan.
+   Inilah yang membuat jalan kembali ke daftar situs ada di setiap halaman. */
+
+.navbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-4); flex-wrap: wrap;
+  padding: var(--s-3) var(--s-5);
+  border-bottom: 1px solid var(--line);
+}
+.navbar-merek {
+  display: flex; align-items: center; gap: var(--s-2);
+  text-decoration: none; color: var(--ink);
+}
+.navbar-nav { display: flex; gap: var(--s-1); }
+.navbar-item {
+  display: inline-flex; align-items: center; gap: var(--s-1);
+  font-size: var(--t-data);
+  text-decoration: none; color: var(--ink-2);
+  padding: var(--s-1) var(--s-2); border-radius: var(--r-kontrol);
+}
+.navbar-item:hover { color: var(--ink); background: var(--surface); }
+.navbar-item[aria-current='page'] {
+  color: var(--ink); background: var(--surface); font-weight: 500;
+}
+
+/* ── Ikon ─────────────────────────────────────────────────────────────────
+   Ikon Reicon, semuanya `currentColor`. Tidak ada satu pun warna ikon ditulis
+   di sini: warnanya diwarisi dari kontrol yang memuatnya, jadi ikon di tombol
+   gelap, di tautan, dan di tombol bahaya otomatis benar. */
+
+.ikon { flex: none; vertical-align: -0.15em; }
+/* Ikon tidak boleh mengecil saat kontrolnya menyusut. */
+.tombol, .hapus-pemicu, .jalan-segarkan, .tambah-pemicu, .kembali {
+  display: inline-flex; align-items: center; gap: var(--s-1);
+}
+
+/* ── Kembali ke index ─────────────────────────────────────────────────── */
+
+.kembali {
+  font-size: var(--t-data); color: var(--ink-2);
+  text-decoration: none; margin-bottom: var(--s-3);
+}
+.kembali:hover { color: var(--ink); text-decoration: underline; }
+
+/* ── Waktu pemindaian di kaki tabel ─────────────────────────────────────── */
+
+.tabel-kaki { display: flex; gap: var(--s-3); align-items: baseline; flex-wrap: wrap; }
+.tabel-waktu {
+  display: inline-flex; align-items: center; gap: var(--s-1);
+  margin-left: auto; color: var(--ink-2);
+}
+
+/* ── Halaman model ────────────────────────────────────────────────────────── */
+
+.model-set { border: 0; padding: 0; margin: 0; }
+.model-legend {
+  font-size: var(--t-mikro); color: var(--ink-2);
+  padding: 0; margin-bottom: var(--s-2);
+}
+.model-baris {
+  display: flex; align-items: baseline; gap: var(--s-2); flex-wrap: wrap;
+  padding: var(--s-3);
+  border: 1px solid var(--line); border-radius: var(--r-kontrol);
+  margin-bottom: var(--s-2);
+  font-size: var(--t-data);
+  cursor: pointer;
+}
+.model-baris:hover { border-color: var(--line-kuat); }
+.model-baris:has(input:checked) { border-color: var(--ink); background: var(--surface); }
+/* Yang tidak terpasang tetap terbaca, tapi jelas tidak bisa dipilih. */
+.model-baris[data-mati] { cursor: default; opacity: 0.72; }
+.model-baris[data-mati]:hover { border-color: var(--line); }
+.model-baris input { accent-color: var(--ink); margin: 0; }
+.model-nama { font-weight: 500; }
+.model-versi, .model-tiada { color: var(--ink-2); font-size: var(--t-mikro); }
+.model-tiada { margin-left: auto; }
+.model-galat { color: var(--sev-critical); font-size: var(--t-mikro); margin-left: auto; }
+.model-status { font-size: var(--t-mikro); color: var(--ink-2); min-height: 1.2em; margin: 0; }

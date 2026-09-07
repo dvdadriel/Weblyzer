@@ -75,7 +75,12 @@ async function main(): Promise<number> {
       // ketiga dapat mengklaim ulang pemindaian yang masih berlangsung.
       requeueInterrupted(db)
 
-      const run = createRun(db, site.id, 'full')
+      // Tipe run mengikuti kategori yang diminta. Sebelumnya selalu 'full'
+      // walau cuma satu analyzer yang dijalankan, dan kebohongan itu menular:
+      // UI membaca tipe run untuk memberi nama pemindaian yang berjalan, jadi
+      // "Scan Bug" muncul sebagai "memindai full" dan terbaca seolah ketiga
+      // kategori sedang ditimpa.
+      const run = createRun(db, site.id, only ?? 'full')
       enqueue(db, {
         runId: run.id,
         type: 'scan',

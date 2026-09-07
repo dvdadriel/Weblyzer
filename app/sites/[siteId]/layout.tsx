@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation'
 import { db } from '../../../lib/ui/db.ts'
 import { situs } from '../../../lib/ui/queries.ts'
-import { Wordmark } from '../../../components/Wordmark.tsx'
 import { Tab } from '../../../components/Tab.tsx'
+import { Ikon } from '../../../components/Ikon.tsx'
+import Link from 'next/link'
 
 export default async function SiteLayout({
   children,
@@ -16,8 +17,14 @@ export default async function SiteLayout({
   if (!s) notFound()
 
   return (
-    <main className="wrap">
-      <Wordmark />
+    <>
+      {/* Tautan kembali yang kontekstual, di samping navbar yang global.
+          Keduanya menuju index, dan itu memang lazim: yang ini muncul hanya di
+          tempat yang punya asal untuk dikembalikan. */}
+      <Link href="/" className="kembali">
+        <Ikon nama="kembali" />
+        Semua Situs
+      </Link>
       {/* `div`, bukan `p`: sebuah heading tidak boleh berada di dalam `<p>`, dan
           nama situs memang judul halaman ini. Kelasnya sama, jadi tampilannya
           tidak berubah — yang berubah cuma DOM-nya jadi jujur. */}
@@ -27,6 +34,6 @@ export default async function SiteLayout({
       </div>
       <Tab siteId={s.id} />
       {children}
-    </main>
+    </>
   )
 }

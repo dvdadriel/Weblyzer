@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { getDb } from '../lib/db.ts'
 import { createSite } from '../lib/repos/sites.ts'
 import { runAktif } from '../lib/ui/queries.ts'
+import { pilihPenyedia } from '../lib/ai/penyedia.ts'
+import type { IdPenyedia } from '../lib/ai/penyedia.ts'
 
 /**
  * Menandai temuan diabaikan, atau membukanya kembali.
@@ -151,5 +153,22 @@ export async function hapusSitus(siteId: number): Promise<HasilAksi> {
 
   getDb().prepare('DELETE FROM sites WHERE id = ?').run(siteId)
   revalidatePath('/')
+  return null
+}
+
+/**
+ * Menyimpan penyedia AI pilihan. String kosong berarti dimatikan.
+ *
+ * Validasinya ada di `pilihPenyedia`, bukan di sini: form bisa mengirim apa
+ * saja, dan `config` bertipe TEXT bebas yang akan menerima nilai sampah tanpa
+ * keluhan — lalu memunculkannya sebagai nama perintah yang di-spawn.
+ */
+export async function simpanPenyedia(id: string): Promise<HasilAksi> {
+  try {
+    pilihPenyedia(getDb(), id === '' ? null : (id as IdPenyedia))
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+  revalidatePath('/model')
   return null
 }

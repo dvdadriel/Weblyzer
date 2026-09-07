@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import type { BarisTemuan } from '../lib/ui/queries.ts'
 import { SeverityChip } from './SeverityChip.tsx'
 import { ubahStatusTemuan } from '../app/actions.ts'
+import { Ikon } from './Ikon.tsx'
 
 /**
  * Membuang awalan domain dari URL yang ditampilkan.
@@ -70,11 +71,13 @@ export function TabelTemuan({
   baseUrl,
   status = 'open',
   path,
+  waktuScan,
 }: {
   baris: BarisTemuan[]
   baseUrl: string
   status?: 'open' | 'ignored'
   path: string
+  waktuScan: string | null
 }) {
   const [terbuka, setTerbuka] = useState<number | null>(null)
 
@@ -137,8 +140,18 @@ export function TabelTemuan({
           })}
         </tbody>
       </table>
+      {/* Waktu pemindaian ada di sini karena inilah pertanyaan yang dibawa
+          pembaca tabel: apa yang saya lihat ini masih berlaku? Kolom
+          `Terlihat run 2–10` tidak menjawabnya — nomor run bukan waktu, dan
+          tidak ada apa pun di layar yang menerjemahkannya ke tanggal. */}
       <p className="tabel-kaki">
         {baris.length} temuan {status === 'open' ? 'terbuka' : 'diabaikan'}.
+        {waktuScan !== null && (
+          <span className="tabel-waktu">
+            <Ikon nama="waktu" />
+            dipindai {waktuScan}
+          </span>
+        )}
       </p>
     </div>
   )

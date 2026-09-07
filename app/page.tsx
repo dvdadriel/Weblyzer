@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { db } from '../lib/ui/db.ts'
 import { ringkasanSitus } from '../lib/ui/queries.ts'
-import { Wordmark } from '../components/Wordmark.tsx'
 import { TambahSitus } from '../components/TambahSitus.tsx'
 import { HapusSitus } from '../components/HapusSitus.tsx'
 
@@ -13,8 +12,8 @@ export default function Dashboard() {
   const situs = ringkasanSitus(db())
 
   return (
-    <main className="wrap">
-      <Wordmark judul />
+    <>
+      <h1 className="halaman-judul">Situs</h1>
 
       {situs.length === 0 ? (
         <div className="kosong">
@@ -69,6 +68,6 @@ export default function Dashboard() {
       )}
 
       <TambahSitus />
-    </main>
+    </>
   )
 }

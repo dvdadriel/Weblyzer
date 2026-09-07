@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { hapusSitus } from '../app/actions.ts'
+import { Ikon } from './Ikon.tsx'
 
 /**
  * Menghapus satu situs, dengan konfirmasi di tempat.
@@ -42,6 +43,7 @@ export function HapusSitus({
           aria-label={`Hapus ${nama}`}
           onClick={() => setTanya(true)}
         >
+          <Ikon nama="hapus" />
           Hapus
         </button>
       </div>
