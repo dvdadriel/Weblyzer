@@ -14,6 +14,7 @@ const TAB = [
   ['bugs', 'Bug'],
   ['console', 'Console'],
   ['security', 'Security'],
+  ['seo', 'SEO'],
   ['lighthouse', 'Lighthouse'],
 ] as const
 

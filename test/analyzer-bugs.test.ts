@@ -1,6 +1,7 @@
 import { test, expect } from 'vitest'
 import { analyzeBugs } from '../lib/analyzers/bugs.ts'
 import type { PageVisit } from '../lib/scanners/visit.ts'
+import { SEO_KOSONG } from './seo-kosong.ts'
 
 function pageVisit(patch: Partial<PageVisit> = {}): PageVisit {
   return {
@@ -19,6 +20,7 @@ function pageVisit(patch: Partial<PageVisit> = {}): PageVisit {
     resources: [],
     responseHeaders: {},
     setCookies: [],
+    seo: SEO_KOSONG,
     ...patch,
   }
 }

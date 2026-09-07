@@ -3,6 +3,25 @@ import { normalizeUrl } from '../url.ts'
 
 export { normalizeUrl }
 
+/**
+ * Data SEO satu halaman.
+ *
+ * Yang dipilih adalah hal yang tidak bisa disimpulkan dari data lain, dan
+ * khususnya hal yang butuh MELIHAT BANYAK HALAMAN untuk dinilai: judul dan
+ * description hanya bisa disebut kembar kalau halaman lain juga diketahui, dan
+ * hreflang hanya bisa disebut tidak konsisten kalau pasangannya ikut dibaca.
+ * Di situlah letak nilainya dibanding Lighthouse, yang tiap kali hanya melihat
+ * satu halaman dan hanya pada segelintir halaman sampel.
+ */
+export type SeoHalaman = {
+  metaDescription: string
+  h1: string[]
+  canonical: string | null
+  metaRobots: string | null
+  lang: string | null
+  hreflang: { lang: string; href: string }[]
+}
+
 export type RedirectHop = { url: string; status: number }
 
 export type ConsoleEntry = {
@@ -48,6 +67,11 @@ export type PageVisit = {
    *  respons yang jelas mengirim dua cookie). Jadi ini satu-satunya sumbernya,
    *  dan bentuk array-nya sekaligus menjaga flag tiap cookie tetap terpisah. */
   setCookies: string[]
+  /**
+   * Elemen yang dinilai analyzer SEO. Dikumpulkan di sini, bukan dinilai —
+   * pemisahan yang sama seperti tiga kategori lain.
+   */
+  seo: SeoHalaman
   /** Pesan kegagalan navigasi, bila ada. */
   error?: string
 }
@@ -163,6 +187,14 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
       let mediaCount = 0
       let responseHeaders: Record<string, string> = {}
       let setCookies: string[] = []
+      let seo: SeoHalaman = {
+        metaDescription: '',
+        h1: [],
+        canonical: null,
+        metaRobots: null,
+        lang: null,
+        hreflang: [],
+      }
       let error: string | undefined
 
       try {
@@ -204,6 +236,30 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
         title = await page.title()
         mediaCount = await page.$$eval('img, video, iframe, canvas, picture', (els) => els.length)
         textLength = await page.evaluate(() => document.body?.innerText.trim().length ?? 0)
+        // Satu `evaluate` untuk enam field, bukan enam panggilan: tiap
+        // panggilan adalah satu perjalanan ke browser, dan 141 halaman x 5
+        // perjalanan tambahan adalah biaya yang tidak membeli apa pun.
+        seo = await page.evaluate(() => {
+          const isi = (sel: string) =>
+            (document.querySelector(sel) as HTMLMetaElement | null)?.content?.trim() ?? ''
+          return {
+            metaDescription: isi('meta[name="description" i]'),
+            h1: [...document.querySelectorAll('h1')].map((h) => h.textContent?.trim() ?? ''),
+            // `href` pada elemen link sudah diabsolutkan browser, jadi
+            // canonical relatif tidak perlu digabung tangan.
+            canonical:
+              (document.querySelector('link[rel="canonical" i]') as HTMLLinkElement | null)?.href ??
+              null,
+            metaRobots: isi('meta[name="robots" i]') || null,
+            lang: document.documentElement.getAttribute('lang'),
+            hreflang: [...document.querySelectorAll('link[rel="alternate" i][hreflang]')].map(
+              (l) => ({
+                lang: (l as HTMLLinkElement).hreflang,
+                href: (l as HTMLLinkElement).href,
+              }),
+            ),
+          }
+        })
       } catch (err) {
         // Navigasi yang gagal meninggalkan page dengan navigasi tertunda ke
         // chrome-error://chromewebdata/ dan tidak pernah pulih sendiri: setiap
@@ -253,6 +309,7 @@ export async function visit(baseUrl: string, opts: VisitOptions = {}): Promise<P
         resources,
         responseHeaders,
         setCookies,
+        seo,
         ...(error === undefined ? {} : { error }),
       })
 

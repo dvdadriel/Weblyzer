@@ -15,7 +15,7 @@ import { TombolScan } from '../../../../components/TombolScan.tsx'
 
 export const dynamic = 'force-dynamic'
 
-const KATEGORI = ['bugs', 'console', 'security']
+const KATEGORI = ['bugs', 'console', 'security', 'seo']
 
 /**
  * `node:sqlite` mengembalikan baris berprototipe null, dan React menolak
@@ -68,7 +68,7 @@ export default async function Kategori({
   const tombol = (
     <TombolScan
       siteId={id}
-      kategori={kategori as 'bugs' | 'console' | 'security'}
+      kategori={kategori as 'bugs' | 'console' | 'security' | 'seo'}
       path={path}
       berjalan={berjalan}
     />

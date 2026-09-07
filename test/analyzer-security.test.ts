@@ -1,6 +1,7 @@
 import { test, expect } from 'vitest'
 import { analyzeSecurity } from '../lib/analyzers/security.ts'
 import type { PageVisit } from '../lib/scanners/visit.ts'
+import { SEO_KOSONG } from './seo-kosong.ts'
 import type { ProbeResult } from '../lib/scanners/probe.ts'
 
 const HEADER_LENGKAP = {
@@ -28,6 +29,7 @@ function pageVisit(patch: Partial<PageVisit> = {}): PageVisit {
     resources: [],
     responseHeaders: { ...HEADER_LENGKAP },
     setCookies: [],
+    seo: SEO_KOSONG,
     ...patch,
   }
 }

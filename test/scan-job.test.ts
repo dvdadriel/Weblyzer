@@ -141,7 +141,7 @@ test('situs tidak dikenal menggagalkan job dengan pesan jelas', async () => {
   expect(failed.error).toContain('999')
 })
 
-test('pemindaian penuh mengisi tiga kategori', async () => {
+test('pemindaian penuh mengisi keempat kategori', async () => {
   const server = await startFixtureServer('rusak-konsol')
   try {
     const site = createSite(db, { name: 'Berisik', base_url: server.url, max_pages: 5 })
@@ -151,7 +151,10 @@ test('pemindaian penuh mengisi tiga kategori', async () => {
     const kategori = db
       .prepare('SELECT DISTINCT category FROM findings ORDER BY category')
       .all() as { category: string }[]
-    expect(kategori.map((k) => k.category)).toEqual(['bugs', 'console', 'security'])
+    // Daftar utuh, bukan `toContain`: kategori yang diam-diam berhenti
+    // menghasilkan temuan adalah tab yang kosong tanpa satu pun galat, dan
+    // `toContain` akan meloloskannya.
+    expect(kategori.map((k) => k.category)).toEqual(['bugs', 'console', 'security', 'seo'])
   } finally {
     await server.close()
   }

@@ -19,7 +19,7 @@ const HANDLERS = {
 const USAGE = `Penggunaan:
   npm run scan -- add-site <nama> <url>      Menambahkan situs
   npm run scan -- list                       Menampilkan semua situs
-  npm run scan -- scan <site-id> [kategori]  Memindai situs (kategori: bugs|console|security)
+  npm run scan -- scan <site-id> [kategori]  Memindai situs (kategori: bugs|console|security|seo)
   npm run scan -- pages <site-id>            Menampilkan halaman tersimpan
   npm run scan -- findings <site-id>         Menampilkan temuan terbuka
   npm run scan -- lighthouse <site-id>       Mengukur skor Lighthouse
@@ -70,10 +70,19 @@ async function main(): Promise<number> {
         return 1
       }
       const only = args[1]
-      if (only !== undefined && only !== 'bugs' && only !== 'console' && only !== 'security') {
-        console.error(`Kategori tidak dikenal: ${only}. Pilih bugs, console, atau security.`)
+      // `as const` plus predikat, bukan `includes` biasa: `includes` pada
+      // array string tidak mempersempit tipe, jadi `only` tetap `string` dan
+      // `createRun` menerima nilai yang RunType tidak mengenal.
+      const KATEGORI_CLI = ['bugs', 'console', 'security', 'seo'] as const
+      type KategoriCli = (typeof KATEGORI_CLI)[number]
+      const dikenal = (k: string): k is KategoriCli =>
+        (KATEGORI_CLI as readonly string[]).includes(k)
+
+      if (only !== undefined && !dikenal(only)) {
+        console.error(`Kategori tidak dikenal: ${only}. Pilih ${KATEGORI_CLI.join(', ')}.`)
         return 1
       }
+      const kategori: KategoriCli | undefined = only === undefined ? undefined : (only as KategoriCli)
 
       // Hanya perintah yang memang menjalankan job yang boleh mengubah antrian.
       // Bila ini dijalankan pada setiap perintah, `list` di terminal lain akan
@@ -86,11 +95,11 @@ async function main(): Promise<number> {
       // UI membaca tipe run untuk memberi nama pemindaian yang berjalan, jadi
       // "Scan Bug" muncul sebagai "memindai full" dan terbaca seolah ketiga
       // kategori sedang ditimpa.
-      const run = createRun(db, site.id, only ?? 'full')
+      const run = createRun(db, site.id, kategori ?? 'full')
       enqueue(db, {
         runId: run.id,
         type: 'scan',
-        payload: only === undefined ? { siteId: site.id } : { siteId: site.id, only },
+        payload: kategori === undefined ? { siteId: site.id } : { siteId: site.id, only: kategori },
       })
 
       // Ringkasan ikut diantrikan hanya bila ada penyedia terpilih. Antrian

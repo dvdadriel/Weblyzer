@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { jalankanScan } from '../app/actions.ts'
 import { Ikon } from './Ikon.tsx'
 
-export type Kategori = 'bugs' | 'console' | 'security' | 'lighthouse'
+export type Kategori = 'bugs' | 'console' | 'security' | 'seo' | 'lighthouse'
 
 /**
  * Label tombol per kategori. Tunggal dan huruf besar, berpasangan dengan label
@@ -16,6 +16,7 @@ const LABEL: Record<Kategori, string> = {
   bugs: 'Scan Bug',
   console: 'Scan Console',
   security: 'Scan Security',
+  seo: 'Scan SEO',
   lighthouse: 'Scan Lighthouse',
 }
 
@@ -28,6 +29,7 @@ const NAMA_RUN: Record<string, string> = {
   bugs: 'Scan Bug',
   console: 'Scan Console',
   security: 'Scan Security',
+  seo: 'Scan SEO',
   lighthouse: 'Scan Lighthouse',
   full: 'Scan lengkap',
 }

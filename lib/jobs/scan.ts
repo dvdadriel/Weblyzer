@@ -8,11 +8,12 @@ import { probeSite, type ProbeResult } from '../scanners/probe.ts'
 import { analyzeBugs, type PageIdMap } from '../analyzers/bugs.ts'
 import { analyzeConsole } from '../analyzers/console.ts'
 import { analyzeSecurity } from '../analyzers/security.ts'
+import { analyzeSeo } from '../analyzers/seo.ts'
 
 /** Kategori yang butuh permintaan langsung ke server, di luar kunjungan browser. */
 const BUTUH_PROBE = new Set<string>(['security'])
 
-const KATEGORI = ['bugs', 'console', 'security'] as const
+const KATEGORI = ['bugs', 'console', 'security', 'seo'] as const
 export type ScanCategory = (typeof KATEGORI)[number]
 
 const PROBE_KOSONG: ProbeResult = { exposed: [], directoryListing: [], tls: null }
@@ -30,6 +31,8 @@ function nilai(
       return analyzeConsole(visits, pageIds)
     case 'security':
       return analyzeSecurity(visits, probe ?? PROBE_KOSONG, pageIds)
+    case 'seo':
+      return analyzeSeo(visits, pageIds)
   }
 }
 

@@ -84,7 +84,7 @@ export async function tambahSitus(_sebelum: HasilAksi, form: FormData): Promise<
  */
 export async function jalankanScan(
   siteId: number,
-  kategori: 'bugs' | 'console' | 'security' | 'lighthouse',
+  kategori: 'bugs' | 'console' | 'security' | 'seo' | 'lighthouse',
   path: string,
 ): Promise<HasilAksi> {
   // Penjaga ganda-klik. Tanpa ini dua Chromium berebut satu situs.
