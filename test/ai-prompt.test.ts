@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { susunPrompt, type TemuanRingkas } from '../lib/ai/prompt.ts'
+import { susunPrompt, kelompokkan, type TemuanRingkas } from '../lib/ai/prompt.ts'
 import type { Severity } from '../lib/findings.ts'
 
 const BASE = 'https://uji.test'
@@ -38,33 +38,108 @@ test('temuan tanpa halaman disebut sebagai seluruh situs', () => {
  * dengan 200 temuan low bisa menyembunyikan critical-nya dari ringkasan hanya
  * karena critical itu kebetulan berada di akhir tabel.
  */
-test('yang dikutip adalah yang paling parah, bukan yang paling awal', () => {
+test('masalah paling parah tetap terkutip walau tenggelam di antara yang remeh', () => {
   const temuan = [
-    ...Array.from({ length: 40 }, () => t('low', 'remeh')),
+    ...Array.from({ length: 40 }, (_, i) => t('low', `remeh-${i}`)),
     t('critical', 'penting'),
   ]
   const p = susunPrompt({ nama: 'Uji', baseUrl: BASE, temuan })
   expect(p).toMatch(/bugs\/penting/)
 })
 
-test('jumlah yang tidak dikutip disebut, bukan disembunyikan', () => {
+/**
+ * Klaim yang dipilih menggantikan pemotongan 25-terparah: SELURUH temuan
+ * terwakili. Empat puluh temuan low yang identik dulu menyisakan 15 yang tak
+ * pernah dilihat model; sekarang jadi satu baris berisi angka 40.
+ */
+test('temuan identik menyatu, dan seluruhnya terwakili', () => {
   const temuan = Array.from({ length: 40 }, () => t('low'))
   const p = susunPrompt({ nama: 'Uji', baseUrl: BASE, temuan })
-  expect(p).toMatch(/15 temuan lain tidak dikutip/)
-  expect(p).toMatch(/jangan mengaku sudah melihat semuanya/)
+  expect(p).toMatch(/mencakup seluruh temuan situs ini/)
+  expect(p).toMatch(/40 halaman/)
+  expect(p).not.toMatch(/tidak terwakili/)
 })
 
-test('daftar yang lengkap dinyatakan lengkap', () => {
+test('daftar lengkap dinyatakan lengkap, beserta jumlah masalahnya', () => {
   const p = susunPrompt({ nama: 'Uji', baseUrl: BASE, temuan: [t('high')] })
-  expect(p).toMatch(/Berikut seluruh temuannya/)
-  expect(p).toMatch(/Daftar di atas lengkap/)
+  expect(p).toMatch(/1 masalah berbeda, dan semuanya ada di bawah ini/)
+  expect(p).toMatch(/mencakup seluruh temuan situs ini/)
   expect(p).not.toMatch(/tidak dikutip/)
 })
 
-test('kutipan dibatasi 25 baris walau temuannya ratusan', () => {
-  const temuan = Array.from({ length: 300 }, () => t('high'))
+test('ratusan masalah BERBEDA tetap dibatasi, dan sisanya disebut', () => {
+  // Judul berbeda tiap temuan, jadi tidak ada yang bisa digabung — kasus
+  // terburuk yang membuat BATAS_KELOMPOK masih perlu ada.
+  const temuan = Array.from({ length: 300 }, (_, i) => t('high', `aturan-${i}`))
   const p = susunPrompt({ nama: 'Uji', baseUrl: BASE, temuan })
-  expect(p.split('\n').filter((l) => l.startsWith('- [')).length).toBe(25)
+  expect(p.split('\n').filter((l) => l.startsWith('- [')).length).toBe(40)
+  expect(p).toMatch(/260 temuan tidak terwakili/)
+  expect(p).toMatch(/jangan mengaku sudah melihat semuanya/)
+})
+
+/* ── kelompokkan ─────────────────────────────────────────────────────────── */
+
+/** Jaminan paling penting: penggabungan tidak boleh menelan satu temuan pun. */
+test('jumlah seluruh kelompok selalu sama dengan jumlah temuan', () => {
+  const temuan = [
+    ...Array.from({ length: 22 }, (_, i) => t('medium', 'lh', `${BASE}/h${i % 6}`)),
+    ...Array.from({ length: 6 }, (_, i) => t('critical', 'http-error', `${BASE}/p${i}`)),
+    t('high', 'cookie', null),
+  ]
+  const k = kelompokkan(temuan, BASE)
+  expect(k.reduce((n, g) => n + g.jumlah, 0)).toBe(temuan.length)
+})
+
+/**
+ * Inti `judulTanpaUrl`. Tanpa ini situs dengan 200 halaman rusak menghasilkan
+ * 200 kelompok, dan pengelompokan tidak menyelesaikan apa pun.
+ */
+test('URL di dalam judul tidak memecah satu masalah jadi banyak', () => {
+  const temuan = [
+    { category: 'bugs', severity: 'critical' as const, rule: 'http-error',
+      title: `HTTP 500 pada ${BASE}/divan`, url: `${BASE}/divan` },
+    { category: 'bugs', severity: 'critical' as const, rule: 'http-error',
+      title: `HTTP 500 pada ${BASE}/headboard`, url: `${BASE}/headboard` },
+  ]
+  const k = kelompokkan(temuan, BASE)
+  expect(k).toHaveLength(1)
+  expect(k[0]?.jumlah).toBe(2)
+  expect(k[0]?.judul).toBe('HTTP 500')
+  expect(k[0]?.contoh).toEqual(['/divan', '/headboard'])
+})
+
+test('contoh URL dibatasi tapi jumlahnya tetap jujur', () => {
+  const temuan = Array.from({ length: 20 }, (_, i) => t('high', 'a', `${BASE}/x${i}`))
+  const k = kelompokkan(temuan, BASE)
+  expect(k[0]?.jumlah).toBe(20)
+  expect(k[0]?.contoh).toHaveLength(6)
+  const p = susunPrompt({ nama: 'Uji', baseUrl: BASE, temuan })
+  expect(p).toMatch(/\+14 lagi/)
+})
+
+test('severity kelompok adalah yang terparah di dalamnya', () => {
+  const k = kelompokkan(
+    [t('low', 'a', `${BASE}/1`), t('critical', 'a', `${BASE}/2`), t('medium', 'a', `${BASE}/3`)],
+    BASE,
+  )
+  expect(k).toHaveLength(1)
+  expect(k[0]?.severity).toBe('critical')
+})
+
+test('kelompok diurutkan parah dulu, lalu terbanyak halaman', () => {
+  const temuan = [
+    ...Array.from({ length: 5 }, (_, i) => t('medium', 'banyak', `${BASE}/m${i}`)),
+    t('medium', 'sedikit', `${BASE}/s`),
+    t('critical', 'parah', `${BASE}/c`),
+  ]
+  const k = kelompokkan(temuan, BASE)
+  expect(k.map((g) => g.rule)).toEqual(['parah', 'banyak', 'sedikit'])
+})
+
+test('URL yang sama tidak dicatat dua kali sebagai contoh', () => {
+  const k = kelompokkan([t('high', 'a', `${BASE}/sama`), t('high', 'a', `${BASE}/sama`)], BASE)
+  expect(k[0]?.jumlah).toBe(2)
+  expect(k[0]?.contoh).toEqual(['/sama'])
 })
 
 test('URL raksasa dipotong', () => {
