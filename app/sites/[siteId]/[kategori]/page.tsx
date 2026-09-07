@@ -15,10 +15,6 @@ const KATEGORI = ['bugs', 'console', 'security', 'lighthouse']
  * mengirimnya ke client component. Menyalinnya jadi objek biasa di batas itu
  * lebih murah daripada mengubah lapisan query yang dipakai bersama.
  */
-function polos(baris: BarisTemuan[]): BarisTemuan[] {
-  return baris.map((b) => ({ ...b }))
-}
-
 export default async function Kategori({
   params,
   searchParams,
@@ -69,7 +65,7 @@ export default async function Kategori({
           // pemindaian, sementara pertanyaan di sini murni soal saringan.
           <p className="saring-kosong">Belum ada temuan yang diabaikan di kategori ini.</p>
         ) : (
-          <TabelTemuan baris={polos(diabaikan)} baseUrl={baseUrl} status="ignored" path={path} />
+          <TabelTemuan baris={diabaikan} baseUrl={baseUrl} status="ignored" path={path} />
         )}
       </>
     )
@@ -89,7 +85,7 @@ export default async function Kategori({
     <>
       {saringan}
       <TabelTemuan
-        baris={polos(temuanKategori(db(), id, kategori))}
+        baris={temuanKategori(db(), id, kategori)}
         baseUrl={baseUrl}
         status="open"
         path={path}

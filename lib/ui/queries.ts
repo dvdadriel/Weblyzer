@@ -122,13 +122,23 @@ const URUTAN = `CASE f.severity
   WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2
   WHEN 'low' THEN 3 ELSE 4 END`
 
+/**
+ * `node:sqlite` mengembalikan objek berprototipe null, dan React menolak
+ * meneruskannya ke client component ("Only plain objects can be passed").
+ * Disalin di sini, di sumbernya, supaya setiap pemakai mendapat objek biasa —
+ * bukan di tiap halaman yang kebetulan menemuinya lebih dulu.
+ */
+function polos<T extends object>(baris: T[]): T[] {
+  return baris.map((b) => ({ ...b }))
+}
+
 export function temuanKategori(
   db: DatabaseSync,
   siteId: number,
   category: string,
   status: 'open' | 'ignored' | 'fixed' = 'open',
 ): BarisTemuan[] {
-  return db
+  return polos(db
     .prepare(
       `SELECT f.id, f.category, f.severity, f.rule, f.title, f.detail_json, f.status,
               p.url AS url, f.first_seen_run, f.last_seen_run
@@ -137,7 +147,7 @@ export function temuanKategori(
        WHERE f.site_id = ? AND f.category = ? AND f.status = ?
        ORDER BY ${URUTAN}, f.rule, p.url`,
     )
-    .all(siteId, category, status) as unknown as BarisTemuan[]
+    .all(siteId, category, status) as unknown as BarisTemuan[])
 }
 
 export function keadaanKategori(db: DatabaseSync, siteId: number, category: string): Keadaan {

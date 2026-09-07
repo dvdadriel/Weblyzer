@@ -194,6 +194,10 @@ code {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-x: auto;
+  /* Detail Lighthouse bisa panjang sekali. Tanpa batas ini satu baris yang
+     dibuka bisa mendorong seluruh tabel keluar layar. */
+  max-height: 18rem;
+  overflow-y: auto;
 }
 
 /* Aksi teks polos: aksennya --ink, sama seperti sisa antarmuka. Tidak ada
