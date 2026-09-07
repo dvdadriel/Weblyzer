@@ -2,8 +2,8 @@
  * Wordmark di header. `judul` menentukan apakah dia *judul halaman* ini atau
  * cuma penanda merek.
  *
- * Di dashboard tidak ada judul lain, jadi "audit" memang judul halamannya dan
- * dirender `<h1>`. Di halaman situs, judulnya adalah nama situs — wordmark
+ * Di dashboard tidak ada judul lain, jadi "weblyzer" memang judul halamannya
+ * dan dirender `<h1>`. Di halaman situs, judulnya adalah nama situs — wordmark
  * turun jadi teks biasa supaya tidak ada dua `<h1>` yang bersaing.
  *
  * Tanpa ini tidak ada satu pun heading di seluruh aplikasi: struktur yang
@@ -15,9 +15,9 @@ export function Wordmark({ judul = false }: { judul?: boolean } = {}) {
   return (
     <header className="wordmark">
       {judul ? (
-        <h1 className="wordmark-teks">audit</h1>
+        <h1 className="wordmark-teks">weblyzer</h1>
       ) : (
-        <span className="wordmark-teks">audit</span>
+        <span className="wordmark-teks">weblyzer</span>
       )}
     </header>
   )

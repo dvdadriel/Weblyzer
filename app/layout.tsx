@@ -19,7 +19,7 @@ const mark = Space_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Audit',
+  title: 'Weblyzer',
   description: 'Apa yang rusak di situs saya, dan apa yang sudah beres.',
 }
 

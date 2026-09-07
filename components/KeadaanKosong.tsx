@@ -15,7 +15,7 @@ const ISI: Record<Exclude<Keadaan, 'ada-temuan'>, { judul: string; teks: string 
   },
 }
 
-export function KeadaanKosong({ keadaan, siteId }: { keadaan: Keadaan; siteId: number }) {
+export function KeadaanKosong({ keadaan }: { keadaan: Keadaan }) {
   if (keadaan === 'ada-temuan') return null
   const { judul, teks } = ISI[keadaan]
   return (
@@ -24,14 +24,10 @@ export function KeadaanKosong({ keadaan, siteId }: { keadaan: Keadaan; siteId: n
           hasil paling sering — justru di sini heading sungguhan paling berguna. */}
       <h2 className="kosong-judul">{judul}</h2>
       <p className="kosong-teks">{teks}</p>
-      {/* Perintah pindai hanya muncul ketika memang ada yang perlu dikerjakan.
-          Pada keadaan `bersih` jawabannya adalah "tidak ada", dan mengajak
-          bertindak justru melemahkan jawaban yang sudah selesai itu. */}
-      {keadaan !== 'bersih' && (
-        <p className="kosong-teks">
-          <code>npm run scan -- scan {siteId}</code>
-        </p>
-      )}
+      {/* Tanpa perintah terminal maupun tombol kedua: tombol pindai sudah ada
+          di atas blok ini di setiap keadaan. Mengulangnya di sini berarti dua
+          cara untuk satu pekerjaan, dan pada keadaan `bersih` mengajak
+          bertindak justru melemahkan jawaban yang sudah selesai. */}
     </div>
   )
 }

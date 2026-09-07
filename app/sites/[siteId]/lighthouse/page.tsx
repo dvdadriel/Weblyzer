@@ -1,6 +1,8 @@
 import { db } from '../../../../lib/ui/db.ts'
-import { skorSitus, keadaanKategori, situs } from '../../../../lib/ui/queries.ts'
+import { skorSitus, keadaanKategori, situs, runAktif } from '../../../../lib/ui/queries.ts'
 import { GridSkor } from '../../../../components/GridSkor.tsx'
+import { TombolScan } from '../../../../components/TombolScan.tsx'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,14 +14,11 @@ export const dynamic = 'force-dynamic'
  * Menumpang di sana berarti menyuruh menjalankan perintah yang salah, jadi
  * teksnya ditulis di tempat.
  */
-function Kosong({ judul, teks, perintah }: { judul: string; teks: string; perintah: string }) {
+function Kosong({ judul, teks }: { judul: string; teks: string }) {
   return (
     <div className="kosong">
       <h2 className="kosong-judul">{judul}</h2>
       <p className="kosong-teks">{teks}</p>
-      <p className="kosong-teks">
-        <code>{perintah}</code>
-      </p>
     </div>
   )
 }
@@ -32,39 +31,65 @@ export default async function Lighthouse({
   const { siteId } = await params
   const id = Number(siteId)
 
+  const keadaan = keadaanKategori(db(), id, 'lighthouse')
+
+  // Satu-satunya keadaan tanpa tombol ukur. Lighthouse mengukur halaman yang
+  // sudah tersimpan, jadi kalau crawl belum pernah jalan tidak ada yang bisa
+  // diukur — tombol di sini akan menjalankan pekerjaan yang pasti kosong.
+  // Yang memperbaiki keadaan ini adalah crawl, dan itu ada di tab lain.
+  if (keadaan === 'belum-dipindai') {
+    return (
+      <>
+        <Kosong
+          judul="Belum pernah dipindai"
+          teks="Halamannya pun belum diketahui. Lighthouse mengukur halaman yang sudah tersimpan, jadi pemindaian harus jalan lebih dulu."
+        />
+        <p className="kosong-teks" style={{ textAlign: 'center' }}>
+          <Link href={`/sites/${id}/bugs`}>Buka tab bugs untuk memindai</Link>
+        </p>
+      </>
+    )
+  }
+
+  const tombol = (
+    <TombolScan
+      siteId={id}
+      kategori="lighthouse"
+      path={`/sites/${id}/lighthouse`}
+      berjalan={runAktif(db(), id) ?? null}
+    />
+  )
+
   const skor = skorSitus(db(), id)
   if (skor.length > 0) {
     const s = situs(db(), id)
-    return <GridSkor baris={skor} baseUrl={s?.base_url ?? ''} />
-  }
-
-  const keadaan = keadaanKategori(db(), id, 'lighthouse')
-
-  if (keadaan === 'belum-dipindai') {
     return (
-      <Kosong
-        judul="Belum pernah dipindai"
-        teks="Halamannya pun belum diketahui. Jalankan pemindaian dulu, baru pengukuran Lighthouse."
-        perintah={`npm run scan -- scan ${id}`}
-      />
+      <>
+        {tombol}
+        <GridSkor baris={skor} baseUrl={s?.base_url ?? ''} />
+      </>
     )
   }
 
   if (keadaan === 'gagal') {
     return (
-      <Kosong
-        judul="Pemindaian terakhir gagal"
-        teks="Skornya tidak diketahui — ini bukan berarti halamannya cepat. Ukur lagi."
-        perintah={`npm run scan -- lighthouse ${id}`}
-      />
+      <>
+        {tombol}
+        <Kosong
+          judul="Pemindaian terakhir gagal"
+          teks="Skornya tidak diketahui — ini bukan berarti halamannya cepat. Ukur lagi."
+        />
+      </>
     )
   }
 
   return (
-    <Kosong
-      judul="Belum ada pengukuran Lighthouse"
-      teks="Halamannya sudah diketahui, tapi belum satu pun diukur."
-      perintah={`npm run scan -- lighthouse ${id}`}
-    />
+    <>
+      {tombol}
+      <Kosong
+        judul="Belum ada pengukuran Lighthouse"
+        teks="Halamannya sudah diketahui, tapi belum satu pun diukur."
+      />
+    </>
   )
 }

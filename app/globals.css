@@ -275,3 +275,94 @@ code {
 /* Skor yang tidak ada ditulis `—`, bukan 0, dan memakai tinta kedua supaya
    tidak terbaca sebagai salah satu pita warna. */
 .sel-kosong { color: var(--ink-2); font-weight: 400; }
+
+/* ── Kontrol ─────────────────────────────────────────────────────────────
+   Permukaan kontrol pertama di aplikasi. `--r-kontrol` dideklarasikan sejak
+   awal untuk ini: 10px, lebih rapat dari panel 16px supaya tombol terbaca
+   sebagai benda yang ditekan, bukan panel kecil. */
+
+.tombol {
+  font: inherit;
+  font-size: var(--t-data);
+  font-weight: 500;
+  color: var(--bg);
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: var(--r-kontrol);
+  padding: var(--s-1) var(--s-3);
+  cursor: pointer;
+  transition: background var(--d-cepat) var(--e-out);
+}
+/* Tinta dinaikkan lewat transparansi, bukan warna kedua: satu-satunya perubahan
+   adalah tombolnya terasa terangkat. */
+.tombol:hover { background: oklch(35.6% 0.056 162 / 0.85); }
+.tombol:active { background: var(--ink); transform: translateY(1px); }
+.tombol:disabled {
+  cursor: default;
+  background: var(--sev-ignored);
+  border-color: var(--sev-ignored);
+}
+
+.kontrol {
+  font: inherit;
+  font-size: var(--t-data);
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line-kuat);
+  border-radius: var(--r-kontrol);
+  padding: var(--s-1) var(--s-2);
+  width: 100%;
+}
+.kontrol:hover { border-color: var(--ink); }
+/* Placeholder wajib diuji terpisah: warna teks isi tidak menjaminnya. */
+.kontrol::placeholder { color: var(--sev-ignored); }
+
+.bilah-aksi {
+  display: flex; gap: var(--s-3); align-items: center; flex-wrap: wrap;
+  margin-top: var(--s-5);
+}
+
+/* ── Tambah situs ─────────────────────────────────────────────────────── */
+
+.tambah { margin-top: var(--s-6); }
+.tambah-pemicu {
+  display: inline-block;
+  font-size: var(--t-data); font-weight: 500; color: var(--ink-2);
+  cursor: pointer; padding: var(--s-1) 0; list-style: none;
+}
+.tambah-pemicu::-webkit-details-marker { display: none; }
+.tambah-pemicu:hover { color: var(--ink); }
+.tambah[open] .tambah-pemicu { color: var(--ink); margin-bottom: var(--s-3); }
+
+.tambah-form {
+  display: flex; flex-direction: column; gap: var(--s-3);
+  max-width: 26rem;
+  padding: var(--s-4);
+  background: var(--surface);
+  border-radius: var(--r-panel);
+}
+.tambah-baris { display: flex; flex-direction: column; gap: var(--s-1); margin: 0; }
+.tambah-label { font-size: var(--t-mikro); color: var(--ink-2); }
+/* Input di dalam panel `--surface`, jadi latarnya `--bg` supaya medannya jelas. */
+.tambah-form .kontrol { background: var(--bg); }
+.tambah-aksi { margin: 0; }
+.tambah-galat { margin: 0; font-size: var(--t-data); color: var(--sev-critical); }
+
+/* ── Pemindaian berjalan ──────────────────────────────────────────────────
+   Tanpa animasi, dan sengaja: tidak ada satu pun angka progres dari proses
+   pemindai, jadi apa pun yang bergerak di sini akan mengarang. */
+
+.jalan {
+  display: flex; gap: var(--s-2); align-items: baseline; flex-wrap: wrap;
+  margin: var(--s-5) 0 0;
+  font-size: var(--t-data); color: var(--ink-2);
+}
+.jalan-tanda { font-weight: 600; color: var(--ink); }
+.jalan-segarkan {
+  font: inherit; font-size: inherit;
+  color: var(--ink); background: none; border: 0;
+  border-bottom: 1px solid var(--line-kuat);
+  padding: 0; cursor: pointer;
+}
+.jalan-segarkan:hover { border-bottom-color: var(--ink); }
+.jalan-galat { font-size: var(--t-data); color: var(--sev-critical); }

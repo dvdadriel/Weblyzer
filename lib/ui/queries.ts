@@ -41,7 +41,16 @@ const NOL: Record<Severity, number> = {
 function runTerakhir(db: DatabaseSync, siteId: number) {
   return db
     .prepare(
-      `SELECT status, error, finished_at FROM runs
+      // `finished_at` disimpan UTC, jadi dikonversi ke jam pemakai di sini —
+      // sama seperti `runAktif`. Tanpa ini kartu menulis "dipindai 06:34"
+      // sementara baris "sedang berjalan" di halaman sebelahnya menulis 13:34
+      // untuk pemindaian yang sama.
+      //
+      // Detik dibuang: pertanyaannya "kapan terakhir dipindai", dan presisi
+      // detik cuma menambah dua angka yang tidak pernah dipakai.
+      `SELECT status, error,
+              strftime('%Y-%m-%d %H:%M', finished_at, 'localtime') AS finished_at
+       FROM runs
        WHERE site_id = ? AND finished_at IS NOT NULL
        ORDER BY id DESC LIMIT 1`,
     )
@@ -188,4 +197,41 @@ export function situs(db: DatabaseSync, siteId: number) {
   return db
     .prepare('SELECT id, name, base_url FROM sites WHERE id = ?')
     .get(siteId) as { id: number; name: string; base_url: string } | undefined
+}
+
+/**
+ * Run yang masih berjalan untuk sebuah situs, apa pun tipenya.
+ *
+ * Sengaja tidak menyaring per tipe: satu crawl memakai satu Chromium, jadi
+ * tombol di tab mana pun harus mati selama ada scan berjalan. Kalau disaring
+ * per kategori, menekan "bugs" lalu "security" menjalankan dua browser yang
+ * berebut dan salah satunya kalah tanpa jejak.
+ *
+ * ponytail: run yang lebih tua dari AMBANG_MACET dianggap mati. Proses pekerja
+ * yang di-kill -9 tidak pernah sempat menulis status akhirnya, dan tanpa batas
+ * ini tombolnya mati selamanya. Naik kelasnya: simpan PID pekerja di tabel
+ * `runs` lalu `process.kill(pid, 0)` — pasti, tapi butuh migrasi kolom.
+ */
+const AMBANG_MACET = '-30 minutes'
+
+export function runAktif(db: DatabaseSync, siteId: number) {
+  // Disalin jadi objek biasa di sini, sama seperti `polos` untuk baris tabel.
+  // Hasilnya diteruskan ke client component, dan baris `node:sqlite` yang
+  // berprototipe null membuat React melempar. Terbukti mahal: tanpa ini
+  // halamannya 200 selama tidak ada pemindaian dan 500 tepat ketika ada —
+  // jadi jalur yang rusak justru yang paling jarang diuji.
+  const baris = db
+    .prepare(
+      // `mulai` dihitung SQLite, bukan JS: nilai di kolomnya UTC, sedangkan
+      // yang ditanya pemakai adalah "sejak kapan" menurut jamnya sendiri.
+      // Dikerjakan di server juga menghindari selisih hidrasi — jam server dan
+      // jam browser tidak wajib sama.
+      `SELECT id, strftime('%H:%M', started_at, 'localtime') AS mulai FROM runs
+       WHERE site_id = ?
+         AND status IN ('queued', 'running')
+         AND started_at > datetime('now', ?)
+       ORDER BY id DESC LIMIT 1`,
+    )
+    .get(siteId, AMBANG_MACET) as { id: number; mulai: string } | undefined
+  return baris ? { ...baris } : undefined
 }

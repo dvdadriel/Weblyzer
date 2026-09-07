@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { db } from '../lib/ui/db.ts'
 import { ringkasanSitus } from '../lib/ui/queries.ts'
 import { Wordmark } from '../components/Wordmark.tsx'
+import { TambahSitus } from '../components/TambahSitus.tsx'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,10 +18,7 @@ export default function Dashboard() {
       {situs.length === 0 ? (
         <div className="kosong">
           <h2 className="kosong-judul">Belum ada situs.</h2>
-          <p className="kosong-teks">
-            Tambahkan lewat terminal:{' '}
-            <code>npm run scan -- add-site Nama https://situs.com</code>
-          </p>
+          <p className="kosong-teks">Tambahkan situs pertama untuk mulai memindai.</p>
         </div>
       ) : (
         <ul className="kartu-daftar">
@@ -61,6 +59,8 @@ export default function Dashboard() {
           ))}
         </ul>
       )}
+
+      <TambahSitus />
     </main>
   )
 }

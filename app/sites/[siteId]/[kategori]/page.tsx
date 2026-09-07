@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '../../../../lib/ui/db.ts'
-import { temuanKategori, keadaanKategori, situs } from '../../../../lib/ui/queries.ts'
+import { temuanKategori, keadaanKategori, situs, runAktif } from '../../../../lib/ui/queries.ts'
 import type { BarisTemuan } from '../../../../lib/ui/queries.ts'
 import { TabelTemuan } from '../../../../components/TabelTemuan.tsx'
 import { KeadaanKosong } from '../../../../components/KeadaanKosong.tsx'
+import { TombolScan } from '../../../../components/TombolScan.tsx'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,9 +57,20 @@ export default async function Kategori({
   const s = situs(db(), id)
   const baseUrl = s?.base_url ?? ''
 
+  const berjalan = runAktif(db(), id) ?? null
+  const tombol = (
+    <TombolScan
+      siteId={id}
+      kategori={kategori as 'bugs' | 'console' | 'security'}
+      path={path}
+      berjalan={berjalan}
+    />
+  )
+
   if (status === 'ignored') {
     return (
       <>
+        {tombol}
         {saringan}
         {diabaikan.length === 0 ? (
           // Sengaja bukan KeadaanKosong: teks di sana bicara soal keadaan
@@ -75,14 +87,16 @@ export default async function Kategori({
   if (keadaan !== 'ada-temuan') {
     return (
       <>
+        {tombol}
         {saringan}
-        <KeadaanKosong keadaan={keadaan} siteId={id} />
+        <KeadaanKosong keadaan={keadaan} />
       </>
     )
   }
 
   return (
     <>
+      {tombol}
       {saringan}
       <TabelTemuan
         baris={temuanKategori(db(), id, kategori)}
