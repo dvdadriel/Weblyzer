@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 28" width="36" height="28" fill="none">
+  <!-- Casing retro Braun -->
+  <rect x="1.5" y="1.5" width="33" height="25" rx="6" fill="#FDFBF7" stroke="#1B2B23" stroke-width="2"/>
+  <!-- Bezel layar CRT / panel instrumen -->
+  <rect x="4.5" y="4.5" width="27" height="19" rx="3.5" stroke="#E2DAD0" stroke-width="1"/>
+  <!-- Tracing W monoline instrumen -->
+  <path d="M 7.5 9.5 L 12 20.5 L 18 12.5 L 24 20.5 L 28.5 9.5" 
+        stroke="#1B2B23" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Indikator diode retro amber di vertex tengah -->
+  <circle cx="18" cy="12.5" r="2" fill="#D97706" stroke="#1B2B23" stroke-width="0.9"/>
+  <!-- Titik probe terminal konsol -->
+  <circle cx="28.5" cy="9.5" r="1.5" fill="#1B2B23"/>
+  <circle cx="7.5" cy="9.5" r="1.5" fill="#1B2B23"/>
+</svg>
