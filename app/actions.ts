@@ -4,7 +4,8 @@ import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { revalidatePath } from 'next/cache'
 import { getDb } from '../lib/db.ts'
-import { createSite } from '../lib/repos/sites.ts'
+import { validasi } from '../lib/pengaturan-situs.ts'
+import { createSite, updateSite } from '../lib/repos/sites.ts'
 import { runAktif } from '../lib/ui/queries.ts'
 import { pilihPenyedia, PENYEDIA } from '../lib/ai/penyedia.ts'
 import { ujiPenyedia } from '../lib/ai/jalankan.ts'
@@ -267,5 +268,43 @@ export async function aturStrategi(siteId: number, keduanya: boolean): Promise<H
     .prepare('UPDATE sites SET lighthouse_strategy = ? WHERE id = ?')
     .run(keduanya ? 'both' : 'mobile', siteId)
   revalidatePath(`/sites/${siteId}/lighthouse`)
+  return null
+}
+
+/**
+ * Menyimpan pengaturan satu situs.
+ *
+ * Ditolak selagi pemindaian berjalan, sama seperti `aturStrategi` dan
+ * `hapusSitus`: `max_pages` dibaca `visit()` saat crawl dimulai, jadi
+ * mengubahnya di tengah jalan menghasilkan pemindaian yang setengah memakai
+ * nilai lama — dan tidak ada di layar yang bisa menjelaskan angka itu nanti.
+ */
+export async function simpanPengaturan(
+  siteId: number,
+  _sebelum: HasilAksi,
+  form: FormData,
+): Promise<HasilAksi> {
+  if (runAktif(getDb(), siteId)) {
+    return { error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
+  }
+
+  const hasil = validasi({
+    maxPages: String(form.get('maxPages') ?? ''),
+    mode: String(form.get('mode') ?? ''),
+    sitemap: String(form.get('sitemap') ?? ''),
+    // Checkbox yang tidak dicentang TIDAK dikirim browser sama sekali, jadi
+    // absennya berarti mati. Membacanya sebagai `=== 'on'` menangkap keduanya.
+    enabled: form.get('enabled') === 'on',
+  })
+  if (!hasil.ok) return { error: hasil.galat }
+
+  try {
+    updateSite(getDb(), siteId, hasil.nilai)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+
+  revalidatePath(`/sites/${siteId}/pengaturan`)
+  revalidatePath('/')
   return null
 }

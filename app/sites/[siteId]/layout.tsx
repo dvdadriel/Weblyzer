@@ -46,6 +46,13 @@ export default async function SiteLayout({
           <span>Unduh Excel</span>
           <span className="unduh-tag">.xlsx</span>
         </a>
+        {/* Di sebelah unduhan, bukan sebagai tab: pengaturan bukan kategori
+            temuan, dan menaruhnya di bilah tab akan menyiratkan ia punya
+            temuannya sendiri. Keduanya aksi tingkat situs, jadi duduk bersama. */}
+        <Link className="unduh-tautan" href={`/sites/${s.id}/pengaturan`}>
+          <Ikon nama="segarkan" ukuran={14} />
+          <span>Pengaturan</span>
+        </Link>
         <span className="unduh-catatan">
           seluruh kategori, termasuk yang sudah beres dan diabaikan
         </span>

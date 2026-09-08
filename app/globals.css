@@ -1607,3 +1607,41 @@ code {
      pesan yang tidak menyebut sebabnya. */
   user-select: all;
 }
+
+/* ── Pengaturan situs ─────────────────────────────────────────────────────
+   Meniru `.model-set` yang sudah ada untuk pemilihan penyedia: label di atas,
+   kontrol, lalu catatan yang menjelaskan harganya. Yang dijaga di sini adalah
+   catatan itu tidak pernah opsional — tiap medan punya biaya yang tidak
+   terlihat dari namanya. */
+.atur { max-width: 75ch; }
+.atur-set {
+  display: flex; flex-direction: column; gap: var(--s-4);
+  margin: 0; padding: var(--s-4);
+  border: 1px solid var(--line); border-radius: var(--r-panel);
+  background: var(--surface-card);
+}
+.atur-set[disabled] { opacity: 0.6; }
+.atur-baris { display: flex; flex-direction: column; gap: var(--s-1); }
+.atur-label { font-size: var(--t-body); font-weight: 600; color: var(--ink); }
+.atur-catatan { font-size: var(--t-mikro); color: var(--ink-2); line-height: 1.5; }
+.atur-input {
+  font: inherit; font-size: var(--t-body); color: var(--ink);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line-kuat); border-radius: var(--r-kontrol);
+  background: var(--bg); max-width: 32rem;
+}
+.atur-input:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+/* Centang duduk di baris yang sama dengan labelnya, sedangkan medan lain
+   bertumpuk: checkbox yang labelnya di atas kehilangan hubungan visualnya. */
+.atur-centang { flex-direction: row; align-items: flex-start; gap: var(--s-2); }
+.atur-centang > span { display: flex; flex-direction: column; gap: var(--s-1); }
+.atur-galat {
+  display: flex; align-items: flex-start; gap: var(--s-2);
+  margin-top: var(--s-3); padding: var(--s-2) var(--s-3);
+  font-size: var(--t-mikro); line-height: 1.5;
+  border: 1px solid var(--line); border-left: 3px solid var(--sev-high);
+  border-radius: var(--r-kontrol);
+  background: var(--surface-card); color: var(--ink-2);
+}
+.atur-galat svg { flex: none; position: relative; top: 0.2em; }
+.atur-galat strong { color: var(--ink); }
