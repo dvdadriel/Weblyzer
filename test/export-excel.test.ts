@@ -396,3 +396,40 @@ test('tugas gabungan menghitung varian, bukan halaman', () => {
   expect(p).toContain('2 varian, 2 temuan')
   expect(p).not.toMatch(/Terdampak: \d+ halaman/)
 })
+
+/**
+ * Temuan `aturan` diukur: `judul-hilang` berarti elemen `<title>` benar-benar
+ * tidak ada. Temuan claude-seo adalah PENILAIAN, dan penilaian bisa keliru
+ * dengan cara yang tidak bisa dilakukan pengukuran. Asisten yang tidak diberi
+ * tahu bedanya akan memperlakukan keduanya sama yakinnya.
+ */
+test('prompt untuk temuan claude-seo menyuruh verifikasi dulu', () => {
+  const { db, siteId } = siap()
+  const page = upsertPage(db, siteId, { url: 'https://uji.test/', statusCode: 200, loadMs: 5 })
+  const run = createRun(db, siteId, 'geo')
+  reconcile(db, siteId, run.id, 'geo', [
+    { url: 'https://uji.test/', pageId: page.id, severity: 'high', rule: 'entitas-brand-lemah', title: 'Sinyal entitas brand sempit', detail: {} },
+  ])
+
+  const p = teks(promptSheet(db, siteId).data[1]![6]!)!
+  expect(p).toMatch(/VERIFIKASI DULU/)
+  expect(p).toContain('penilaian, bukan pengukuran')
+  expect(p).toContain('claude-seo')
+  // Kolom Sumber-nya juga menyebutkannya, supaya terlihat tanpa membuka prompt.
+  expect(teks(promptSheet(db, siteId).data[1]![2]!)).toBe('claude-seo')
+})
+
+test('prompt untuk temuan aturan TIDAK menyuruh verifikasi lebih dulu', () => {
+  // Pembedaannya harus nyata di kedua arah. Kalau semua prompt berbunyi
+  // "verifikasi dulu", peringatan itu berhenti berarti apa pun.
+  const { db, siteId } = siap()
+  const page = upsertPage(db, siteId, { url: 'https://uji.test/a', statusCode: 500, loadMs: 5 })
+  const run = createRun(db, siteId, 'bugs')
+  reconcile(db, siteId, run.id, 'bugs', [
+    { url: 'https://uji.test/a', pageId: page.id, severity: 'critical', rule: 'http-error', title: 'HTTP 500 pada https://uji.test/a', detail: {} },
+  ])
+
+  const p = teks(promptSheet(db, siteId).data[1]![6]!)!
+  expect(p).not.toMatch(/VERIFIKASI DULU/)
+  expect(teks(promptSheet(db, siteId).data[1]![2]!)).toBe('aturan')
+})
