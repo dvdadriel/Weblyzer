@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
 export type HasilJalan =
@@ -60,6 +60,25 @@ export function direktoriKerja(siteId: number): string {
   mkdirSync(dir, { recursive: true })
   return dir
 }
+
+/**
+ * Berkas hasil yang ditulis model, dan sumber kebenaran yang sebenarnya.
+ *
+ * stdout ternyata kanal yang salah untuk sesi panjang: `claude -p`
+ * mengembalikan pesan asisten **terakhir**, bukan transkripnya. Audit full
+ * yang berhasil menulis JSON lalu menambahkan satu kalimat penutup
+ * menghasilkan stdout 139 byte berbunyi "the audit JSON above is unchanged
+ * and final" — JSON-nya hilang seluruhnya, setelah dua puluh menit bekerja.
+ *
+ * Berkas tidak punya masalah itu. Ia juga kebal terhadap tiga hal lain yang
+ * sudah menggigit di fitur ini: exit code non-nol, `maxBuffer`, dan proses
+ * yang dibunuh — hasil yang sudah tertulis tetap ada terlepas dari bagaimana
+ * prosesnya berakhir.
+ *
+ * Namanya berawalan `weblyzer-` supaya tidak mungkin bertabrakan dengan
+ * berkas yang ditulis skill claude-seo sendiri (`audit-data.json`, `crawl.json`).
+ */
+export const NAMA_HASIL = 'weblyzer-temuan.json'
 
 /**
  * Menafsirkan hasil `execFile`.
@@ -132,6 +151,24 @@ export function jalankanClaudeSeo(
   batasMs: number,
 ): Promise<HasilJalan> {
   const cwd = direktoriKerja(siteId)
+  const hasil = join(cwd, NAMA_HASIL)
+
+  // Hasil run SEBELUMNYA dihapus lebih dulu, dan ini bukan kebersihan —
+  // ini penjaga §2.2. Tanpa penghapusan ini, run yang gagal tanpa menulis apa
+  // pun akan membaca berkas run kemarin dan melaporkannya sebagai hasil hari
+  // ini: temuan yang sudah diperbaiki muncul lagi, dan yang baru tidak pernah
+  // terlihat. Kegagalan akan menyamar jadi keberhasilan yang membeku.
+  try {
+    rmSync(hasil, { force: true })
+  } catch {
+    // Kalau berkasnya tidak bisa dihapus, `bacaHasil` di bawah akan membaca
+    // yang basi. Lebih baik gagal keras daripada melaporkan data kemarin.
+    return Promise.resolve({
+      ok: false,
+      galat: `Tidak bisa menghapus hasil run sebelumnya di ${hasil}`,
+    })
+  }
+
   return new Promise((resolve) => {
     const anak = execFile(
       'claude',
@@ -152,9 +189,28 @@ export function jalankanClaudeSeo(
           // Gagal menulis catatan diagnosis tidak boleh menggagalkan analisis
           // yang hasilnya sudah ada di tangan.
         }
+        // Berkas hasil menang atas stdout, apa pun yang terjadi pada
+        // prosesnya. Kalau model sudah menuliskannya, pekerjaannya selesai —
+        // exit code, stderr, dan kalimat penutup di stdout tidak mengubah itu.
+        const dariBerkas = bacaHasil(hasil)
+        if (dariBerkas !== null) {
+          resolve({ ok: true, teks: dariBerkas })
+          return
+        }
         resolve(tafsirkan(err, stdout, stderr, batasMs))
       },
     )
     anak.stdin?.end(prompt)
   })
+}
+
+/** Membaca berkas hasil bila ada dan tidak kosong. `null` berarti model tidak
+ *  pernah menulisnya, dan pemanggilnya jatuh ke stdout. */
+function bacaHasil(path: string): string | null {
+  try {
+    const isi = readFileSync(path, 'utf8')
+    return isi.trim() === '' ? null : isi
+  } catch {
+    return null
+  }
 }

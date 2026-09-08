@@ -1,3 +1,5 @@
+import { NAMA_HASIL } from './jalankan.ts'
+
 /**
  * Prompt untuk claude-seo, dijalankan headless.
  *
@@ -77,10 +79,20 @@ function bagianSebelumnya(sebelumnya: TemuanSebelumnya[]): string[] {
  *   adalah satu masalah; 40 baris akan mengubur tab-nya.
  */
 const ATURAN = [
-  'Keluarkan HANYA JSON. Tanpa kalimat pembuka, tanpa penutup, tanpa blok kode.',
+  `LANGKAH TERAKHIR — WAJIB: tulis hasilnya sebagai JSON ke berkas`,
+  `\`./${NAMA_HASIL}\` di direktori kerja Anda, memakai tool Write.`,
   '',
-  'Bentuknya:',
+  'Berkas, BUKAN jawaban akhir Anda. Alasannya: yang membaca hasil ini adalah',
+  'program, dan program itu hanya menerima pesan terakhir Anda. Kalau JSON-nya',
+  'Anda tulis sebagai jawaban lalu Anda menambahkan satu kalimat penutup,',
+  'JSON-nya hilang seluruhnya dan seluruh pekerjaan Anda terbuang. Ini sudah',
+  'terjadi. Berkas tidak punya masalah itu.',
+  '',
+  'Isi berkasnya JSON saja, tanpa blok kode:',
   '{"temuan":[{"rule":"...","severity":"...","title":"...","url":"...","detail":"..."}]}',
+  '',
+  'Tulis berkas itu SEBELUM Anda menjawab apa pun, dan tulis walau temuannya',
+  'kosong. Setelah itu jawaban akhir Anda boleh apa saja — sudah tidak dibaca.',
   '',
   'Aturan keras:',
   '- "rule": kebab-case pendek, bahasa Inggris atau Indonesia, dan HARUS STABIL',
@@ -97,8 +109,9 @@ const ATURAN = [
   '  halaman adalah satu temuan; sebutkan jumlah halamannya di "detail".',
   '- Jangan mengarang. Temuan yang tidak Anda periksa sendiri jangan disebut,',
   '  dan URL yang tidak Anda buka jangan dikarang.',
-  '- Kalau situsnya bersih untuk aspek ini, kembalikan {"temuan":[]}. Array',
-  '  kosong adalah jawaban yang sah dan lebih baik daripada temuan yang dipaksa.',
+  '- Kalau situsnya bersih untuk aspek ini, tulis {"temuan":[]}. Array kosong',
+  '  adalah jawaban yang sah dan lebih baik daripada temuan yang dipaksa —',
+  '  tapi berkasnya tetap harus ada.',
 ]
 
 export function promptGeo(
