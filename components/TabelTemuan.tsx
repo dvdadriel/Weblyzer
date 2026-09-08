@@ -58,47 +58,48 @@ function BarisDetail({
           semantik tabel di sebagian screen reader, dan navigasi per kolom
           adalah syarat di PRODUCT.md. */}
       <td colSpan={4}>
-        <p className="detail-judul">{b.title}</p>
-        <pre className="detail-json">{rapikan(b.detail_json)}</pre>
+        <div className="detail-konten">
+          <p className="detail-judul">{b.title}</p>
+          <pre className="detail-json">{rapikan(b.detail_json)}</pre>
 
-        <p className="detail-aksi">
-          {bisaPeriksa && status === 'open' && (
+          <p className="detail-aksi">
+            {bisaPeriksa && status === 'open' && (
+              <button
+                type="button"
+                className="tombol-teks"
+                disabled={memeriksa || pending}
+                onClick={() =>
+                  mulaiPeriksa(async () => {
+                    lapor(await periksaTemuan(b.id, path))
+                  })
+                }
+              >
+                <Ikon nama="scan" ukuran={13} />
+                {memeriksa ? 'Memeriksa…' : 'Periksa Lagi'}
+              </button>
+            )}
+
             <button
               type="button"
               className="tombol-teks"
-              disabled={memeriksa || pending}
+              disabled={pending || memeriksa}
               onClick={() =>
-                mulaiPeriksa(async () => {
-                  lapor(await periksaTemuan(b.id, path))
+                mulai(async () => {
+                  await ubahStatusTemuan(b.id, status === 'open' ? 'ignored' : 'open', path)
                 })
               }
             >
-              <Ikon nama="scan" />
-              {memeriksa ? 'Memeriksa…' : 'Periksa Lagi'}
+              {status === 'open' ? 'Abaikan' : 'Buka Lagi'}
             </button>
-          )}
 
-          <button
-            type="button"
-            className="tombol-teks"
-            disabled={pending || memeriksa}
-            onClick={() =>
-              mulai(async () => {
-                await ubahStatusTemuan(b.id, status === 'open' ? 'ignored' : 'open', path)
-              })
-            }
-          >
-            {status === 'open' ? 'Abaikan' : 'Buka Lagi'}
-          </button>
-
-          {!bisaPeriksa && status === 'open' && (
-            <span className="detail-catatan">
-              Pemeriksaan satu temuan belum ada untuk {namaKategori(b.category)} — jalankan
-              ulang seluruh kategorinya.
-            </span>
-          )}
-        </p>
-
+            {!bisaPeriksa && status === 'open' && (
+              <span className="detail-catatan">
+                Pemeriksaan satu temuan belum ada untuk {namaKategori(b.category)} — jalankan
+                ulang seluruh kategorinya.
+              </span>
+            )}
+          </p>
+        </div>
       </td>
     </tr>
   )
@@ -189,8 +190,10 @@ export function TabelTemuan({
                   {b.url === null ? b.title : jalur(b.url, baseUrl)}
                 </td>
                 <td className="sel-mikro">
-                  run {b.first_seen_run}
-                  {b.first_seen_run !== b.last_seen_run && `–${b.last_seen_run}`}
+                  <span className="tag-run">
+                    run {b.first_seen_run}
+                    {b.first_seen_run !== b.last_seen_run && `–${b.last_seen_run}`}
+                  </span>
                 </td>
               </tr>,
               // Dirender hanya saat mengembang: isinya tidak pernah ada di DOM
@@ -216,7 +219,7 @@ export function TabelTemuan({
         {baris.length} temuan {status === 'open' ? 'terbuka' : 'diabaikan'}.
         {waktuScan !== null && (
           <span className="tabel-waktu">
-            <Ikon nama="waktu" />
+            <Ikon nama="waktu" ukuran={13} />
             dipindai {waktuScan.waktu}
             {/* Kata sifat, bukan lencana tersendiri: pertanyaannya bukan "apa
                 pemicunya" melainkan "angka ini masih berlaku atau tidak", dan

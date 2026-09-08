@@ -38,7 +38,8 @@ export function Tab({ siteId }: { siteId: number }) {
             className="tab-item"
             aria-current={aktif ? 'page' : undefined}
           >
-            {label}
+            <span>{label}</span>
+            {(t === 'geo' || t === 'audit') && <span className="tab-ai-tag">AI</span>}
           </Link>
         )
       })}

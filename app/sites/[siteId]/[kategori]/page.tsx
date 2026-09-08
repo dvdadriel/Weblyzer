@@ -38,6 +38,7 @@ export default async function Kategori({
   const status: 'open' | 'ignored' = q === 'ignored' ? 'ignored' : 'open'
   const path = `/sites/${id}/${kategori}`
 
+  const terbuka = temuanKategori(db(), id, kategori, 'open')
   const diabaikan = temuanKategori(db(), id, kategori, 'ignored')
 
   // Saringan yang cuma punya satu sisi berisi adalah kebisingan: kalau belum
@@ -49,14 +50,16 @@ export default async function Kategori({
         className="saring-item"
         aria-current={status === 'open' ? 'true' : undefined}
       >
-        Terbuka
+        <span>Terbuka</span>
+        <span className="saring-hitung">{terbuka.length}</span>
       </Link>
       <Link
         href={`${path}?status=ignored`}
         className="saring-item"
         aria-current={status === 'ignored' ? 'true' : undefined}
       >
-        Diabaikan
+        <span>Diabaikan</span>
+        <span className="saring-hitung">{diabaikan.length}</span>
       </Link>
     </nav>
   )
@@ -66,18 +69,18 @@ export default async function Kategori({
 
   /**
    * Keterangan sumber, hanya untuk kategori yang dinilai claude-seo.
-   *
-   * Bukan kolom `Sumber` di tiap baris: di dalam satu tab nilainya sama untuk
-   * semua baris, jadi kolom itu akan mengulang kata yang sama 216 kali. Yang
-   * belum terkatakan bukan "dari mana baris ini" melainkan "kenapa tab ini
-   * berbeda", dan itu satu kalimat, sekali, di atas tabelnya.
    */
   const keterangan = sumberKategori(kategori) === 'claude-seo' && (
-    <p className="unduh-catatan" role="note">
-      Dinilai claude-seo, bukan diukur aturan. Jawabannya bisa bergeser antar
-      analisis walau situsnya tidak berubah, jadi &quot;sudah diperbaiki&quot; di sini
-      lebih tepat dibaca sebagai checklist Anda sendiri.
-    </p>
+    <div className="catatan-sumber" role="note">
+      <span style={{ color: 'var(--sev-high)', marginTop: '2px', flexShrink: 0 }}>
+        [!]
+      </span>
+      <span>
+        Dinilai claude-seo, bukan diukur aturan. Jawabannya bisa bergeser antar
+        analisis walau situsnya tidak berubah, jadi &quot;sudah diperbaiki&quot; di sini
+        lebih tepat dibaca sebagai checklist Anda sendiri.
+      </span>
+    </div>
   )
 
   const berjalan = runAktif(db(), id) ?? null

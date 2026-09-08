@@ -32,9 +32,10 @@ function warna(n: number): string {
 
 function SelSkor({ n }: { n: number | null }) {
   if (n === null) return <td className="sel-skor sel-kosong">—</td>
+  const kelas = n >= 90 ? 'skor-baik' : n >= 50 ? 'skor-sedang' : 'skor-buruk'
   return (
-    <td className="sel-skor" style={{ color: warna(n) }}>
-      {n}
+    <td className="sel-skor">
+      <span className={`skor-pill ${kelas}`}>{n}</span>
     </td>
   )
 }
@@ -84,13 +85,26 @@ export function GridSkor({ baris, baseUrl }: { baris: BarisSkor[]; baseUrl: stri
           ))}
         </tbody>
       </table>
-      {/* Kalau kolom strategy disembunyikan, strateginya disebut sekali di sini.
-          Menyembunyikan kolom boleh; menghilangkan informasinya tidak — skor
-          mobile dan desktop berbeda jauh. */}
-      <p className="tabel-kaki">
-        {baris.length} pengukuran
-        {banyakStrategi ? '' : ` (${baris[0]?.strategy ?? '-'})`}.
-      </p>
+      <div className="tabel-kaki" style={{ justifyContent: 'space-between' }}>
+        <span>
+          {baris.length} pengukuran
+          {banyakStrategi ? '' : ` (${baris[0]?.strategy ?? '-'})`}.
+        </span>
+        <div className="skor-legenda">
+          <span className="legenda-item">
+            <span className="legenda-dot" style={{ backgroundColor: 'var(--sev-fixed)' }} />
+            <span>90–100</span>
+          </span>
+          <span className="legenda-item">
+            <span className="legenda-dot" style={{ backgroundColor: 'var(--sev-medium)' }} />
+            <span>50–89</span>
+          </span>
+          <span className="legenda-item">
+            <span className="legenda-dot" style={{ backgroundColor: 'var(--sev-critical)' }} />
+            <span>&lt;50</span>
+          </span>
+        </div>
+      </div>
     </div>
   )
 }

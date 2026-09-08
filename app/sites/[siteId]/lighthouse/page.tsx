@@ -3,6 +3,8 @@ import { skorSitus, keadaanKategori, situs, runAktif } from '../../../../lib/ui/
 import { GridSkor } from '../../../../components/GridSkor.tsx'
 import { TombolScan } from '../../../../components/TombolScan.tsx'
 import { PilihStrategi } from '../../../../components/PilihStrategi.tsx'
+import { Ikon } from '../../../../components/Ikon.tsx'
+import type { NamaIkon } from '../../../../components/Ikon.tsx'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -20,9 +22,22 @@ const STRATEGI = [
  * Menumpang di sana berarti menyuruh menjalankan perintah yang salah, jadi
  * teksnya ditulis di tempat.
  */
-function Kosong({ judul, teks }: { judul: string; teks: string }) {
+function Kosong({
+  judul,
+  teks,
+  ikon = 'kompas',
+  warna,
+}: {
+  judul: string
+  teks: string
+  ikon?: NamaIkon
+  warna?: string
+}) {
   return (
     <div className="kosong">
+      <div className="kosong-ikon" style={warna ? { color: warna } : undefined}>
+        <Ikon nama={ikon} ukuran={24} />
+      </div>
       <h2 className="kosong-judul">{judul}</h2>
       <p className="kosong-teks">{teks}</p>
     </div>
@@ -68,15 +83,14 @@ export default async function Lighthouse({
 
   return (
     <>
-      <div className="bilah-aksi">
-        <TombolScan
-          siteId={id}
-          kategori="lighthouse"
-          path={`/sites/${id}/lighthouse`}
-          berjalan={runAktif(db(), id) ?? null}
-        />
+      <TombolScan
+        siteId={id}
+        kategori="lighthouse"
+        path={`/sites/${id}/lighthouse`}
+        berjalan={runAktif(db(), id) ?? null}
+      >
         <PilihStrategi siteId={id} keduanya={keduanya} />
-      </div>
+      </TombolScan>
 
       {/* Sub-tab sebagai tautan berparameter, sama seperti saringan status di
           tab temuan: bisa di-bookmark, tombol back berfungsi, dan skor mobile
@@ -118,6 +132,8 @@ export default async function Lighthouse({
         <Kosong
           judul="Pemindaian terakhir gagal"
           teks="Skornya tidak diketahui — ini bukan berarti halamannya cepat. Ukur lagi."
+          ikon="alert"
+          warna="var(--sev-critical)"
         />
       ) : (
         <Kosong
@@ -127,6 +143,7 @@ export default async function Lighthouse({
               ? 'Desktop sudah dinyalakan tapi belum sempat terukur. Jalankan Scan Lighthouse.'
               : 'Halamannya sudah diketahui, tapi belum satu pun diukur.'
           }
+          ikon="kompas"
         />
       )}
     </>

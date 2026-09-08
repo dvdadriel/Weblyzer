@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { simpanPenyedia, ujiKoneksi } from '../app/actions.ts'
 import type { Ketersediaan } from '../lib/ai/penyedia.ts'
+import { Ikon } from './Ikon.tsx'
 
 /**
  * Memilih penyedia AI dari yang benar-benar terpasang di mesin ini.
@@ -130,11 +131,21 @@ export function PilihModel({
           terjadi — tanpa itu, tidak ada cara membedakan "tersimpan" dari
           "belum diklik". */}
       <p className="model-status" role="status">
-        {menunggu ? 'Menyimpan…' : tersimpan ? 'Tersimpan.' : ''}
+        {menunggu && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Ikon nama="segarkan" ukuran={13} /> Menyimpan…
+          </span>
+        )}
+        {!menunggu && tersimpan && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--sev-fixed)' }}>
+            <Ikon nama="ceklis" ukuran={13} /> Tersimpan.
+          </span>
+        )}
       </p>
 
       {galat && (
-        <p className="model-galat" role="alert">
+        <p className="model-galat" role="alert" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+          <Ikon nama="alert" ukuran={13} />
           {galat}
         </p>
       )}

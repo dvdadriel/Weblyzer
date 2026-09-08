@@ -43,7 +43,7 @@ export function HapusSitus({
           aria-label={`Hapus ${nama}`}
           onClick={() => setTanya(true)}
         >
-          <Ikon nama="hapus" />
+          <Ikon nama="hapus" ukuran={13} />
           Hapus
         </button>
       </div>
@@ -53,11 +53,11 @@ export function HapusSitus({
   return (
     <div className="hapus hapus-tanya" role="group" aria-label={`Konfirmasi hapus ${nama}`}>
       <p className="hapus-teks">
-        Hapus {nama}?{' '}
+        <strong>Hapus {nama}?</strong>{' '}
         {jumlahTemuan > 0
           ? `${jumlahTemuan} temuan terbuka dan seluruh riwayat pemindaiannya ikut hilang.`
           : 'Seluruh riwayat pemindaiannya ikut hilang.'}{' '}
-        Tidak bisa dibatalkan.
+        Tindakan ini tidak bisa dibatalkan.
       </p>
 
       <p className="hapus-aksi">
@@ -68,13 +68,11 @@ export function HapusSitus({
           onClick={() =>
             mulai(async () => {
               const hasil = await hapusSitus(siteId)
-              // Kalau gagal, panelnya tetap terbuka dengan alasannya. Menutup
-              // diri sambil membiarkan situsnya ada akan terbaca seperti
-              // penghapusan yang berhasil.
               if (hasil?.error) setGalat(hasil.error)
             })
           }
         >
+          <Ikon nama="hapus" ukuran={13} />
           {menunggu ? 'Menghapus…' : 'Hapus Permanen'}
         </button>
         <button
@@ -91,7 +89,8 @@ export function HapusSitus({
       </p>
 
       {galat && (
-        <p className="hapus-galat" role="alert">
+        <p className="hapus-galat" role="alert" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+          <Ikon nama="alert" ukuran={13} />
           {galat}
         </p>
       )}

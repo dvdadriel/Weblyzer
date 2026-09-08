@@ -53,7 +53,7 @@ export function PilihStrategi({
             })
           }}
         />
-        Ukur desktop juga
+        <span className="strategi-teks">Ukur desktop juga</span>
         <span className="strategi-biaya">
           {nyala ? ' · pengukuran jadi dua kali lebih lama' : ' · ~2x waktu pengukuran'}
         </span>

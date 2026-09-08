@@ -30,27 +30,30 @@ export function Navbar() {
 
   return (
     <header className="navbar">
-      <Link href="/" className="navbar-merek">
-        <Image src="/logo.png" alt="" width={34} height={26} priority />
-        <span className="wordmark-teks">weblyzer</span>
-      </Link>
+      <div className="navbar-inner">
+        <Link href="/" className="navbar-merek">
+          <Image src="/logo.png" alt="" width={34} height={26} priority />
+          <span className="wordmark-teks">weblyzer</span>
+          <span className="navbar-badge">audit</span>
+        </Link>
 
-      <nav className="navbar-nav" aria-label="Bagian utama">
-        {NAV.map((n) => (
-          <Link
-            key={n.href}
-            href={n.href}
-            className="navbar-item"
-            /* `aria-current` hanya untuk halaman yang benar-benar dibuka.
-               Home dicocokkan tepat, bukan dengan `startsWith`: kalau tidak,
-               setiap halaman aktif karena semuanya diawali "/". */
-            aria-current={path === n.href ? 'page' : undefined}
-          >
-            <Ikon nama={n.ikon} />
-            {n.label}
-          </Link>
-        ))}
-      </nav>
+        <nav className="navbar-nav" aria-label="Bagian utama">
+          {NAV.map((n) => (
+            <Link
+              key={n.href}
+              href={n.href}
+              className="navbar-item"
+              /* `aria-current` hanya untuk halaman yang benar-benar dibuka.
+                 Home dicocokkan tepat, bukan dengan `startsWith`: kalau tidak,
+                 setiap halaman aktif karena semuanya diawali "/". */
+              aria-current={path === n.href ? 'page' : undefined}
+            >
+              <Ikon nama={n.ikon} ukuran={15} />
+              {n.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
     </header>
   )
 }

@@ -89,9 +89,10 @@ export function RingkasanAi({
           ditindaklanjuti, dan "gemini butuh GEMINI_API_KEY", yang bisa. */}
       {gagal && (
         <p className="ringkas-gagal" role="alert">
-          <span aria-hidden="true">[!]</span> Percobaan terakhir gagal
-          {status?.model !== null && status?.model !== undefined && ` (${status.model})`}:{' '}
-          <span className="ringkas-mentah">{status?.galat ?? 'tanpa pesan'}</span>
+          <Ikon nama="alert" ukuran={14} />
+          <span>Percobaan terakhir gagal{status?.model ? ` (${status.model})` : ''}:{' '}
+            <span className="ringkas-mentah">{status?.galat ?? 'tanpa pesan'}</span>
+          </span>
         </p>
       )}
 
@@ -101,20 +102,20 @@ export function RingkasanAi({
         </p>
       )}
 
-      {/* Terbuka secara default, dan bisa dilipat.
-          PRODUCT.md menyebut dua konteks pemakaian yang saling berlawanan di
-          sini: pemeriksaan pagi datang untuk membaca ringkasan ini, sedangkan
-          orang yang baru memperbaiki sesuatu datang untuk melihat tabel. Tiga
-          paragraf prosa di atas tabel melayani yang pertama dan menghalangi
-          yang kedua — dan panel ini muncul di keempat tab, termasuk tab skor
-          Lighthouse yang tidak dibahasnya sama sekali. `<details>` melayani
-          keduanya dengan satu klik, tanpa state dan tanpa JS. */}
       {isi !== null && (
         <details className="ringkas-lipat" open>
           <summary className="ringkas-label">
-            Ringkasan AI
-            {isi.model !== null && ` · ${isi.model}`}
-            {isi.waktu !== null && ` · ${isi.waktu}`}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Ikon nama="sparkle" ukuran={14} />
+              <span>Ringkasan AI</span>
+            </span>
+            {isi.model !== null && <span className="ringkas-model-pill">{isi.model}</span>}
+            {isi.waktu !== null && (
+              <span style={{ fontSize: 'var(--t-mikro)', color: 'var(--ink-2)', fontWeight: 400, marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                <Ikon nama="waktu" ukuran={12} />
+                {isi.waktu}
+              </span>
+            )}
           </summary>
 
           <div className="ringkas-isi">
@@ -131,7 +132,7 @@ export function RingkasanAi({
 
       <p className="ringkas-aksi">
         <button className="ringkas-ulang" type="button" onClick={ulangi} disabled={menunggu}>
-          <Ikon nama="segarkan" />
+          <Ikon nama="segarkan" ukuran={13} />
           {menunggu ? 'Meringkas…' : isi === null ? 'Ringkas Sekarang' : 'Ringkas Ulang'}
         </button>
       </p>

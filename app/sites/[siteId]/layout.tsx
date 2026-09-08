@@ -23,23 +23,28 @@ export default async function SiteLayout({
           Keduanya menuju index, dan itu memang lazim: yang ini muncul hanya di
           tempat yang punya asal untuk dikembalikan. */}
       <Link href="/" className="kembali">
-        <Ikon nama="kembali" />
+        <Ikon nama="kembali" ukuran={14} />
         Semua Situs
       </Link>
-      {/* `div`, bukan `p`: sebuah heading tidak boleh berada di dalam `<p>`, dan
-          nama situs memang judul halaman ini. Kelasnya sama, jadi tampilannya
-          tidak berubah — yang berubah cuma DOM-nya jadi jujur. */}
-      <div className="kartu-judul">
+      <div className="kartu-judul" style={{ marginBottom: 'var(--s-1)' }}>
         <h1 className="kartu-nama">{s.name}</h1>
-        <span className="kartu-url">{s.base_url}</span>
+        <a
+          href={s.base_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="kartu-url"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+          title={`Kunjungi ${s.base_url}`}
+        >
+          <span>{s.base_url}</span>
+          <Ikon nama="eksternal" ukuran={12} />
+        </a>
       </div>
-      {/* Unduhan adalah tautan biasa, bukan tombol dengan JS: browser yang
-          menangani penyimpanannya, dan `<a download>` sudah bekerja tanpa satu
-          baris pun kode klien. Diletakkan di header situs, bukan per tab,
-          karena berkasnya memuat seluruh kategori. */}
       <p className="unduh">
         <a className="unduh-tautan" href={`/sites/${s.id}/export`} download>
-          Unduh Excel
+          <Ikon nama="unduh" ukuran={14} />
+          <span>Unduh Excel</span>
+          <span className="unduh-tag">.xlsx</span>
         </a>
         <span className="unduh-catatan">
           seluruh kategori, termasuk yang sudah beres dan diabaikan

@@ -23,14 +23,14 @@ export function TambahSitus() {
   return (
     <details className="tambah">
       <summary className="tambah-pemicu">
-        <Ikon nama="tambah" />
-        Tambah Situs
+        <Ikon nama="tambah" ukuran={14} />
+        Tambah Situs Baru
       </summary>
 
       <form action={kirim} className="tambah-form">
         <p className="tambah-baris">
           <label className="tambah-label" htmlFor="nama">
-            Nama
+            Nama Situs
           </label>
           {/* `defaultValue` dari state, bukan string kosong: lihat catatan di
               `HasilAksi`. Simpan yang gagal tidak boleh menghapus apa yang
@@ -39,6 +39,7 @@ export function TambahSitus() {
             className="kontrol"
             id="nama"
             name="nama"
+            placeholder="Misal: Toko Online Saya"
             defaultValue={hasil?.nama ?? ''}
             required
             autoComplete="off"
@@ -47,7 +48,7 @@ export function TambahSitus() {
 
         <p className="tambah-baris">
           <label className="tambah-label" htmlFor="url">
-            Alamat
+            Alamat URL (Basis)
           </label>
           {/* `type="url"` memberi keyboard yang benar di ponsel, tapi validasi
               sebenarnya tetap di server: `normalizeBaseUrl` yang memutuskan,
@@ -66,6 +67,7 @@ export function TambahSitus() {
 
         <p className="tambah-aksi">
           <button className="tombol" type="submit" disabled={menunggu}>
+            <Ikon nama="ceklis" ukuran={14} />
             {menunggu ? 'Menyimpan…' : 'Simpan Situs'}
           </button>
         </p>
@@ -74,7 +76,8 @@ export function TambahSitus() {
             memindahkan fokus. Pesannya menyebut apa yang salah, bukan minta
             maaf — PRODUCT.md. */}
         {hasil?.error && (
-          <p className="tambah-galat" role="alert">
+          <p className="tambah-galat" role="alert" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Ikon nama="alert" ukuran={13} />
             {hasil.error}
           </p>
         )}

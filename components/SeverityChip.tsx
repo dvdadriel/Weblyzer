@@ -6,8 +6,15 @@ const PENANDA: Record<Severity, string> = {
 
 export function SeverityChip({ severity }: { severity: Severity }) {
   return (
-    <span className="chip" style={{ color: `var(--sev-${severity})` }}>
-      <span aria-hidden="true">{PENANDA[severity]}</span>
+    <span
+      className="chip"
+      style={{
+        color: `var(--sev-${severity})`,
+        backgroundColor: `var(--sev-${severity}-bg)`,
+        borderColor: `var(--sev-${severity})`,
+      }}
+    >
+      <span aria-hidden="true" style={{ fontWeight: 700 }}>{PENANDA[severity]}</span>
       <span>{severity}</span>
     </span>
   )

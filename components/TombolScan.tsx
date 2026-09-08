@@ -91,11 +91,13 @@ export function TombolScan({
   kategori,
   path,
   berjalan,
+  children,
 }: {
   siteId: number
   kategori: Kategori
   path: string
   berjalan: { type: string; mulai: string } | null
+  children?: React.ReactNode
 }) {
   const [galat, setGalat] = useState<string | null>(null)
   const [menunggu, mulai] = useTransition()
@@ -112,26 +114,15 @@ export function TombolScan({
   }, [berjalan, router])
 
   if (berjalan) {
-    return (
+    const jalanEl = (
       <p className="jalan" role="status">
         <span className="jalan-tanda" aria-hidden="true">
           [..]
         </span>
         <span>
-          {/* Kategori yang berjalan disebut namanya. Versi sebelumnya menulis
-              "Scan situs ini" untuk semua kategori, dan itu terbaca seolah
-              keempat tab sedang ditimpa sekaligus — padahal `scanHandler`
-              hanya merekonsiliasi kategori yang diminta. */}
           {NAMA_RUN[berjalan.type] ?? 'Scan'} berjalan sejak {berjalan.mulai}. Halaman
           ini akan berganti sendiri saat selesai.
-          {/* Kenapa tab LAIN ikut mati, bukan cuma yang sedang dipindai.
-              Tanpa alasannya, tombol mati di tab yang tidak diminta terbaca
-              sebagai kerusakan. */}
           {NAMA_RUN[berjalan.type] !== LABEL[kategori] &&
-            // Alasannya berbeda tergantung apa yang berjalan, dan alasan yang
-            // salah lebih buruk daripada tanpa alasan: geo dan audit tidak
-            // memakai Chromium sama sekali, jadi menyebut "satu browser" di
-            // sana adalah penjelasan yang tidak benar.
             (berjalan.type === 'geo' || berjalan.type === 'audit' ? (
               <> Tab ini ikut menunggu supaya dua analisis tidak menimpa hasil satu sama lain.</>
             ) : (
@@ -139,11 +130,22 @@ export function TombolScan({
             ))}
         </span>
         <button className="jalan-segarkan" type="button" onClick={() => router.refresh()}>
-          <Ikon nama="segarkan" />
+          <Ikon nama="segarkan" ukuran={13} />
           Periksa Sekarang
         </button>
       </p>
     )
+
+    if (children) {
+      return (
+        <div className="bilah-aksi">
+          {jalanEl}
+          {children}
+        </div>
+      )
+    }
+
+    return jalanEl
   }
 
   return (
@@ -159,14 +161,17 @@ export function TombolScan({
           })
         }
       >
-        <Ikon nama="scan" />
+        <Ikon nama="scan" ukuran={15} />
         {menunggu ? 'Memulai…' : LABEL[kategori]}
       </button>
+
+      {children}
 
       {LEWAT_AI.has(kategori) && <span className="unduh-catatan">{LAMA[kategori]}</span>}
 
       {galat && (
-        <span className="jalan-galat" role="alert">
+        <span className="jalan-galat" role="alert" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+          <Ikon nama="alert" ukuran={13} />
           {galat}
         </span>
       )}
