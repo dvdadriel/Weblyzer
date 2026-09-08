@@ -177,8 +177,38 @@ export function temuanKategori(
     .all(siteId, category, status) as unknown as BarisTemuan[])
 }
 
+/**
+ * Run terakhir yang benar-benar menyentuh kategori ini.
+ *
+ * Bukan `runTerakhir`, yang mengembalikan run terakhir apa pun tipenya. Itu
+ * cukup untuk kartu dashboard yang memang bicara soal situs, tapi salah untuk
+ * satu kategori — dan salahnya persis §2.2: sebuah situs yang rajin dipindai
+ * tapi BELUM PERNAH dianalisis GEO akan melaporkan tab GEO-nya "bersih",
+ * artinya "sudah diperiksa, tidak ada apa-apa". Padahal artinya "tidak tahu".
+ *
+ * `full` ikut untuk empat kategori deterministik karena `scan` tanpa argumen
+ * memang menyentuh keempatnya. `geo` dan `audit` TIDAK pernah ikut `full`:
+ * keduanya subcommand tersendiri dan tidak pernah dijalankan oleh pemindaian
+ * biasa, jadi memasukkannya akan mengaku sudah dianalisis oleh crawl yang
+ * tidak pernah memanggil claude-seo.
+ */
+const IKUT_FULL = new Set(['bugs', 'console', 'security', 'seo'])
+
+function runTerakhirKategori(db: DatabaseSync, siteId: number, category: string) {
+  const sql = IKUT_FULL.has(category)
+    ? `SELECT status, error FROM runs
+       WHERE site_id = ? AND type IN (?, 'full') AND finished_at IS NOT NULL
+       ORDER BY id DESC LIMIT 1`
+    : `SELECT status, error FROM runs
+       WHERE site_id = ? AND type = ? AND finished_at IS NOT NULL
+       ORDER BY id DESC LIMIT 1`
+  return db.prepare(sql).get(siteId, category) as
+    | { status: string; error: string | null }
+    | undefined
+}
+
 export function keadaanKategori(db: DatabaseSync, siteId: number, category: string): Keadaan {
-  const run = runTerakhir(db, siteId)
+  const run = runTerakhirKategori(db, siteId, category)
   if (run === undefined) return 'belum-dipindai'
   if (run.status === 'failed') return 'gagal'
 
@@ -243,6 +273,20 @@ export function situs(db: DatabaseSync, siteId: number) {
  */
 const AMBANG_MACET = '-30 minutes'
 
+/**
+ * Ambang terpisah untuk claude-seo.
+ *
+ * Audit full menjelajah sampai `max_pages` lalu men-spawn sampai 15 subagent;
+ * batas waktunya sendiri 90 menit. Dengan ambang 30 menit, tombolnya muncul
+ * kembali di menit ke-31 atas audit yang masih berjalan — ditekan, dan situs
+ * itu dapat DUA audit sekaligus yang saling menimpa rekonsiliasinya.
+ *
+ * Angkanya sengaja lebih besar dari batas waktu jobnya, bukan sama: pekerja
+ * yang mati tepat sebelum menulis status akhirnya harus tetap terbebaskan,
+ * tapi hanya setelah tidak mungkin lagi ia masih hidup.
+ */
+const AMBANG_MACET_LAMA = '-120 minutes'
+
 export function runAktif(db: DatabaseSync, siteId: number) {
   // Disalin jadi objek biasa di sini, sama seperti `polos` untuk baris tabel.
   // Hasilnya diteruskan ke client component, dan baris `node:sqlite` yang
@@ -258,10 +302,13 @@ export function runAktif(db: DatabaseSync, siteId: number) {
       `SELECT id, type, strftime('%H:%M', started_at, 'localtime') AS mulai FROM runs
        WHERE site_id = ?
          AND status IN ('queued', 'running')
-         AND started_at > datetime('now', ?)
+         AND started_at > datetime('now',
+               CASE WHEN type IN ('geo', 'audit') THEN ? ELSE ? END)
        ORDER BY id DESC LIMIT 1`,
     )
-    .get(siteId, AMBANG_MACET) as { id: number; type: string; mulai: string } | undefined
+    .get(siteId, AMBANG_MACET_LAMA, AMBANG_MACET) as
+    | { id: number; type: string; mulai: string }
+    | undefined
   return baris ? { ...baris } : undefined
 }
 

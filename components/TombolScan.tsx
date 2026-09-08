@@ -5,7 +5,18 @@ import { useEffect, useState, useTransition } from 'react'
 import { jalankanScan } from '../app/actions.ts'
 import { Ikon } from './Ikon.tsx'
 
-export type Kategori = 'bugs' | 'console' | 'security' | 'seo' | 'lighthouse'
+export type Kategori =
+  | 'bugs'
+  | 'console'
+  | 'security'
+  | 'seo'
+  | 'geo'
+  | 'audit'
+  | 'lighthouse'
+
+/** Kategori yang dijalankan claude-seo, bukan aturan deterministik. Keduanya
+ *  jauh lebih lama dan memakai token, jadi tombolnya menyebutkan itu. */
+const LEWAT_AI = new Set<Kategori>(['geo', 'audit'])
 
 /**
  * Label tombol per kategori. Tunggal dan huruf besar, berpasangan dengan label
@@ -17,7 +28,22 @@ const LABEL: Record<Kategori, string> = {
   console: 'Scan Console',
   security: 'Scan Security',
   seo: 'Scan SEO',
+  geo: 'Analisis GEO',
+  audit: 'Audit Full',
   lighthouse: 'Scan Lighthouse',
+}
+
+/**
+ * Perkiraan lama untuk kategori yang lewat claude-seo.
+ *
+ * Ditulis di sebelah tombolnya, sebelum ditekan. Tombol yang tidak
+ * memberitahukan bahwa ia akan sibuk sembilan puluh menit dan memakai token
+ * adalah tombol yang menipu — dan ini satu-satunya aksi di seluruh aplikasi
+ * yang biayanya tidak nol.
+ */
+const LAMA: Partial<Record<Kategori, string>> = {
+  geo: 'beberapa menit, memakai token',
+  audit: 'bisa puluhan menit, memakai banyak token',
 }
 
 /**
@@ -30,6 +56,8 @@ const NAMA_RUN: Record<string, string> = {
   console: 'Scan Console',
   security: 'Scan Security',
   seo: 'Scan SEO',
+  geo: 'Analisis GEO',
+  audit: 'Audit Full',
   lighthouse: 'Scan Lighthouse',
   full: 'Scan lengkap',
 }
@@ -99,9 +127,16 @@ export function TombolScan({
           {/* Kenapa tab LAIN ikut mati, bukan cuma yang sedang dipindai.
               Tanpa alasannya, tombol mati di tab yang tidak diminta terbaca
               sebagai kerusakan. */}
-          {NAMA_RUN[berjalan.type] !== LABEL[kategori] && (
-            <> Tab ini ikut menunggu karena satu penjelajahan memakai satu browser.</>
-          )}
+          {NAMA_RUN[berjalan.type] !== LABEL[kategori] &&
+            // Alasannya berbeda tergantung apa yang berjalan, dan alasan yang
+            // salah lebih buruk daripada tanpa alasan: geo dan audit tidak
+            // memakai Chromium sama sekali, jadi menyebut "satu browser" di
+            // sana adalah penjelasan yang tidak benar.
+            (berjalan.type === 'geo' || berjalan.type === 'audit' ? (
+              <> Tab ini ikut menunggu supaya dua analisis tidak menimpa hasil satu sama lain.</>
+            ) : (
+              <> Tab ini ikut menunggu karena satu penjelajahan memakai satu browser.</>
+            ))}
         </span>
         <button className="jalan-segarkan" type="button" onClick={() => router.refresh()}>
           <Ikon nama="segarkan" />
@@ -127,6 +162,8 @@ export function TombolScan({
         <Ikon nama="scan" />
         {menunggu ? 'Memulai…' : LABEL[kategori]}
       </button>
+
+      {LEWAT_AI.has(kategori) && <span className="unduh-catatan">{LAMA[kategori]}</span>}
 
       {galat && (
         <span className="jalan-galat" role="alert">

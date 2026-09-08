@@ -10,6 +10,7 @@ import { scanHandler } from '../lib/jobs/scan.ts'
 import { listPages } from '../lib/repos/pages.ts'
 import { lighthouseHandler } from '../lib/jobs/lighthouse.ts'
 import { ringkasanHandler } from '../lib/jobs/ringkasan.ts'
+import { claudeSeoHandler, ASPEK, adalahAspek } from '../lib/jobs/claude-seo.ts'
 import { penyediaTerpilih } from '../lib/ai/penyedia.ts'
 import { skorTerakhir } from '../lib/repos/lighthouse.ts'
 
@@ -17,6 +18,7 @@ const HANDLERS = {
   scan: scanHandler,
   lighthouse: lighthouseHandler,
   ringkasan: ringkasanHandler,
+  'claude-seo': claudeSeoHandler,
 }
 
 const PEMICU = pemicuDari(process.env)
@@ -56,7 +58,9 @@ const USAGE = `Penggunaan:
   npm run scan -- findings <site-id>         Menampilkan temuan terbuka
   npm run scan -- lighthouse <site-id>       Mengukur skor Lighthouse
   npm run scan -- scores <site-id>           Menampilkan skor terakhir
-  npm run scan -- jadwal                     Memindai semua situs aktif (untuk cron)`
+  npm run scan -- jadwal                     Memindai semua situs aktif (untuk cron)
+  npm run scan -- geo <site-id>              Analisis GEO/AI search lewat claude-seo
+  npm run scan -- audit <site-id>            Audit SEO penuh lewat claude-seo (lama)`
 
 async function main(): Promise<number> {
   const [command, ...args] = process.argv.slice(2)
@@ -340,6 +344,67 @@ async function main(): Promise<number> {
         )
         .all(site.id) as { severity: string; n: number }[]
       for (const r of rekap) console.log(`  lighthouse/${r.severity}: ${r.n}`)
+      return 0
+    }
+
+    case 'geo':
+    case 'audit': {
+      const siteId = Number(args[0])
+      const site = getSite(db, siteId)
+      if (!site) {
+        console.error(`Situs ${args[0]} tidak ditemukan.`)
+        return 1
+      }
+      if (!adalahAspek(command)) {
+        console.error(`Aspek tidak dikenal: ${command}. Pilih ${ASPEK.join(', ')}.`)
+        return 1
+      }
+
+      requeueInterrupted(db)
+
+      const run = createRun(db, site.id, command, PEMICU)
+      enqueue(db, {
+        runId: run.id,
+        type: 'claude-seo',
+        payload: { siteId: site.id, aspek: command },
+      })
+      console.log(
+        `Run ${run.id}: claude-seo ${command} untuk ${site.base_url} — ` +
+          (command === 'geo'
+            ? 'beberapa menit ...'
+            : `sampai ${site.max_pages} halaman, bisa puluhan menit ...`),
+      )
+
+      await drainQueue(db, HANDLERS, { concurrency: 1 })
+
+      const own = db
+        .prepare(
+          `SELECT COUNT(*) AS total,
+                  SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
+           FROM jobs WHERE run_id = ?`,
+        )
+        .get(run.id) as { total: number; failed: number | null }
+      const ownFailed = Number(own.failed ?? 0)
+      finishRun(db, run.id, ownFailed > 0 ? 'failed' : 'done')
+
+      if (ownFailed > 0) {
+        const err = db
+          .prepare("SELECT error FROM jobs WHERE run_id = ? AND status = 'failed' LIMIT 1")
+          .get(run.id) as { error: string } | undefined
+        console.error(`Gagal: ${err?.error ?? 'tidak diketahui'}`)
+        return 1
+      }
+
+      const rekap = db
+        .prepare(
+          `SELECT severity, COUNT(*) AS n FROM findings
+           WHERE site_id = ? AND category = ? AND status = 'open'
+           GROUP BY severity ORDER BY severity`,
+        )
+        .all(site.id, command) as { severity: string; n: number }[]
+      console.log('Selesai.')
+      for (const r of rekap) console.log(`  ${command}/${r.severity}: ${r.n}`)
+      if (rekap.length === 0) console.log(`  Tidak ada temuan ${command} terbuka.`)
       return 0
     }
 

@@ -1,5 +1,6 @@
 import type { Kelompok } from '../ai/prompt.ts'
 import type { Severity } from '../findings.ts'
+import { sumberKategori } from '../kategori.ts'
 
 /** Urutan keparahan. Sengaja disalin, tidak diimpor dari `ai/prompt.ts`:
  *  urutan kerja daftar tugas dan urutan kutipan prompt ringkasan kebetulan
@@ -327,6 +328,26 @@ const UMUM: Petunjuk = {
 }
 
 /**
+ * Fallback untuk temuan dari claude-seo.
+ *
+ * Aturannya tidak bisa didaftar di `PETUNJUK`: namanya dikarang model per
+ * temuan, jadi daftarnya tak berhingga. Yang bisa dijamin adalah asal-usulnya
+ * — dan itu justru keterangan yang paling penting di sini.
+ *
+ * Kalimat "verifikasi dulu" bukan kehati-hatian berlebih. Temuan `aturan`
+ * diukur: `judul-hilang` berarti elemen `<title>` benar-benar tidak ada.
+ * Temuan claude-seo adalah PENILAIAN, dan penilaian bisa keliru dengan cara
+ * yang tidak bisa dilakukan pengukuran. Asisten yang tidak diberi tahu bedanya
+ * akan memperlakukan keduanya sama yakinnya.
+ */
+const UMUM_AI: Petunjuk = {
+  deteksi:
+    'Dinilai oleh claude-seo (model bahasa yang memeriksa situs), bukan diukur aturan deterministik. Rincian penilaiannya ada di kolom Detail pada sheet temuan.',
+  periksa:
+    'VERIFIKASI DULU. Ini penilaian, bukan pengukuran — buka salah satu halaman contoh dan pastikan masalahnya nyata sebelum mengubah apa pun. Kalau ternyata keliru, katakan; itu jawaban yang lebih berguna daripada tambalan untuk masalah yang tidak ada.',
+}
+
+/**
  * Menyusun satu prompt siap tempel untuk satu kelompok masalah.
  *
  * Ditutup dengan aturan keras, dan itu bukan hiasan. Dua di antaranya menutup
@@ -339,7 +360,7 @@ export function promptPerbaikan(
   k: Tugas,
   situs: { nama: string; baseUrl: string },
 ): string {
-  const p = PETUNJUK[k.rule] ?? UMUM
+  const p = PETUNJUK[k.rule] ?? (sumberKategori(k.category) === 'claude-seo' ? UMUM_AI : UMUM)
   const gabungan = k.anggota > 1
   const rincianTerpotong = k.rincian.length < k.anggota
 

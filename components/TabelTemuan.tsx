@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import type { BarisTemuan, ScanKategori } from '../lib/ui/queries.ts'
+import { BISA_RECHECK, namaKategori } from '../lib/kategori.ts'
 import { SeverityChip } from './SeverityChip.tsx'
 import { ubahStatusTemuan, periksaTemuan } from '../app/actions.ts'
 import { Ikon } from './Ikon.tsx'
@@ -45,11 +46,11 @@ function BarisDetail({
   const [pending, mulai] = useTransition()
   const [memeriksa, mulaiPeriksa] = useTransition()
 
-  // Lighthouse tidak punya jalur pemeriksaan per temuan: satu pengukuran ulang
-  // yang jujur berarti mengukur dua kali lalu mengiris hasilnya, dan mesin itu
-  // sudah ada sebagai Scan Lighthouse. Tombol yang selalu menolak lebih buruk
-  // daripada tidak ada tombol, jadi yang muncul penjelasannya.
-  const bisaPeriksa = b.category !== 'lighthouse'
+  // Daftarnya dibaca dari `lib/kategori.ts`, bukan disalin ke sini. Salinan
+  // sebelumnya berbunyi `category !== 'lighthouse'` dan langsung bohong begitu
+  // GEO dan Audit ada: keduanya juga tidak bisa diperiksa per temuan, tapi
+  // tombolnya tetap muncul lalu selalu menolak.
+  const bisaPeriksa = BISA_RECHECK.has(b.category)
 
   return (
     <tr id={`detail-${b.id}`} className="baris-detail">
@@ -92,7 +93,8 @@ function BarisDetail({
 
           {!bisaPeriksa && status === 'open' && (
             <span className="detail-catatan">
-              Pemeriksaan satu temuan belum ada untuk Lighthouse — jalankan Scan Lighthouse.
+              Pemeriksaan satu temuan belum ada untuk {namaKategori(b.category)} — jalankan
+              ulang seluruh kategorinya.
             </span>
           )}
         </p>

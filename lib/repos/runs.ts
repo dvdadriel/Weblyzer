@@ -7,6 +7,8 @@ export type RunType =
   | 'security'
   | 'lighthouse'
   | 'seo'
+  | 'geo'
+  | 'audit'
   | 'ringkasan'
   | 'full'
 export type RunStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled'

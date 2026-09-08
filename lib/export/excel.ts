@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { kelompokkan, type TemuanRingkas } from '../ai/prompt.ts'
 import { barisPrompt } from './prompt-perbaikan.ts'
+import { KATEGORI, namaKategori, sumberKategori } from '../kategori.ts'
 
 /**
  * Menyusun isi berkas Excel untuk satu situs.
@@ -11,16 +12,7 @@ import { barisPrompt } from './prompt-perbaikan.ts'
  * memeriksa hal yang sudah bisa diperiksa di sini.
  */
 
-const KATEGORI = ['bugs', 'console', 'security', 'seo', 'lighthouse'] as const
-
 /** Nama sheet yang dibaca manusia, bukan nama kategori internal. */
-const NAMA_SHEET: Record<string, string> = {
-  bugs: 'Bug',
-  console: 'Console',
-  security: 'Security',
-  seo: 'SEO',
-  lighthouse: 'Lighthouse',
-}
 
 /** Urutan keparahan untuk ORDER BY — sama dengan urutan kerja di UI. */
 const URUTAN = `CASE f.severity
@@ -97,7 +89,7 @@ function sheetTemuan(db: DatabaseSync, siteId: number, category: string): Sheet 
   }[]
 
   return {
-    sheet: NAMA_SHEET[category] ?? category,
+    sheet: namaKategori(category),
     // Lebar mengikuti isi: URL dan judul adalah kolom yang panjang, sedangkan
     // severity dan nomor run selalu pendek.
     columns: [
@@ -128,7 +120,15 @@ function sheetTemuan(db: DatabaseSync, siteId: number, category: string): Sheet 
   }
 }
 
-const KOLOM_PROMPT = ['Severity', 'Kategori', 'Aturan', 'Masalah', 'Halaman', 'Prompt']
+const KOLOM_PROMPT = [
+  'Severity',
+  'Kategori',
+  'Sumber',
+  'Aturan',
+  'Masalah',
+  'Halaman',
+  'Prompt',
+]
 
 /**
  * Sheet prompt perbaikan: satu baris siap tempel per masalah.
@@ -169,6 +169,7 @@ function sheetPrompt(db: DatabaseSync, siteId: number): Sheet {
     columns: [
       { width: 10 },
       { width: 12 },
+      { width: 12 },
       { width: 24 },
       { width: 56 },
       { width: 10 },
@@ -187,6 +188,10 @@ function sheetPrompt(db: DatabaseSync, siteId: number): Sheet {
         : baris.map((b): Sel[] => [
             { value: b.severity },
             { value: b.kategori },
+            // Di sheet INI sumbernya per baris, karena di sini kategori memang
+            // bercampur dalam satu tabel — dan prompt untuk temuan claude-seo
+            // layak dibaca dengan kewaspadaan yang berbeda.
+            { value: sumberKategori(b.kategori) },
             { value: b.rule },
             { value: b.masalah },
             { value: b.jumlah },
@@ -254,7 +259,7 @@ function sheetRingkasan(db: DatabaseSync, siteId: number, waktuEkspor: string): 
     [{ value: 'Alamat' }, { value: s?.base_url ?? '' }],
     [{ value: 'Berkas dibuat' }, { value: waktuEkspor }],
     [{ value: '' }, { value: '' }],
-    judul(['Kategori', 'Terbuka / Diabaikan / Beres', 'Terakhir dipindai']),
+    judul(['Kategori', 'Sumber', 'Terbuka / Diabaikan / Beres', 'Terakhir dipindai']),
   ]
 
   for (const k of KATEGORI) {
@@ -268,16 +273,29 @@ function sheetRingkasan(db: DatabaseSync, siteId: number, waktuEkspor: string): 
       )
       .get(siteId, k) as { terbuka: number | null; diabaikan: number | null; beres: number | null }
 
+    // `full` hanya berlaku untuk kategori yang memang disentuh `scan` tanpa
+    // argumen. `geo` dan `audit` adalah subcommand tersendiri, jadi memasukkan
+    // `full` di sana akan menuliskan tanggal dari crawl yang tidak pernah
+    // memanggil claude-seo — kesegaran yang berbohong, tepat di sheet yang ada
+    // justru untuk menjamin kesegaran.
     const waktu = db
       .prepare(
-        `SELECT strftime('%Y-%m-%d %H:%M', finished_at, 'localtime') AS w FROM runs
-         WHERE site_id = ? AND type IN (?, 'full') AND status = 'done' AND finished_at IS NOT NULL
-         ORDER BY id DESC LIMIT 1`,
+        sumberKategori(k) === 'claude-seo'
+          ? `SELECT strftime('%Y-%m-%d %H:%M', finished_at, 'localtime') AS w FROM runs
+             WHERE site_id = ? AND type = ? AND status = 'done' AND finished_at IS NOT NULL
+             ORDER BY id DESC LIMIT 1`
+          : `SELECT strftime('%Y-%m-%d %H:%M', finished_at, 'localtime') AS w FROM runs
+             WHERE site_id = ? AND type IN (?, 'full') AND status = 'done' AND finished_at IS NOT NULL
+             ORDER BY id DESC LIMIT 1`,
       )
       .get(siteId, k) as { w: string } | undefined
 
     data.push([
-      { value: NAMA_SHEET[k] ?? k },
+      { value: namaKategori(k) },
+      // Sumber di sini, bukan per baris temuan: di sheet temuan setiap baris
+      // nilainya sama dan namanya sudah ada di nama sheet-nya. Di sini ia
+      // membedakan tujuh kategori yang berdampingan dalam satu tabel.
+      { value: sumberKategori(k) },
       { value: `${Number(h.terbuka ?? 0)} / ${Number(h.diabaikan ?? 0)} / ${Number(h.beres ?? 0)}` },
       // "Belum pernah" dan tanggal kosong bukan hal yang sama, dan sel kosong
       // di Excel tidak bisa membedakannya.
@@ -287,7 +305,7 @@ function sheetRingkasan(db: DatabaseSync, siteId: number, waktuEkspor: string): 
 
   return {
     sheet: 'Ringkasan',
-    columns: [{ width: 28 }, { width: 30 }, { width: 20 }],
+    columns: [{ width: 28 }, { width: 12 }, { width: 30 }, { width: 20 }],
     data,
   }
 }

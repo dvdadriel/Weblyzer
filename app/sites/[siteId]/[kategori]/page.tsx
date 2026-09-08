@@ -12,10 +12,11 @@ import type { BarisTemuan } from '../../../../lib/ui/queries.ts'
 import { TabelTemuan } from '../../../../components/TabelTemuan.tsx'
 import { KeadaanKosong } from '../../../../components/KeadaanKosong.tsx'
 import { TombolScan } from '../../../../components/TombolScan.tsx'
+import { sumberKategori } from '../../../../lib/kategori.ts'
 
 export const dynamic = 'force-dynamic'
 
-const KATEGORI = ['bugs', 'console', 'security', 'seo']
+const KATEGORI = ['bugs', 'console', 'security', 'seo', 'geo', 'audit']
 
 /**
  * `node:sqlite` mengembalikan baris berprototipe null, dan React menolak
@@ -63,12 +64,28 @@ export default async function Kategori({
   const s = situs(db(), id)
   const baseUrl = s?.base_url ?? ''
 
+  /**
+   * Keterangan sumber, hanya untuk kategori yang dinilai claude-seo.
+   *
+   * Bukan kolom `Sumber` di tiap baris: di dalam satu tab nilainya sama untuk
+   * semua baris, jadi kolom itu akan mengulang kata yang sama 216 kali. Yang
+   * belum terkatakan bukan "dari mana baris ini" melainkan "kenapa tab ini
+   * berbeda", dan itu satu kalimat, sekali, di atas tabelnya.
+   */
+  const keterangan = sumberKategori(kategori) === 'claude-seo' && (
+    <p className="unduh-catatan" role="note">
+      Dinilai claude-seo, bukan diukur aturan. Jawabannya bisa bergeser antar
+      analisis walau situsnya tidak berubah, jadi &quot;sudah diperbaiki&quot; di sini
+      lebih tepat dibaca sebagai checklist Anda sendiri.
+    </p>
+  )
+
   const berjalan = runAktif(db(), id) ?? null
   const waktuScan = waktuScanKategori(db(), id, kategori)
   const tombol = (
     <TombolScan
       siteId={id}
-      kategori={kategori as 'bugs' | 'console' | 'security' | 'seo'}
+      kategori={kategori as 'bugs' | 'console' | 'security' | 'seo' | 'geo' | 'audit'}
       path={path}
       berjalan={berjalan}
     />
@@ -78,6 +95,7 @@ export default async function Kategori({
     return (
       <>
         {tombol}
+        {keterangan}
         {saringan}
         {diabaikan.length === 0 ? (
           // Sengaja bukan KeadaanKosong: teks di sana bicara soal keadaan
@@ -101,6 +119,7 @@ export default async function Kategori({
     return (
       <>
         {tombol}
+        {keterangan}
         {saringan}
         <KeadaanKosong keadaan={keadaan} />
       </>
@@ -110,6 +129,7 @@ export default async function Kategori({
   return (
     <>
       {tombol}
+      {keterangan}
       {saringan}
       <TabelTemuan
         baris={temuanKategori(db(), id, kategori)}

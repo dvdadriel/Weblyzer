@@ -19,3 +19,4 @@ ruvector.db
 # Blob biner dari tooling lokal, bukan bagian proyek
 agentdb.rvf
 agentdb.rvf.lock
+claude-seo-out/

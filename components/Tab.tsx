@@ -15,6 +15,12 @@ const TAB = [
   ['console', 'Console'],
   ['security', 'Security'],
   ['seo', 'SEO'],
+  // GEO dan Audit datang dari claude-seo, bukan dari aturan. Diletakkan
+  // BERSEBELAHAN dan setelah SEO, bukan diselipkan di antara yang
+  // deterministik: keduanya punya sifat berbeda (§lib/kategori.ts), dan
+  // mengelompokkannya membuat batas itu terlihat tanpa perlu label tambahan.
+  ['geo', 'GEO'],
+  ['audit', 'Audit'],
   ['lighthouse', 'Lighthouse'],
 ] as const
 

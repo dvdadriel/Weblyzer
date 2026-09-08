@@ -84,15 +84,18 @@ export async function tambahSitus(_sebelum: HasilAksi, form: FormData): Promise<
  */
 export async function jalankanScan(
   siteId: number,
-  kategori: 'bugs' | 'console' | 'security' | 'seo' | 'lighthouse',
+  kategori: 'bugs' | 'console' | 'security' | 'seo' | 'geo' | 'audit' | 'lighthouse',
   path: string,
 ): Promise<HasilAksi> {
   // Penjaga ganda-klik. Tanpa ini dua Chromium berebut satu situs.
   if (runAktif(getDb(), siteId)) return { error: 'Pemindaian situs ini sedang berjalan.' }
 
+  // `geo` dan `audit` adalah subcommand-nya sendiri, bukan kategori dari
+  // `scan`: keduanya tidak menjelajah dengan Chromium melainkan memanggil
+  // claude-seo, dan `scanHandler` akan menolaknya sebagai kategori tak dikenal.
   const argumen =
-    kategori === 'lighthouse'
-      ? ['lighthouse', String(siteId)]
+    kategori === 'lighthouse' || kategori === 'geo' || kategori === 'audit'
+      ? [kategori, String(siteId)]
       : ['scan', String(siteId), kategori]
 
   const anak = spawn(process.execPath, [join(process.cwd(), 'scripts/scan.ts'), ...argumen], {

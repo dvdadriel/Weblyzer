@@ -29,6 +29,8 @@ test('setiap kategori punya sheet-nya, walau tanpa temuan', () => {
     'Console',
     'Security',
     'SEO',
+    'GEO',
+    'Audit',
     'Lighthouse',
     'Skor Lighthouse',
   ])
@@ -101,7 +103,8 @@ test('kategori yang belum pernah dipindai disebut begitu, bukan sel kosong', () 
   const { db, siteId } = siap()
   const r = susunSheet(db, siteId, WAKTU)[0]!
   const bug = r.data.find((baris) => teks(baris[0]!) === 'Bug')!
-  expect(teks(bug[2]!)).toBe('belum pernah')
+  expect(teks(bug[1]!)).toBe('aturan')
+  expect(teks(bug[3]!)).toBe('belum pernah')
 })
 
 test('waktu pemindaian per kategori ikut, bukan hanya waktu ekspor', () => {
@@ -110,7 +113,7 @@ test('waktu pemindaian per kategori ikut, bukan hanya waktu ekspor', () => {
   finishRun(db, run.id, 'done')
   const r = susunSheet(db, siteId, WAKTU)[0]!
   const bug = r.data.find((baris) => teks(baris[0]!) === 'Bug')!
-  expect(teks(bug[2]!)).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+  expect(teks(bug[3]!)).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
 })
 
 /* ── Skor ────────────────────────────────────────────────────────────────── */
@@ -184,8 +187,8 @@ test('temuan identik jadi satu baris prompt, bukan satu baris per temuan', () =>
 
   const s = promptSheet(db, siteId)
   expect(s.data).toHaveLength(2)
-  expect(teks(s.data[1]![4]!)).toBe('6')
-  expect(teks(s.data[1]![2]!)).toBe('http-error')
+  expect(teks(s.data[1]![5]!)).toBe('6')
+  expect(teks(s.data[1]![3]!)).toBe('http-error')
 })
 
 test('hanya temuan terbuka yang dapat prompt', () => {
@@ -201,7 +204,7 @@ test('hanya temuan terbuka yang dapat prompt', () => {
   ])
   db.prepare("UPDATE findings SET status = 'ignored' WHERE rule = 'noindex'").run()
 
-  const aturan = promptSheet(db, siteId).data.slice(1).map((r) => teks(r[2]!))
+  const aturan = promptSheet(db, siteId).data.slice(1).map((r) => teks(r[3]!))
   expect(aturan).toEqual(['http-error'])
 })
 
@@ -215,7 +218,7 @@ test('prompt menyebut situs, aturan, dan halaman contoh', () => {
     { url: 'https://uji.test/x', pageId: page.id, severity: 'high', rule: 'insecure-cookie', title: 'Cookie sesi tanpa flag Secure', detail: {} },
   ])
 
-  const p = teks(promptSheet(db, siteId).data[1]![5]!)!
+  const p = teks(promptSheet(db, siteId).data[1]![6]!)!
   expect(p).toContain('Uji')
   expect(p).toContain('https://uji.test')
   expect(p).toContain('security/insecure-cookie')
@@ -233,7 +236,7 @@ test('prompt untuk aturan tak dikenal tetap terbentuk', () => {
     { url: 'https://uji.test/z', pageId: null, severity: 'medium', rule: 'aturan-yang-belum-ada', title: 'Sesuatu', detail: {} },
   ])
 
-  const p = teks(promptSheet(db, siteId).data[1]![5]!)!
+  const p = teks(promptSheet(db, siteId).data[1]![6]!)!
   expect(p).toContain('bugs/aturan-yang-belum-ada')
   expect(p).toContain('Tugas Anda')
 })
@@ -257,7 +260,7 @@ test('prompt mengaku daftarnya lengkap hanya bila memang lengkap', () => {
     })),
   )
 
-  const banyak = teks(promptSheet(db, siteId).data[1]![5]!)!
+  const banyak = teks(promptSheet(db, siteId).data[1]![6]!)!
   // Asisten yang mengira sudah melihat semuanya akan menyatakan selesai
   // terlalu cepat. Yang terpotong harus disebut jumlahnya.
   expect(banyak).toContain('hanya contoh')
@@ -269,7 +272,7 @@ test('prompt mengaku daftarnya lengkap hanya bila memang lengkap', () => {
   reconcile(db2, id2, r2.id, 'bugs', [
     { url: 'https://uji.test/satu', pageId: null, severity: 'high', rule: 'http-error', title: 'HTTP 500 pada https://uji.test/satu', detail: {} },
   ])
-  const sedikit = teks(promptSheet(db2, id2).data[1]![5]!)!
+  const sedikit = teks(promptSheet(db2, id2).data[1]![6]!)!
   expect(sedikit).toContain('lengkap')
   expect(sedikit).not.toContain('hanya contoh')
 })
@@ -302,7 +305,7 @@ test('kolom prompt membungkus teks', () => {
   reconcile(db, siteId, run.id, 'bugs', [
     { url: 'https://uji.test/a', pageId: null, severity: 'low', rule: 'http-error', title: 'HTTP 500 pada https://uji.test/a', detail: {} },
   ])
-  expect(promptSheet(db, siteId).data[1]![5]!).toMatchObject({ wrap: true })
+  expect(promptSheet(db, siteId).data[1]![6]!).toMatchObject({ wrap: true })
 })
 
 /**
@@ -334,11 +337,11 @@ test('aturan yang perbaikannya satu digabung jadi satu tugas', () => {
 
   const b = promptSheet(db, siteId).data.slice(1)
   expect(b).toHaveLength(1)
-  expect(teks(b[0]![3]!)).toBe('Judul halaman kembar antar halaman berbeda')
+  expect(teks(b[0]![4]!)).toBe('Judul halaman kembar antar halaman berbeda')
 
   // Yang hilang akibat penggabungan dikembalikan sebagai rincian — daftar
   // judul yang bertabrakan justru bahan utama untuk memperbaikinya.
-  const p = teks(b[0]![5]!)!
+  const p = teks(b[0]![6]!)!
   expect(p).toContain('European Collection')
   expect(p).toContain('Urban Living')
   expect(p).toContain('Hospitality')
@@ -358,11 +361,11 @@ test('audit Lighthouse yang sama di mobile dan desktop adalah satu tugas', () =>
   const b = promptSheet(db, siteId).data.slice(1)
   // Dua audit berbeda tetap dua tugas; strategi yang berbeda tidak.
   expect(b).toHaveLength(2)
-  expect(b.map((r) => teks(r[3]!))).toEqual([
+  expect(b.map((r) => teks(r[4]!))).toEqual([
     'Uses third-party cookies',
     'Document does not have a main landmark',
   ])
-  expect(teks(b[0]![5]!)).toContain('[desktop]')
+  expect(teks(b[0]![6]!)).toContain('[desktop]')
 })
 
 /** Audit Lighthouse yang berbeda perbaikannya berbeda — itu bukan satu tugas. */
@@ -389,7 +392,7 @@ test('tugas gabungan menghitung varian, bukan halaman', () => {
     { url: 'https://uji.test/', pageId: page.id, severity: 'medium', rule: 'judul-kembar', key: 'A', title: '2 halaman memakai judul yang sama: "A"', detail: {} },
     { url: 'https://uji.test/', pageId: page.id, severity: 'medium', rule: 'judul-kembar', key: 'B', title: '3 halaman memakai judul yang sama: "B"', detail: {} },
   ])
-  const p = teks(promptSheet(db, siteId).data[1]![5]!)!
+  const p = teks(promptSheet(db, siteId).data[1]![6]!)!
   expect(p).toContain('2 varian, 2 temuan')
   expect(p).not.toMatch(/Terdampak: \d+ halaman/)
 })

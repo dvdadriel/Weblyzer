@@ -6,9 +6,11 @@ import { probeSite } from './scanners/probe.ts'
 import { analyzeBugs } from './analyzers/bugs.ts'
 import { analyzeConsole } from './analyzers/console.ts'
 import { analyzeSecurity } from './analyzers/security.ts'
+import { BISA_RECHECK } from './kategori.ts'
 
-/** Kategori yang bisa diperiksa ulang per temuan. */
-const BISA = new Set(['bugs', 'console', 'security'])
+/** Daftarnya di `lib/kategori.ts` supaya client component bisa membacanya
+ *  tanpa menarik Playwright ke bundle browser. */
+const BISA = BISA_RECHECK
 
 export type HasilRecheck =
   | { keadaan: 'beres' }
