@@ -160,6 +160,37 @@ test('stderr dipakai sebagai pesan galat bila ada, apa adanya', () => {
   expect(!h.ok && h.galat).toBe('Credit balance too low')
 })
 
+/**
+ * Terjadi sungguhan pada audit pertama: `claude -p` keluar non-nol setelah
+ * empat menit dengan stderr KOSONG, sementara skill-nya jelas sudah bekerja —
+ * crawl.json, sitemap.xml, dan home-raw.html tertulis di direktori kerjanya.
+ * Membuang hasil kerja sebanyak itu karena satu angka exit adalah kerugian
+ * yang tidak perlu.
+ */
+test('exit non-nol dengan keluaran tetap dipakai keluarannya', () => {
+  const err = Object.assign(new Error('Command failed'), { code: 1 })
+  const h = tafsirkan(err, '{"temuan":[{"rule":"a"}]}', '', 60_000)
+  expect(h.ok).toBe(true)
+  expect(h.ok && h.teks).toContain('temuan')
+})
+
+test('timeout tidak boleh diselamatkan keluaran separuh', () => {
+  // Keluaran dari proses yang DIBUNUH bisa terpotong di tengah JSON. Yang
+  // separuh lebih berbahaya daripada yang tidak ada: `bacaTemuan` bisa saja
+  // berhasil membaca sebagiannya, dan sisanya direkonsiliasi sebagai "sudah
+  // diperbaiki" padahal cuma tidak sempat dilaporkan.
+  const err = Object.assign(new Error('timeout'), { code: 'ETIMEDOUT', killed: true })
+  const h = tafsirkan(err, '{"temuan":[{"rule":"a"}', '', 60_000)
+  expect(h.ok).toBe(false)
+})
+
+test('exit non-nol tanpa keluaran menyebutkan exit code-nya', () => {
+  const err = Object.assign(new Error('Command failed: claude -p --allowedTools ...'), { code: 143 })
+  const h = tafsirkan(err, '', '', 60_000)
+  expect(h.ok).toBe(false)
+  expect(!h.ok && h.galat).toMatch(/kode 143/)
+})
+
 test('keluaran kosong tanpa error tetap kegagalan', () => {
   // Nol keluaran bukan nol temuan. Kalau ini dianggap berhasil, `reconcile`
   // akan menandai seluruh temuan geo lama sebagai sudah diperbaiki.

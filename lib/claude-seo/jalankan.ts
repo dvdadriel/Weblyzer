@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 export type HasilJalan =
@@ -84,10 +84,29 @@ export function tafsirkan(
         galat: `claude-seo tidak selesai dalam ${Math.round(batasMs / 60_000)} menit`,
       }
     }
-    // stderr lebih berguna daripada pesan Error generik, tapi hanya kalau ada.
-    // Pesan mentah dipertahankan: kegagalan yang diterjemahkan jadi kalimat
-    // sopan akan menyembunyikan sebab yang sebenarnya bisa ditindaklanjuti.
-    const pesan = stderr.trim() !== '' ? stderr.trim() : err.message
+
+    // Exit code non-nol TAPI ada keluaran: keluarannya dipakai.
+    //
+    // Versi pertama menyerah di sini, dan itu terbukti salah pada audit
+    // sungguhan — `claude -p` keluar non-nol setelah empat menit dengan stderr
+    // KOSONG, sementara skill-nya jelas sudah bekerja (crawl.json, sitemap.xml,
+    // dan home-raw.html tertulis di direktori kerjanya). Membuang hasil kerja
+    // sebanyak itu karena satu angka exit adalah kerugian yang tidak perlu.
+    //
+    // Aman karena `bacaTemuan` tetap menjadi penjaganya: keluaran yang bukan
+    // JSON temuan akan ditolak di sana, dan job-nya gagal seperti seharusnya.
+    // Yang berubah cuma satu — exit code tidak lagi memveto keluaran yang sah.
+    if (stdout.trim() !== '') return { ok: true, teks: stdout }
+    // Tanpa keluaran: stderr mentah kalau ada, karena kegagalan yang
+    // diterjemahkan jadi kalimat sopan menyembunyikan sebab yang bisa
+    // ditindaklanjuti. Kalau stderr juga kosong, exit code-nya disebutkan —
+    // `Command failed: claude -p --allowedTools ...` tanpa apa pun lagi adalah
+    // pesan yang muncul pada kegagalan nyata pertama, dan mendiagnosisnya
+    // berarti menjalankan ulang seluruhnya.
+    const pesan =
+      stderr.trim() !== ''
+        ? stderr.trim()
+        : `claude keluar dengan kode ${err.code ?? '?'} tanpa keluaran maupun pesan galat`
     return { ok: false, galat: pesan.slice(0, 2000) }
   }
   if (stdout.trim() === '') {
@@ -118,7 +137,23 @@ export function jalankanClaudeSeo(
       'claude',
       ['-p', '--allowedTools', ...TOOLS],
       { cwd, timeout: batasMs, maxBuffer: 64 * 1024 * 1024 },
-      (err, stdout, stderr) => resolve(tafsirkan(err, stdout, stderr, batasMs)),
+      (err, stdout, stderr) => {
+        // Keluaran mentah selalu disimpan, berhasil maupun gagal.
+        //
+        // Bukan kemewahan: kegagalan pertama yang nyata memberi pesan
+        // "Command failed" tanpa isi, dan satu-satunya cara mendiagnosisnya
+        // adalah menjalankan ulang sembilan puluh menit. Ditulis ke direktori
+        // kerja yang sudah di-gitignore, ditimpa tiap run — yang dibutuhkan
+        // adalah kegagalan TERAKHIR, bukan arsipnya.
+        try {
+          writeFileSync(join(cwd, 'terakhir-stdout.txt'), stdout)
+          writeFileSync(join(cwd, 'terakhir-stderr.txt'), stderr)
+        } catch {
+          // Gagal menulis catatan diagnosis tidak boleh menggagalkan analisis
+          // yang hasilnya sudah ada di tangan.
+        }
+        resolve(tafsirkan(err, stdout, stderr, batasMs))
+      },
     )
     anak.stdin?.end(prompt)
   })
