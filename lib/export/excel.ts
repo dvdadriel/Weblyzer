@@ -1,4 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
+import { kelompokkan, type TemuanRingkas } from '../ai/prompt.ts'
+import { barisPrompt } from './prompt-perbaikan.ts'
 
 /**
  * Menyusun isi berkas Excel untuk satu situs.
@@ -30,7 +32,15 @@ const URUTAN = `CASE f.severity
  * menerima null sebagai Cell tapi tidak sebagai nilai di dalam CellObject,
  * dan itu justru pas: skor yang tidak terukur memang bukan nilai.
  */
-export type Sel = { value: string | number; fontWeight?: 'bold' } | null
+export type Sel = {
+  value: string | number
+  fontWeight?: 'bold'
+  /** Membungkus teks panjang. Dipakai kolom Prompt, yang isinya paragraf
+   *  berbaris-baris — tanpa ini Excel menampilkannya sebagai satu garis
+   *  panjang dan isinya cuma terbaca lewat formula bar. */
+  wrap?: boolean
+  alignVertical?: 'top'
+} | null
 export type Sheet = {
   /** Nama tab di Excel. Propertinya `sheet` di pustakanya, BUKAN `name` —
    *  versi pertama memakai `name` dan lolos compiler karena `.map()`
@@ -114,6 +124,74 @@ function sheetTemuan(db: DatabaseSync, siteId: number, category: string): Sheet 
         { value: b.last_seen_run },
         { value: b.detail_json },
       ]),
+    ],
+  }
+}
+
+const KOLOM_PROMPT = ['Severity', 'Kategori', 'Aturan', 'Masalah', 'Halaman', 'Prompt']
+
+/**
+ * Sheet prompt perbaikan: satu baris siap tempel per masalah.
+ *
+ * Hanya temuan `open`. Yang `ignored` sudah diputuskan untuk tidak dikerjakan
+ * dan yang `fixed` sudah dikerjakan — memberi prompt untuk keduanya berarti
+ * mengirim orang memperbaiki hal yang tidak perlu diperbaiki. Ini kebalikan
+ * dari sheet temuan, yang justru memuat ketiganya karena tugasnya melapor,
+ * bukan menyuruh.
+ *
+ * Dikelompokkan dengan `kelompokkan` yang sama seperti prompt ringkasan AI,
+ * bukan satu baris per temuan. 216 temuan Comforta jadi belasan tugas, dan
+ * enam HTTP 500 dari satu controller rusak jadi satu tugas — bukan enam
+ * salinan prompt yang sama yang harus dikerjakan enam kali.
+ */
+function sheetPrompt(db: DatabaseSync, siteId: number): Sheet {
+  const s = db
+    .prepare('SELECT name, base_url FROM sites WHERE id = ?')
+    .get(siteId) as { name: string; base_url: string } | undefined
+
+  const temuan = db
+    .prepare(
+      `SELECT f.category, f.severity, f.rule, f.title, p.url AS url
+       FROM findings f LEFT JOIN pages p ON p.id = f.page_id
+       WHERE f.site_id = ? AND f.status = 'open'
+       ORDER BY ${URUTAN}, f.rule, p.url`,
+    )
+    .all(siteId) as unknown as TemuanRingkas[]
+
+  const baseUrl = s?.base_url ?? ''
+  const baris = barisPrompt(kelompokkan(temuan, baseUrl), {
+    nama: s?.name ?? '(tidak diketahui)',
+    baseUrl,
+  })
+
+  return {
+    sheet: 'Prompt Perbaikan',
+    columns: [
+      { width: 10 },
+      { width: 12 },
+      { width: 24 },
+      { width: 56 },
+      { width: 10 },
+      { width: 110 },
+    ],
+    data: [
+      judul(KOLOM_PROMPT),
+      // Sheet tanpa satu pun masalah terbuka tidak dibiarkan cuma berisi
+      // header: header sendirian terbaca seperti data yang gagal dimuat.
+      ...(baris.length === 0
+        ? [
+            [
+              { value: 'Tidak ada temuan terbuka. Tidak ada yang perlu diperbaiki.' },
+            ] as Sel[],
+          ]
+        : baris.map((b): Sel[] => [
+            { value: b.severity },
+            { value: b.kategori },
+            { value: b.rule },
+            { value: b.masalah },
+            { value: b.jumlah },
+            { value: b.prompt, wrap: true, alignVertical: 'top' },
+          ])),
     ],
   }
 }
@@ -223,6 +301,11 @@ function sheetRingkasan(db: DatabaseSync, siteId: number, waktuEkspor: string): 
 export function susunSheet(db: DatabaseSync, siteId: number, waktuEkspor: string): Sheet[] {
   return [
     sheetRingkasan(db, siteId, waktuEkspor),
+    // Sheet kedua, bukan terakhir. Ringkasan menjawab "seberapa buruk", dan
+    // pertanyaan berikutnya selalu "lalu saya kerjakan apa" — sheet temuan
+    // adalah rujukan, bukan tempat memulai. Diletakkan di ujung, ia tidak
+    // pernah ditemukan.
+    sheetPrompt(db, siteId),
     ...KATEGORI.map((k) => sheetTemuan(db, siteId, k)),
     sheetSkor(db, siteId),
   ]

@@ -16,12 +16,13 @@ function run(
   status: string,
   geser: string,
   type = 'full',
+  pemicu: 'manual' | 'scheduled' = 'manual',
 ) {
   // `finished_at` diisi hanya untuk run yang selesai, sama seperti finishRun.
   const selesai = status === 'done' ? "datetime('now', ?)" : 'NULL'
   const sql = `INSERT INTO runs (site_id, type, trigger, status, started_at, finished_at)
-               VALUES (?, ?, 'manual', ?, datetime('now', ?), ${selesai})`
-  const args: unknown[] = [siteId, type, status, geser]
+               VALUES (?, ?, ?, ?, datetime('now', ?), ${selesai})`
+  const args: unknown[] = [siteId, type, pemicu, status, geser]
   if (status === 'done') args.push(geser)
   db.prepare(sql).run(...(args as never[]))
 }
@@ -102,7 +103,39 @@ test('run yang belum selesai belum menghasilkan waktu', () => {
 test('waktunya lokal dan tanpa detik', () => {
   const { db, siteId } = siap()
   run(db, siteId, 'done', '-5 minutes', 'bugs')
-  expect(waktuScanKategori(db, siteId, 'bugs')).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+  expect(waktuScanKategori(db, siteId, 'bugs')?.waktu).toMatch(
+    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/,
+  )
+})
+
+test('pemindaian manual tidak ditandai terjadwal', () => {
+  const { db, siteId } = siap()
+  run(db, siteId, 'done', '-5 minutes', 'bugs')
+  expect(waktuScanKategori(db, siteId, 'bugs')?.terjadwal).toBe(false)
+})
+
+test('pemindaian terjadwal ditandai terjadwal', () => {
+  const { db, siteId } = siap()
+  run(db, siteId, 'done', '-5 minutes', 'bugs', 'scheduled')
+  expect(waktuScanKategori(db, siteId, 'bugs')?.terjadwal).toBe(true)
+})
+
+test('penanda mengikuti run TERAKHIR, bukan run mana pun yang terjadwal', () => {
+  // Kalau penandanya dibaca dengan EXISTS, satu pemindaian terjadwal di masa
+  // lalu akan menandai selamanya — dan kaki tabel akan mengaku angkanya
+  // datang dari semalam padahal baru saja ditekan orang.
+  const { db, siteId } = siap()
+  run(db, siteId, 'done', '-2 hours', 'bugs', 'scheduled')
+  run(db, siteId, 'done', '-5 minutes', 'bugs', 'manual')
+  expect(waktuScanKategori(db, siteId, 'bugs')?.terjadwal).toBe(false)
+})
+
+test('hasil waktuScanKategori adalah objek biasa, bukan baris node:sqlite', () => {
+  // Diteruskan ke TabelTemuan yang client component; baris berprototipe null
+  // membuat React melempar "Only plain objects can be passed".
+  const { db, siteId } = siap()
+  run(db, siteId, 'done', '-5 minutes', 'bugs')
+  expect(Object.getPrototypeOf(waktuScanKategori(db, siteId, 'bugs')!)).toBe(Object.prototype)
 })
 
 /**

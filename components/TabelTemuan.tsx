@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import type { BarisTemuan } from '../lib/ui/queries.ts'
+import type { BarisTemuan, ScanKategori } from '../lib/ui/queries.ts'
 import { SeverityChip } from './SeverityChip.tsx'
 import { ubahStatusTemuan, periksaTemuan } from '../app/actions.ts'
 import { Ikon } from './Ikon.tsx'
@@ -113,7 +113,7 @@ export function TabelTemuan({
   baseUrl: string
   status?: 'open' | 'ignored'
   path: string
-  waktuScan: string | null
+  waktuScan: ScanKategori | null
 }) {
   const [terbuka, setTerbuka] = useState<number | null>(null)
   // Hasil pemeriksaan disimpan DI SINI, bukan di baris detailnya.
@@ -215,7 +215,12 @@ export function TabelTemuan({
         {waktuScan !== null && (
           <span className="tabel-waktu">
             <Ikon nama="waktu" />
-            dipindai {waktuScan}
+            dipindai {waktuScan.waktu}
+            {/* Kata sifat, bukan lencana tersendiri: pertanyaannya bukan "apa
+                pemicunya" melainkan "angka ini masih berlaku atau tidak", dan
+                pemicu cuma satu keterangan dari jawaban itu. Lencana terpisah
+                akan menuntut perhatian yang tidak sepadan. */}
+            {waktuScan.terjadwal && ' · terjadwal'}
           </span>
         )}
       </p>

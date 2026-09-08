@@ -22,6 +22,11 @@ export type RingkasanSitus = {
   /** Status AI run terakhir. Dibawa terpisah dari `keadaan` karena AI yang
    *  gagal TIDAK membuat pemindaiannya gagal — temuannya tetap sah. */
   aiGagal: boolean
+  /** Run terakhir dipicu jadwal, bukan orang. "Gagal semalam" dan "gagal saat
+   *  saya klik" adalah dua cerita berbeda: yang pertama berarti situsnya
+   *  berubah tanpa ada yang menyentuhnya, yang kedua bisa saja saya sendiri
+   *  yang salah tekan. Tanpa penanda ini keduanya terlihat sama di kartu. */
+  terjadwal: boolean
 }
 
 export type BarisTemuan = {
@@ -51,14 +56,20 @@ function runTerakhir(db: DatabaseSync, siteId: number) {
       //
       // Detik dibuang: pertanyaannya "kapan terakhir dipindai", dan presisi
       // detik cuma menambah dua angka yang tidak pernah dipakai.
-      `SELECT status, error, ai_status,
+      `SELECT status, error, ai_status, trigger,
               strftime('%Y-%m-%d %H:%M', finished_at, 'localtime') AS finished_at
        FROM runs
        WHERE site_id = ? AND finished_at IS NOT NULL
        ORDER BY id DESC LIMIT 1`,
     )
     .get(siteId) as
-    | { status: string; error: string | null; finished_at: string; ai_status: string }
+    | {
+        status: string
+        error: string | null
+        finished_at: string
+        ai_status: string
+        trigger: string
+      }
     | undefined
 }
 
@@ -96,6 +107,7 @@ export function ringkasanSitus(db: DatabaseSync): RingkasanSitus[] {
       terakhirDipindai: run?.finished_at ?? null,
       pesanGagal: run?.status === 'failed' ? (run.error ?? 'Pemindaian gagal') : null,
       aiGagal: run?.ai_status === 'failed',
+      terjadwal: run?.trigger === 'scheduled',
     }
   }).sort(bandingkan)
 }
@@ -264,20 +276,29 @@ export function runAktif(db: DatabaseSync, siteId: number) {
  * kategori memang menyentuh kategori ini juga. Mengabaikannya akan melaporkan
  * "belum pernah" untuk data yang jelas ada.
  */
+export type ScanKategori = {
+  waktu: string
+  /** Dipicu jadwal, bukan orang. Lihat `RingkasanSitus.terjadwal`. */
+  terjadwal: boolean
+}
+
 export function waktuScanKategori(
   db: DatabaseSync,
   siteId: number,
   category: string,
-): string | null {
+): ScanKategori | null {
   const baris = db
     .prepare(
-      `SELECT strftime('%Y-%m-%d %H:%M', finished_at, 'localtime') AS waktu FROM runs
+      `SELECT strftime('%Y-%m-%d %H:%M', finished_at, 'localtime') AS waktu, trigger FROM runs
        WHERE site_id = ? AND type IN (?, 'full')
          AND status = 'done' AND finished_at IS NOT NULL
        ORDER BY id DESC LIMIT 1`,
     )
-    .get(siteId, category) as { waktu: string } | undefined
-  return baris?.waktu ?? null
+    .get(siteId, category) as { waktu: string; trigger: string } | undefined
+  if (baris === undefined) return null
+  // Objek baru, bukan baris `node:sqlite` yang berprototipe null: hasilnya
+  // diteruskan ke TabelTemuan yang merupakan client component.
+  return { waktu: baris.waktu, terjadwal: baris.trigger === 'scheduled' }
 }
 
 export type RingkasanAi = {

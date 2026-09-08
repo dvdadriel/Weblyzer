@@ -38,12 +38,20 @@ export default function Dashboard() {
                 {s.keadaan === 'belum-dipindai' && (
                   <span className="kartu-status">Belum pernah dipindai</span>
                 )}
+                {/* Pemicu paling berarti tepat di sini. Pemindaian yang gagal
+                    saat ditekan biasanya sudah dilihat orangnya sendiri; yang
+                    gagal terjadwal tidak ada yang menyaksikan, dan itu satu-
+                    satunya kabar bahwa situsnya berubah tanpa disentuh. */}
                 {s.keadaan === 'gagal' && (
-                  <span className="kartu-status gagal">{s.pesanGagal}</span>
+                  <span className="kartu-status gagal">
+                    {s.pesanGagal}
+                    {s.terjadwal && ' (pemindaian terjadwal)'}
+                  </span>
                 )}
                 {s.keadaan === 'bersih' && (
                   <span className="kartu-status bersih">
                     Tidak ada yang rusak &middot; {s.terakhirDipindai}
+                    {s.terjadwal && ' · terjadwal'}
                   </span>
                 )}
 
@@ -67,7 +75,10 @@ export default function Dashboard() {
                     {/* Stempel waktu ikut di sini, bukan cuma di kartu bersih:
                         delapan critical dari semalam berbeda artinya dengan
                         delapan critical dari tiga minggu lalu. */}
-                    <span className="kartu-waktu">dipindai {s.terakhirDipindai}</span>
+                    <span className="kartu-waktu">
+                      dipindai {s.terakhirDipindai}
+                      {s.terjadwal && ' · terjadwal'}
+                    </span>
                   </span>
                 )}
               </Link>

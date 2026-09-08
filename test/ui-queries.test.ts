@@ -132,3 +132,35 @@ test('dalam kelompok yang sama, yang paling parah dulu', () => {
 
   expect(ringkasanSitus(db).map((r) => r.nama)).toEqual(['Parah', 'Ringan'])
 })
+
+/* ── penanda terjadwal ──────────────────────────────────────────────────── */
+
+test('kartu situs menandai run terakhir yang dipicu jadwal', () => {
+  const site = createSite(db, { name: 'A', base_url: 'https://a.test' })
+  const manual = createRun(db, site.id, 'full')
+  finishRun(db, manual.id, 'done')
+  expect(ringkasanSitus(db)[0]!.terjadwal).toBe(false)
+
+  const jadwal = createRun(db, site.id, 'full', 'scheduled')
+  finishRun(db, jadwal.id, 'done')
+  expect(ringkasanSitus(db)[0]!.terjadwal).toBe(true)
+
+  // Dan kembali false begitu ada yang menekan tombolnya sendiri. Penanda yang
+  // lengket akan mengaku "gagal semalam" untuk kegagalan yang baru saja
+  // disaksikan orangnya — persis pembedaan yang fitur ini dibangun untuk itu.
+  const lagi = createRun(db, site.id, 'full')
+  finishRun(db, lagi.id, 'done')
+  expect(ringkasanSitus(db)[0]!.terjadwal).toBe(false)
+})
+
+test('penanda terjadwal tidak mengubah keadaan kartu', () => {
+  // Terjadwal adalah keterangan, bukan keparahan. Situs bersih yang dipindai
+  // jadwal tetap bersih, dan menaikkannya ke urutan atas akan menyaingi situs
+  // yang benar-benar rusak.
+  const site = createSite(db, { name: 'A', base_url: 'https://a.test' })
+  const jadwal = createRun(db, site.id, 'full', 'scheduled')
+  finishRun(db, jadwal.id, 'done')
+  const [r] = ringkasanSitus(db)
+  expect(r!.terjadwal).toBe(true)
+  expect(r!.keadaan).toBe('bersih')
+})

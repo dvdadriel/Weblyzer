@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import { openDb } from '../lib/db.ts'
 import { createSite } from '../lib/repos/sites.ts'
 import { createRun, finishRun } from '../lib/repos/runs.ts'
+import { upsertPage } from '../lib/repos/pages.ts'
 import { reconcile } from '../lib/findings.ts'
 import { susunSheet, namaBerkas } from '../lib/export/excel.ts'
 
@@ -23,6 +24,7 @@ test('setiap kategori punya sheet-nya, walau tanpa temuan', () => {
   // berarti "tidak diketahui". Keduanya berbeda.
   expect(nama(s)).toEqual([
     'Ringkasan',
+    'Prompt Perbaikan',
     'Bug',
     'Console',
     'Security',
@@ -154,4 +156,240 @@ test('nama yang habis disaring tetap menghasilkan nama berkas', () => {
 
 test('kutip ganda tidak bisa keluar dari header Content-Disposition', () => {
   expect(namaBerkas('a"; drop', '2026-09-07')).not.toContain('"')
+})
+
+/* ── Prompt Perbaikan ───────────────────────────────────────────────────── */
+
+const promptSheet = (db: ReturnType<typeof openDb>, siteId: number) =>
+  susunSheet(db, siteId, WAKTU).find((x) => x.sheet === 'Prompt Perbaikan')!
+
+/** Enam HTTP 500 dari satu controller rusak adalah SATU tugas. */
+test('temuan identik jadi satu baris prompt, bukan satu baris per temuan', () => {
+  const { db, siteId } = siap()
+  const run = createRun(db, siteId, 'bugs')
+  reconcile(
+    db,
+    siteId,
+    run.id,
+    'bugs',
+    ['divan', 'headboard', 'bantal', 'guling', 'kasur', 'sofa'].map((p) => ({
+      url: `https://uji.test/acc/${p}`,
+      pageId: null,
+      severity: 'critical' as const,
+      rule: 'http-error',
+      title: `HTTP 500 pada https://uji.test/acc/${p}`,
+      detail: {},
+    })),
+  )
+
+  const s = promptSheet(db, siteId)
+  expect(s.data).toHaveLength(2)
+  expect(teks(s.data[1]![4]!)).toBe('6')
+  expect(teks(s.data[1]![2]!)).toBe('http-error')
+})
+
+test('hanya temuan terbuka yang dapat prompt', () => {
+  // Yang `ignored` sudah diputuskan tidak dikerjakan dan yang `fixed` sudah
+  // dikerjakan. Memberi prompt untuk keduanya mengirim orang memperbaiki hal
+  // yang tidak perlu diperbaiki — kebalikan dari sheet temuan, yang memuat
+  // ketiganya karena tugasnya melapor.
+  const { db, siteId } = siap()
+  const run = createRun(db, siteId, 'bugs')
+  reconcile(db, siteId, run.id, 'bugs', [
+    { url: 'https://uji.test/a', pageId: null, severity: 'critical', rule: 'http-error', title: 'HTTP 500 pada https://uji.test/a', detail: {} },
+    { url: 'https://uji.test/b', pageId: null, severity: 'low', rule: 'noindex', title: 'Dikecualikan dari pencarian', detail: {} },
+  ])
+  db.prepare("UPDATE findings SET status = 'ignored' WHERE rule = 'noindex'").run()
+
+  const aturan = promptSheet(db, siteId).data.slice(1).map((r) => teks(r[2]!))
+  expect(aturan).toEqual(['http-error'])
+})
+
+test('prompt menyebut situs, aturan, dan halaman contoh', () => {
+  const { db, siteId } = siap()
+  // Halaman sungguhan, bukan `pageId: null`: URL contoh datang dari join ke
+  // tabel pages, dan temuan tanpa halaman memang tidak punya URL untuk dikutip.
+  const page = upsertPage(db, siteId, { url: 'https://uji.test/x', statusCode: 200, loadMs: 5 })
+  const run = createRun(db, siteId, 'security')
+  reconcile(db, siteId, run.id, 'security', [
+    { url: 'https://uji.test/x', pageId: page.id, severity: 'high', rule: 'insecure-cookie', title: 'Cookie sesi tanpa flag Secure', detail: {} },
+  ])
+
+  const p = teks(promptSheet(db, siteId).data[1]![5]!)!
+  expect(p).toContain('Uji')
+  expect(p).toContain('https://uji.test')
+  expect(p).toContain('security/insecure-cookie')
+  expect(p).toContain('/x')
+  // Petunjuk khas aturannya, bukan template kosong.
+  expect(p).toContain('Secure')
+})
+
+test('prompt untuk aturan tak dikenal tetap terbentuk', () => {
+  // Menambah analyzer baru tidak boleh menghasilkan sheet yang rusak — cuma
+  // prompt yang lebih tumpul.
+  const { db, siteId } = siap()
+  const run = createRun(db, siteId, 'bugs')
+  reconcile(db, siteId, run.id, 'bugs', [
+    { url: 'https://uji.test/z', pageId: null, severity: 'medium', rule: 'aturan-yang-belum-ada', title: 'Sesuatu', detail: {} },
+  ])
+
+  const p = teks(promptSheet(db, siteId).data[1]![5]!)!
+  expect(p).toContain('bugs/aturan-yang-belum-ada')
+  expect(p).toContain('Tugas Anda')
+})
+
+test('prompt mengaku daftarnya lengkap hanya bila memang lengkap', () => {
+  const { db, siteId } = siap()
+  const run = createRun(db, siteId, 'bugs')
+  // Sepuluh halaman dengan masalah yang sama; contoh yang dikutip dibatasi.
+  reconcile(
+    db,
+    siteId,
+    run.id,
+    'bugs',
+    Array.from({ length: 10 }, (_, i) => ({
+      url: `https://uji.test/p${i}`,
+      pageId: null,
+      severity: 'high' as const,
+      rule: 'http-error',
+      title: `HTTP 500 pada https://uji.test/p${i}`,
+      detail: {},
+    })),
+  )
+
+  const banyak = teks(promptSheet(db, siteId).data[1]![5]!)!
+  // Asisten yang mengira sudah melihat semuanya akan menyatakan selesai
+  // terlalu cepat. Yang terpotong harus disebut jumlahnya.
+  expect(banyak).toContain('hanya contoh')
+  expect(banyak).toMatch(/Ada \d+ halaman lain/)
+  expect(banyak).not.toContain('lengkap untuk masalah ini')
+
+  const { db: db2, siteId: id2 } = siap()
+  const r2 = createRun(db2, id2, 'bugs')
+  reconcile(db2, id2, r2.id, 'bugs', [
+    { url: 'https://uji.test/satu', pageId: null, severity: 'high', rule: 'http-error', title: 'HTTP 500 pada https://uji.test/satu', detail: {} },
+  ])
+  const sedikit = teks(promptSheet(db2, id2).data[1]![5]!)!
+  expect(sedikit).toContain('lengkap')
+  expect(sedikit).not.toContain('hanya contoh')
+})
+
+test('baris prompt diurutkan paling parah dulu', () => {
+  const { db, siteId } = siap()
+  const run = createRun(db, siteId, 'bugs')
+  reconcile(db, siteId, run.id, 'bugs', [
+    { url: 'https://uji.test/a', pageId: null, severity: 'low', rule: 'r-low', title: 'Rendah', detail: {} },
+    { url: 'https://uji.test/b', pageId: null, severity: 'critical', rule: 'r-crit', title: 'Kritis', detail: {} },
+    { url: 'https://uji.test/c', pageId: null, severity: 'medium', rule: 'r-med', title: 'Sedang', detail: {} },
+  ])
+  const sev = promptSheet(db, siteId).data.slice(1).map((r) => teks(r[0]!))
+  expect(sev).toEqual(['critical', 'medium', 'low'])
+})
+
+test('situs tanpa temuan terbuka mendapat baris penjelas, bukan header sendirian', () => {
+  // Header sendirian terbaca seperti data yang gagal dimuat.
+  const { db, siteId } = siap()
+  const s = promptSheet(db, siteId)
+  expect(s.data).toHaveLength(2)
+  expect(teks(s.data[1]![0]!)).toMatch(/tidak ada temuan terbuka/i)
+})
+
+test('kolom prompt membungkus teks', () => {
+  // Isinya paragraf berbaris-baris; tanpa wrap Excel menampilkannya sebagai
+  // satu garis panjang dan isinya cuma terbaca lewat formula bar.
+  const { db, siteId } = siap()
+  const run = createRun(db, siteId, 'bugs')
+  reconcile(db, siteId, run.id, 'bugs', [
+    { url: 'https://uji.test/a', pageId: null, severity: 'low', rule: 'http-error', title: 'HTTP 500 pada https://uji.test/a', detail: {} },
+  ])
+  expect(promptSheet(db, siteId).data[1]![5]!).toMatchObject({ wrap: true })
+})
+
+/**
+ * Springair menghasilkan 46 kelompok `judul-kembar` yang perbaikannya satu dan
+ * sama — template yang tidak menyisipkan nama halaman. Membaca 46 prompt
+ * kembar bukan pekerjaan.
+ */
+test('aturan yang perbaikannya satu digabung jadi satu tugas', () => {
+  const { db, siteId } = siap()
+  const page = upsertPage(db, siteId, { url: 'https://uji.test/', statusCode: 200, loadMs: 5 })
+  const run = createRun(db, siteId, 'seo')
+  reconcile(
+    db,
+    siteId,
+    run.id,
+    'seo',
+    ['European Collection', 'Urban Living', 'Hospitality'].map((t) => ({
+      url: 'https://uji.test/',
+      pageId: page.id,
+      severity: 'medium' as const,
+      rule: 'judul-kembar',
+      // `key` membedakan temuan yang berbagi url + rule. Tanpa itu ketiganya
+      // punya fingerprint yang sama dan reconcile menyimpan satu baris.
+      key: t,
+      title: `4 halaman memakai judul yang sama: "${t}"`,
+      detail: {},
+    })),
+  )
+
+  const b = promptSheet(db, siteId).data.slice(1)
+  expect(b).toHaveLength(1)
+  expect(teks(b[0]![3]!)).toBe('Judul halaman kembar antar halaman berbeda')
+
+  // Yang hilang akibat penggabungan dikembalikan sebagai rincian — daftar
+  // judul yang bertabrakan justru bahan utama untuk memperbaikinya.
+  const p = teks(b[0]![5]!)!
+  expect(p).toContain('European Collection')
+  expect(p).toContain('Urban Living')
+  expect(p).toContain('Hospitality')
+  expect(p).toContain('Rincian (3)')
+})
+
+test('audit Lighthouse yang sama di mobile dan desktop adalah satu tugas', () => {
+  const { db, siteId } = siap()
+  const page = upsertPage(db, siteId, { url: 'https://uji.test/a', statusCode: 200, loadMs: 5 })
+  const run = createRun(db, siteId, 'lighthouse')
+  reconcile(db, siteId, run.id, 'lighthouse', [
+    { url: 'https://uji.test/a', pageId: page.id, severity: 'medium', rule: 'lighthouse-audit', key: 'mobile:third-party-cookies', title: '[mobile] Uses third-party cookies', detail: {} },
+    { url: 'https://uji.test/a', pageId: page.id, severity: 'medium', rule: 'lighthouse-audit', key: 'desktop:third-party-cookies', title: '[desktop] Uses third-party cookies', detail: {} },
+    { url: 'https://uji.test/a', pageId: page.id, severity: 'medium', rule: 'lighthouse-audit', key: 'mobile:landmark-one-main', title: '[mobile] Document does not have a main landmark', detail: {} },
+  ])
+
+  const b = promptSheet(db, siteId).data.slice(1)
+  // Dua audit berbeda tetap dua tugas; strategi yang berbeda tidak.
+  expect(b).toHaveLength(2)
+  expect(b.map((r) => teks(r[3]!))).toEqual([
+    'Uses third-party cookies',
+    'Document does not have a main landmark',
+  ])
+  expect(teks(b[0]![5]!)).toContain('[desktop]')
+})
+
+/** Audit Lighthouse yang berbeda perbaikannya berbeda — itu bukan satu tugas. */
+test('masalah yang benar-benar berbeda tidak digabung', () => {
+  const { db, siteId } = siap()
+  const page = upsertPage(db, siteId, { url: 'https://uji.test/a', statusCode: 200, loadMs: 5 })
+  const run = createRun(db, siteId, 'bugs')
+  reconcile(db, siteId, run.id, 'bugs', [
+    { url: 'https://uji.test/a', pageId: page.id, severity: 'critical', rule: 'http-error', title: 'HTTP 500 pada https://uji.test/a', detail: {} },
+    { url: 'https://uji.test/b', pageId: page.id, severity: 'high', rule: 'http-error', title: 'HTTP 404 pada https://uji.test/b', detail: {} },
+  ])
+  // HTTP 500 dan HTTP 404 adalah dua pekerjaan berbeda walau aturannya sama.
+  expect(promptSheet(db, siteId).data.slice(1)).toHaveLength(2)
+})
+
+test('tugas gabungan menghitung varian, bukan halaman', () => {
+  // 46 temuan judul-kembar Springair semuanya menempel di halaman akar.
+  // Menulis "46 halaman" sementara daftar contohnya cuma memuat "/" adalah
+  // angka yang salah unit.
+  const { db, siteId } = siap()
+  const page = upsertPage(db, siteId, { url: 'https://uji.test/', statusCode: 200, loadMs: 5 })
+  const run = createRun(db, siteId, 'seo')
+  reconcile(db, siteId, run.id, 'seo', [
+    { url: 'https://uji.test/', pageId: page.id, severity: 'medium', rule: 'judul-kembar', key: 'A', title: '2 halaman memakai judul yang sama: "A"', detail: {} },
+    { url: 'https://uji.test/', pageId: page.id, severity: 'medium', rule: 'judul-kembar', key: 'B', title: '3 halaman memakai judul yang sama: "B"', detail: {} },
+  ])
+  const p = teks(promptSheet(db, siteId).data[1]![5]!)!
+  expect(p).toContain('2 varian, 2 temuan')
+  expect(p).not.toMatch(/Terdampak: \d+ halaman/)
 })
