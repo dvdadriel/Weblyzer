@@ -1,0 +1,30 @@
+# Yang tidak boleh masuk image.
+#
+# node_modules PALING penting: image membangunnya sendiri lewat `npm ci` untuk
+# platform container. Menyalin dari host berarti binary native macOS di dalam
+# Linux — dan Chromium host yang tidak akan pernah jalan di sana.
+node_modules
+.next
+
+# data.db adalah volume, bukan isi image. Menyalinnya berarti setiap container
+# baru mulai dengan riwayat mesin pengembang.
+data.db
+data.db-wal
+data.db-shm
+
+# Lokal, dan sebagian memuat keluaran mentah dari analisis.
+claude-seo-out
+docs
+.claude
+.claude-flow
+ruvector.db
+agentdb.rvf
+agentdb.rvf.lock
+test-results
+*.log
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md

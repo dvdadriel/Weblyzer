@@ -55,6 +55,19 @@ npm run dev            # http://localhost:3000
 No `.env`, no database setup. `data.db` creates itself on first use and
 migrations run automatically.
 
+Optional email for scheduled scans, from the environment rather than a
+settings page — this app stores no credentials:
+
+```bash
+export WEBLYZER_SMTP_URL=smtps://user:pass@smtp.example.com:465
+export WEBLYZER_MAIL_FROM=weblyzer@example.com
+export WEBLYZER_MAIL_TO=you@example.com
+```
+
+Mail is only sent when something failed or changed. No email means nothing
+changed, **not** that the schedule ran — the dashboard's "last scanned" column
+is what answers that.
+
 Every scan also works from the terminal, and the UI calls the same CLI:
 
 ```bash
@@ -65,6 +78,47 @@ npm run scan -- geo <id>        # via claude-seo
 npm run scan -- audit <id>      # via claude-seo, takes tens of minutes
 npm run scan -- jadwal          # every enabled site, for cron
 ```
+
+## Docker
+
+```bash
+docker build -t weblyzer .
+docker run -d -p 3000:3000 -v ~/weblyzer-data:/data weblyzer
+```
+
+`/data` must be a volume. Without it the `open` → `fixed` history is lost every
+time the container is replaced, and that history is the whole point of the
+tool. It is a directory rather than a file because WAL writes `data.db-wal` and
+`data.db-shm` alongside it.
+
+**The AI layer does not work in a container**, and that cannot be patched from
+the Dockerfile. AI summaries, the GEO tab, and the Audit tab call the `claude`
+CLI, which needs an interactive OAuth login — a browser and a terminal, neither
+of which exists in a container. Copying host credentials into the image would
+put tokens in a pushable layer. Everything else runs: the four deterministic
+categories, Lighthouse, the Excel export, the scheduler, and email.
+
+Email is read from the environment at run time, never baked into the image:
+
+```bash
+docker run -d -p 3000:3000 -v ~/weblyzer-data:/data \
+  -e WEBLYZER_SMTP_URL=smtps://user:pass@smtp.example.com:465 \
+  -e WEBLYZER_MAIL_FROM=weblyzer@example.com \
+  -e WEBLYZER_MAIL_TO=you@example.com \
+  weblyzer
+```
+
+For the scheduled scan, point host cron at the running container rather than
+adding a second scheduler inside it:
+
+```
+0 0 * * * docker exec weblyzer node scripts/scan.ts jadwal
+```
+
+The image is around 3.8 GB, almost all of it Chromium. Verified by building it
+and running a real scan inside: dependencies present after `npm ci --omit=dev`,
+Chromium launching, findings written to the volume, read back from the host,
+and the web server serving them.
 
 ## Decisions worth knowing about
 
@@ -114,8 +168,7 @@ not deterministic.
 
 No keyword research, SERP data, backlinks, or rank tracking — this audits pages,
 it does not do market analysis. No scheduler is installed for you (the CLI
-command exists; wiring it to cron is yours). No email notifications yet. No
-Dockerfile yet. The UI has no automated tests.
+command exists; wiring it to cron is yours). The UI has no automated tests.
 
 Around 8,200 lines of source and 4,600 lines of tests. One runtime dependency
 outside Next, React, Playwright, and Lighthouse: `write-excel-file`.
