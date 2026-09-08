@@ -24,6 +24,7 @@
   "dependencies": {
     "lighthouse": "^13.4.1",
     "next": "^16.3.4",
+    "nodemailer": "^10.0.1",
     "playwright": "^1.62.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

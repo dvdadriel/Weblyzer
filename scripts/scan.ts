@@ -2,6 +2,8 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { getDb, closeDb } from '../lib/db.ts'
 import { LANGKAH, situsTerjadwal, pemicuDari } from '../lib/jadwal.ts'
+import { perluDikirim, susunPesan, type HasilSitus } from '../lib/notifikasi/pesan.ts'
+import { bacaKonfigurasi, kirimEmail } from '../lib/notifikasi/email.ts'
 import { createSite, listSites, getSite } from '../lib/repos/sites.ts'
 import { createRun, finishRun } from '../lib/repos/runs.ts'
 import { enqueue, requeueInterrupted } from '../lib/queue.ts'
@@ -99,24 +101,73 @@ async function main(): Promise<number> {
         `Jadwal: ${sites.length} situs aktif — ${sites.map((s) => s.name).join(', ')}`,
       )
 
+      // Konfigurasi email diperiksa SEBELUM memindai, bukan sesudah.
+      //
+      // Diperiksa di akhir, satu salah tulis di WEBLYZER_SMTP_URL baru
+      // terdengar setelah empat puluh menit pemindaian — dan besok malam lagi,
+      // dan seterusnya sampai ada yang membaca log. Pemindaiannya TIDAK
+      // dibatalkan karena ini: datanya tetap benar tersimpan, yang hilang cuma
+      // kabarnya.
+      const konfAwal = bacaKonfigurasi(process.env)
+      if (konfAwal.ada === 'rusak') {
+        console.error(`Peringatan — ${konfAwal.galat}. Pemindaian tetap dijalankan.`)
+      } else if (konfAwal.ada === false) {
+        console.log('Notifikasi email tidak dikonfigurasi; hasilnya hanya muncul di log ini.')
+      } else {
+        console.log(`Notifikasi email akan dikirim ke ${konfAwal.nilai.ke} bila ada perubahan.`)
+      }
+
       const gagal: string[] = []
+      const hasil: HasilSitus[] = []
+
       for (const site of sites) {
+        // Nomor run tertinggi SEBELUM situs ini dipindai. Temuan yang
+        // `first_seen_run` di atas angka ini adalah temuan yang baru muncul
+        // malam ini — dihitung dari run, bukan dari waktu, karena run adalah
+        // apa yang dipakai `reconcile` dan waktu bisa bergeser.
+        const batas = (db.prepare('SELECT COALESCE(MAX(id), 0) AS n FROM runs').get() as { n: number }).n
+        const sebelum = jumlahTerbuka(db, site.id)
+
+        const gagalSitus: string[] = []
         for (const langkah of LANGKAH) {
           console.log('')
           console.log(`── ${site.name} (${site.id}) — ${langkah}`)
           const code = await jalankanAnak([langkah, String(site.id)])
-          if (code !== 0) gagal.push(`${site.name}/${langkah}`)
+          if (code !== 0) {
+            gagal.push(`${site.name}/${langkah}`)
+            gagalSitus.push(langkah)
+          }
         }
+
+        const baru = (
+          db
+            .prepare(
+              `SELECT COUNT(*) AS n FROM findings
+               WHERE site_id = ? AND first_seen_run > ? AND status = 'open'`,
+            )
+            .get(site.id, batas) as { n: number }
+        ).n
+        const terbuka = jumlahTerbuka(db, site.id)
+        // Yang beres dihitung dari selisih plus yang baru, bukan dari query
+        // status `fixed`: sebuah temuan bisa beres lalu terbuka lagi dalam
+        // satu jadwal (scan lalu lighthouse), dan menghitung baris `fixed`
+        // akan mengklaim keduanya.
+        const beres = Math.max(0, sebelum + baru - terbuka)
+
+        hasil.push({ nama: site.name, gagal: gagalSitus, baru, beres, terbuka })
       }
 
       console.log('')
       const total = sites.length * LANGKAH.length
       console.log(`Jadwal selesai: ${total - gagal.length} dari ${total} langkah berhasil.`)
+
+      await kabarkan(db, hasil)
+
       if (gagal.length > 0) {
         console.error(`Gagal: ${gagal.join(', ')}`)
-        // Keluar non-nol supaya cron punya sesuatu untuk dilaporkan. Sampai
-        // notifikasi email dibangun, MAILTO di crontab adalah satu-satunya
-        // kabar yang datang sendiri saat browser tertutup.
+        // Tetap keluar non-nol walau email sudah terkirim: `MAILTO` di crontab
+        // tidak digantikan oleh notifikasi ini. Kalau SMTP-nya sendiri yang
+        // rusak, exit code adalah satu-satunya kabar yang tersisa.
         return 1
       }
       return 0
@@ -432,6 +483,48 @@ async function main(): Promise<number> {
       console.error(USAGE)
       return 1
   }
+}
+
+function jumlahTerbuka(db: ReturnType<typeof getDb>, siteId: number): number {
+  return (
+    db
+      .prepare("SELECT COUNT(*) AS n FROM findings WHERE site_id = ? AND status = 'open'")
+      .get(siteId) as { n: number }
+  ).n
+}
+
+/**
+ * Mengabarkan hasil jadwal lewat email, bila dikonfigurasi.
+ *
+ * TIDAK boleh menggagalkan perintah `jadwal`. Pemindaiannya sudah selesai dan
+ * datanya sudah benar tersimpan; notifikasi yang gagal adalah kabar yang tidak
+ * sampai, bukan pekerjaan yang tidak jadi. Pola yang sama dengan ringkasan AI:
+ * kegagalannya dilaporkan sendiri, keras, di tempat yang terlihat.
+ */
+async function kabarkan(db: ReturnType<typeof getDb>, hasil: HasilSitus[]): Promise<void> {
+  const konf = bacaKonfigurasi(process.env)
+
+  if (konf.ada === 'rusak') {
+    // Konfigurasi setengah terisi TIDAK didiamkan: orang yang mengisi dua dari
+    // tiga variabel sedang menunggu email yang tidak akan pernah datang.
+    console.error(`Notifikasi email tidak dikirim — ${konf.galat}`)
+    return
+  }
+  if (konf.ada === false) return
+
+  if (!perluDikirim(hasil)) {
+    console.log('Tidak ada kegagalan maupun perubahan, jadi tidak ada email dikirim.')
+    return
+  }
+
+  const waktu = (
+    db.prepare("SELECT strftime('%Y-%m-%d %H:%M', 'now', 'localtime') AS w").get() as { w: string }
+  ).w
+  const pesan = susunPesan(hasil, waktu)
+  const kirim = await kirimEmail(konf.nilai, pesan)
+
+  if (kirim.ok) console.log(`Email terkirim ke ${konf.nilai.ke}: ${pesan.subjek}`)
+  else console.error(`Email GAGAL terkirim: ${kirim.galat}`)
 }
 
 main()
