@@ -7,6 +7,7 @@ import { reconcile } from '../lib/findings.ts'
 import { keadaanKategori, runAktif } from '../lib/ui/queries.ts'
 import { KATEGORI, SUMBER, sumberKategori, namaKategori, BISA_RECHECK } from '../lib/kategori.ts'
 import { tafsirkan } from '../lib/claude-seo/jalankan.ts'
+import { promptGeo, promptAudit } from '../lib/claude-seo/prompt.ts'
 
 function siap() {
   const db = openDb(':memory:')
@@ -202,4 +203,44 @@ test('keluaran yang ada diteruskan utuh', () => {
   const h = tafsirkan(null, '{"temuan":[]}', 'peringatan yang tidak penting', 60_000)
   expect(h.ok).toBe(true)
   expect(h.ok && h.teks).toBe('{"temuan":[]}')
+})
+
+/* ── prompt: menghindari duplikasi lintas kategori ──────────────────────── */
+
+/**
+ * Terukur pada iSleep: 5 dari 11 temuan GEO muncul lagi di Audit, satu dengan
+ * nama aturan yang identik persis (`tanpa-heading-pertanyaan`). Dua tab
+ * menyuruh mengerjakan satu pekerjaan, dan menandainya beres di satu tab tidak
+ * menutup yang di tab lain — checklist yang menghitung ganda bukan checklist.
+ */
+test('prompt audit diberi tahu apa yang sudah dilaporkan GEO', () => {
+  const p = promptAudit('Uji', 'https://uji.test', 50, [], [
+    { rule: 'tanpa-heading-pertanyaan', title: 'Tidak ada blok FAQ' },
+  ])
+  expect(p).toContain('tanpa-heading-pertanyaan')
+  expect(p).toMatch(/Jangan melaporkannya lagi/)
+})
+
+test('prompt audit tanpa temuan GEO tidak memuat bagian itu', () => {
+  // Bagian kosong berisi perintah tanpa daftar hanya menambah panjang prompt
+  // dan mengundang model menebak apa yang dimaksud.
+  const p = promptAudit('Uji', 'https://uji.test', 50, [], [])
+  expect(p).not.toMatch(/Jangan melaporkannya lagi/)
+})
+
+test('prompt GEO tidak diberi daftar temuan audit', () => {
+  // Satu arah saja: audit yang menghindar, bukan GEO. GEO lebih sempit dan
+  // lebih murah dijalankan; kalau keduanya saling menghindar, tidak ada yang
+  // punya dasar untuk melaporkan apa pun.
+  const p = promptGeo('Uji', 'https://uji.test', [])
+  expect(p).not.toMatch(/Jangan melaporkannya lagi/)
+})
+
+test('kedua prompt menyuruh menulis berkas hasil', () => {
+  for (const p of [
+    promptGeo('Uji', 'https://uji.test', []),
+    promptAudit('Uji', 'https://uji.test', 50, [], []),
+  ]) {
+    expect(p).toContain('weblyzer-temuan.json')
+  }
 })
