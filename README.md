@@ -151,7 +151,7 @@ worker that started before it. This happened for real.
 ## Tests
 
 ```bash
-npm test               # 373 tests
+npm test               # 401 tests
 npx tsc --noEmit       # must be clean
 ```
 
@@ -170,8 +170,9 @@ No keyword research, SERP data, backlinks, or rank tracking — this audits page
 it does not do market analysis. No scheduler is installed for you (the CLI
 command exists; wiring it to cron is yours). The UI has no automated tests.
 
-Around 8,200 lines of source and 4,600 lines of tests. One runtime dependency
-outside Next, React, Playwright, and Lighthouse: `write-excel-file`.
+Around 8,800 lines of source and 4,900 lines of tests. Two runtime dependencies
+outside Next, React, Playwright, and Lighthouse: `write-excel-file` and
+`nodemailer`.
 
 ## Status
 
