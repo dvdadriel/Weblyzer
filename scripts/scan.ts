@@ -1,4 +1,7 @@
+import { spawn } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { getDb, closeDb } from '../lib/db.ts'
+import { LANGKAH, situsTerjadwal, pemicuDari } from '../lib/jadwal.ts'
 import { createSite, listSites, getSite } from '../lib/repos/sites.ts'
 import { createRun, finishRun } from '../lib/repos/runs.ts'
 import { enqueue, requeueInterrupted } from '../lib/queue.ts'
@@ -16,6 +19,35 @@ const HANDLERS = {
   ringkasan: ringkasanHandler,
 }
 
+const PEMICU = pemicuDari(process.env)
+
+/**
+ * Menjalankan perintah ini sendiri sebagai proses anak dan menunggunya habis.
+ *
+ * Satu proses per situs, bukan satu proses untuk semalam. Alasannya bukan
+ * kecepatan — ini justru sedikit lebih lambat — tapi supaya satu situs yang
+ * menjatuhkan prosesnya (Chromium kehabisan memori, rejection tak tertangkap)
+ * tidak ikut membatalkan situs yang belum kebagian. Pemindaian tengah malam
+ * tidak ada yang menonton; kegagalan yang menular akan terlihat sebagai "tidak
+ * ada yang dipindai" esok paginya.
+ */
+function jalankanAnak(argv: string[]): Promise<number> {
+  const script = fileURLToPath(import.meta.url)
+  return new Promise((resolve) => {
+    const anak = spawn(process.execPath, [script, ...argv], {
+      stdio: 'inherit',
+      env: { ...process.env, WEBLYZER_TRIGGER: 'scheduled' },
+    })
+    // Spawn yang gagal memancarkan 'error'; tanpa cabang ini promise-nya
+    // menggantung dan seluruh jadwal berhenti di situs pertama.
+    anak.on('error', (err) => {
+      console.error(`Gagal menjalankan proses anak: ${err.message}`)
+      resolve(1)
+    })
+    anak.on('close', (code) => resolve(code ?? 1))
+  })
+}
+
 const USAGE = `Penggunaan:
   npm run scan -- add-site <nama> <url>      Menambahkan situs
   npm run scan -- list                       Menampilkan semua situs
@@ -23,7 +55,8 @@ const USAGE = `Penggunaan:
   npm run scan -- pages <site-id>            Menampilkan halaman tersimpan
   npm run scan -- findings <site-id>         Menampilkan temuan terbuka
   npm run scan -- lighthouse <site-id>       Mengukur skor Lighthouse
-  npm run scan -- scores <site-id>           Menampilkan skor terakhir`
+  npm run scan -- scores <site-id>           Menampilkan skor terakhir
+  npm run scan -- jadwal                     Memindai semua situs aktif (untuk cron)`
 
 async function main(): Promise<number> {
   const [command, ...args] = process.argv.slice(2)
@@ -45,6 +78,43 @@ async function main(): Promise<number> {
       const sites = listSites(db)
       if (sites.length === 0) console.log('Belum ada situs.')
       for (const s of sites) console.log(`${s.id}\t${s.name}\t${s.base_url}`)
+      return 0
+    }
+
+    case 'jadwal': {
+      const sites = situsTerjadwal(db)
+      if (sites.length === 0) {
+        // Bukan sukses dan bukan galat: tidak ada yang diminta dikerjakan.
+        // Dibedakan dari "semua dipindai dan bersih" — §2.2 berlaku di sini
+        // juga, nol situs bukan nol masalah.
+        console.log('Tidak ada situs yang aktif. Tidak ada yang dipindai.')
+        return 0
+      }
+
+      console.log(
+        `Jadwal: ${sites.length} situs aktif — ${sites.map((s) => s.name).join(', ')}`,
+      )
+
+      const gagal: string[] = []
+      for (const site of sites) {
+        for (const langkah of LANGKAH) {
+          console.log('')
+          console.log(`── ${site.name} (${site.id}) — ${langkah}`)
+          const code = await jalankanAnak([langkah, String(site.id)])
+          if (code !== 0) gagal.push(`${site.name}/${langkah}`)
+        }
+      }
+
+      console.log('')
+      const total = sites.length * LANGKAH.length
+      console.log(`Jadwal selesai: ${total - gagal.length} dari ${total} langkah berhasil.`)
+      if (gagal.length > 0) {
+        console.error(`Gagal: ${gagal.join(', ')}`)
+        // Keluar non-nol supaya cron punya sesuatu untuk dilaporkan. Sampai
+        // notifikasi email dibangun, MAILTO di crontab adalah satu-satunya
+        // kabar yang datang sendiri saat browser tertutup.
+        return 1
+      }
       return 0
     }
 
@@ -95,7 +165,7 @@ async function main(): Promise<number> {
       // UI membaca tipe run untuk memberi nama pemindaian yang berjalan, jadi
       // "Scan Bug" muncul sebagai "memindai full" dan terbaca seolah ketiga
       // kategori sedang ditimpa.
-      const run = createRun(db, site.id, kategori ?? 'full')
+      const run = createRun(db, site.id, kategori ?? 'full', PEMICU)
       enqueue(db, {
         runId: run.id,
         type: 'scan',
@@ -227,7 +297,7 @@ async function main(): Promise<number> {
 
       requeueInterrupted(db)
 
-      const run = createRun(db, site.id, 'lighthouse')
+      const run = createRun(db, site.id, 'lighthouse', PEMICU)
       enqueue(db, { runId: run.id, type: 'lighthouse', payload: { siteId: site.id } })
       console.log(
         `Run ${run.id}: mengukur ${site.base_url} (mode ${site.lighthouse_mode}, ` +
