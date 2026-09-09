@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { adaDemo, situsDemo, temuanDemo, hitungKategori, skorDemo, adalahKategori } from '../lib/demo.ts'
@@ -75,6 +75,34 @@ test('halaman demo tidak mengimpor server action maupun lapisan tulis', () => {
 })
 
 /**
+ * Dua kegagalan senyap sekaligus, dan keduanya terjadi sungguhan.
+ *
+ * `demo.db` dibuat dengan `journal_mode = WAL` (bawaan `openDb`). Setelah Nike
+ * ditambahkan, seluruh datanya duduk di `demo.db-wal` sebesar 342 KB sementara
+ * `demo.db` sendiri tidak berubah satu byte pun — dan `demo.db-wal`
+ * di-gitignore. Commit-nya akan mengirim versi dua situs, dan deployment tidak
+ * akan pernah punya Nike. `git status` diam karena berkas utamanya memang
+ * identik.
+ *
+ * Kedua: mode WAL menuntut SQLite menulis `-shm` bahkan untuk pembacaan. Di
+ * bundle Vercel yang read-only itu tidak mungkin, jadi halaman demo bisa gagal
+ * membaca berkasnya sendiri di produksi sementara lolos di lokal.
+ *
+ * `DELETE` menutup keduanya: satu berkas, tanpa sampingan, dan bisa dibaca
+ * tanpa menulis apa pun.
+ */
+test.skipIf(!ADA)('demo.db tidak dalam mode WAL dan tidak punya berkas sampingan', () => {
+  const db = new DatabaseSync(join(process.cwd(), 'demo.db'), { readOnly: true })
+  const mode = (db.prepare('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode
+  db.close()
+  expect(mode.toLowerCase()).not.toBe('wal')
+
+  for (const sampingan of ['demo.db-wal', 'demo.db-shm']) {
+    expect(existsSync(join(process.cwd(), sampingan))).toBe(false)
+  }
+})
+
+/**
  * `readOnly: true` bukan sekadar niat — ia harus benar-benar menolak tulis.
  * Diuji langsung pada berkas demonya, bukan pada database sementara, karena
  * yang perlu dijamin adalah berkas INI yang di-deploy.
@@ -86,14 +114,15 @@ test.skipIf(!ADA)('demo.db menolak tulis', () => {
   db.close()
 })
 
-test.skipIf(!ADA)('demo memuat dua situs dengan temuan', () => {
+test.skipIf(!ADA)('demo memuat tiga situs dengan temuan', () => {
   const s = situsDemo()
-  expect(s.length).toBeGreaterThanOrEqual(2)
+  expect(s.length).toBeGreaterThanOrEqual(3)
   // Nama keduanya disebut, bukan cuma dihitung: demo yang kehilangan salah
   // satunya masih lolos pemeriksaan jumlah kalau ada situs lain tersisa.
   const nama = s.map((x) => x.nama)
   expect(nama).toContain('Weblyzer')
   expect(nama).toContain('Apple')
+  expect(nama).toContain('Nike')
   for (const x of s) expect(x.terbuka).toBeGreaterThan(0)
 })
 
@@ -131,6 +160,24 @@ test.skipIf(!ADA)('tidak ada temuan demo yang menyebut situs bisnis', () => {
  * Temuan itu dihapus; test ini memastikan yang seperti itu tidak kembali tanpa
  * ada yang menyadarinya.
  */
+/**
+ * HTTP 429 adalah rate limit yang CRAWL KAMI SENDIRI sebabkan — Nike
+ * membatasi kami, dan URL-nya halaman challenge bot. Melaporkannya sebagai
+ * "resource rusak" menyalahkan situs untuk perilaku alat ukurnya sendiri.
+ *
+ * Delapan temuan seperti itu dibuang dari demo. Preseden §2.1: prefetch RSC
+ * Next.js yang dibatalkan juga dibuang karena artefak, bukan cacat. Test ini
+ * menjaganya tidak kembali kalau `demo.db` diregenerasi.
+ */
+test.skipIf(!ADA)('tidak ada temuan demo yang sebenarnya artefak rate-limit', () => {
+  const db = new DatabaseSync(join(process.cwd(), 'demo.db'), { readOnly: true })
+  const n = (
+    db.prepare("SELECT COUNT(*) c FROM findings WHERE title LIKE '%429%'").get() as { c: number }
+  ).c
+  db.close()
+  expect(n).toBe(0)
+})
+
 test.skipIf(!ADA)('tidak ada data demo yang memuat parameter mirip kredensial', () => {
   const db = new DatabaseSync(join(process.cwd(), 'demo.db'), { readOnly: true })
   for (const pola of ['%ssi=%', '%sid=%', '%token=%', '%session=%', '%secret%', '%api_key%', '%apikey%']) {
