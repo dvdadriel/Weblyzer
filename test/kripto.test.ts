@@ -29,19 +29,19 @@ describe('kripto', () => {
 
   it('melempar kalau ciphertext diubah', () => {
     const kotak = enkripsi(RAHASIA, KUNCI_API)
-    kotak.ciphertext[0] ^= 0xff
+    kotak.ciphertext[0] = (kotak.ciphertext[0] ?? 0) ^ 0xff
     expect(() => dekripsi(RAHASIA, kotak)).toThrow()
   })
 
   it('melempar kalau tag diubah', () => {
     const kotak = enkripsi(RAHASIA, KUNCI_API)
-    kotak.tag[0] ^= 0xff
+    kotak.tag[0] = (kotak.tag[0] ?? 0) ^ 0xff
     expect(() => dekripsi(RAHASIA, kotak)).toThrow()
   })
 
   it('melempar kalau iv diubah', () => {
     const kotak = enkripsi(RAHASIA, KUNCI_API)
-    kotak.iv[0] ^= 0xff
+    kotak.iv[0] = (kotak.iv[0] ?? 0) ^ 0xff
     expect(() => dekripsi(RAHASIA, kotak)).toThrow()
   })
 

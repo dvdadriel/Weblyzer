@@ -36,18 +36,21 @@ export function hashPassword(password: string): string {
  */
 export function verifikasiPassword(password: string, tersimpan: string): boolean {
   const bagian = tersimpan.split('$')
+  // Enam bagian: algo, N, r, p, garam, hash. `tsconfig` memakai
+  // `noUncheckedIndexedAccess`, jadi indeksnya diambil setelah panjangnya
+  // dipastikan dan tetap diberi `?? ''` — destructuring array di sini akan
+  // bertipe `string | undefined` walau panjangnya sudah diperiksa.
   if (bagian.length !== 6) return false
-  const [algo, n, r, p, garamB64, hashB64] = bagian
-  if (algo !== 'scrypt') return false
+  if (bagian[0] !== 'scrypt') return false
 
-  const N_ = Number(n)
-  const R_ = Number(r)
-  const P_ = Number(p)
+  const N_ = Number(bagian[1])
+  const R_ = Number(bagian[2])
+  const P_ = Number(bagian[3])
   if (!Number.isInteger(N_) || !Number.isInteger(R_) || !Number.isInteger(P_)) return false
   if (N_ <= 1 || R_ < 1 || P_ < 1) return false
 
-  const garam = Buffer.from(garamB64, 'base64')
-  const harapan = Buffer.from(hashB64, 'base64')
+  const garam = Buffer.from(bagian[4] ?? '', 'base64')
+  const harapan = Buffer.from(bagian[5] ?? '', 'base64')
   if (garam.length === 0 || harapan.length === 0) return false
 
   try {
