@@ -2,23 +2,23 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { Job } from '../queue.ts'
 import { getSite } from '../repos/sites.ts'
 import { setAiStatus } from '../repos/runs.ts'
-import { penyediaTerpilih } from '../ai/penyedia.ts'
+import { bacaRahasia } from '../auth/rahasia.ts'
+import { bacaKunci, kunciSiap } from '../ai/kunci.ts'
 import { jalankanAi } from '../ai/jalankan.ts'
 import type { HasilAi } from '../ai/jalankan.ts'
-import type { IdPenyedia } from '../ai/penyedia.ts'
 import { susunPrompt, type TemuanRingkas } from '../ai/prompt.ts'
 
 /**
  * Pemanggil AI bisa ditukar, dan itu untuk pengujian.
  *
- * Tanpa seam ini, menguji jalur gagal berarti mengandalkan `gemini` yang
- * kebetulan tidak punya GEMINI_API_KEY di mesin yang menjalankan test —
- * jaminan terpentingnya ("AI gagal tidak menyentuh temuan") jadi ikut mati
- * begitu seseorang memasang kunci itu. Jalur suksesnya pun tidak bisa diuji
- * sama sekali: satu pemanggilan nyata butuh tujuh detik dan jawabannya
+ * Tanpa seam ini, menguji jalur gagal berarti mengandalkan API key sungguhan
+ * yang kebetulan ada di mesin yang menjalankan test — jaminan terpentingnya
+ * ("AI gagal tidak menyentuh temuan") jadi ikut mati begitu seseorang
+ * memasang kunci itu. Jalur suksesnya pun tidak bisa diuji sama sekali: satu
+ * pemanggilan nyata butuh beberapa detik, menghabiskan token, dan jawabannya
  * berbeda tiap kali.
  */
-export type PemanggilAi = (id: IdPenyedia, prompt: string) => Promise<HasilAi>
+export type PemanggilAi = (apiKey: string, model: string, prompt: string) => Promise<HasilAi>
 
 /**
  * Meringkas temuan terbuka satu situs dengan AI, lalu menyimpan hasilnya.
@@ -45,12 +45,25 @@ export async function ringkasanHandler(
   const site = getSite(db, siteId)
   if (!site) throw new Error(`Situs ${siteId} tidak ditemukan`)
 
-  const penyedia = penyediaTerpilih(db)
-  if (penyedia === null) {
-    // `skipped`, bukan `failed`. Tidak ada penyedia yang dipilih adalah
-    // keadaan yang sah dan sengaja; kegagalan adalah penyedia yang dipilih
-    // lalu tidak menjawab. Menyamakannya membuat lencana peringatan di
-    // dashboard menyala untuk konfigurasi yang benar-benar diinginkan.
+  // Proses pemindaian berjalan lepas dari request dan tidak punya session,
+  // jadi kuncinya diambil dari pemilik situs. Itulah salah satu sebab kunci
+  // disimpan di database dan bukan hanya di memori sesi.
+  const pemilik = site.user_id
+  if (pemilik === null || !kunciSiap(db, pemilik)) {
+    // `skipped`, bukan `failed`. Tidak ada kunci yang siap adalah keadaan yang
+    // sah dan sengaja: situs guest tidak pernah punya, dan user yang belum
+    // mengonfigurasi model memang belum meminta ringkasan. Kegagalan adalah
+    // kunci yang sudah siap lalu tidak menjawab. Menyamakannya membuat lencana
+    // peringatan di dashboard menyala untuk konfigurasi yang benar-benar
+    // diinginkan.
+    setAiStatus(db, job.run_id, 'skipped', null, null)
+    return
+  }
+
+  const kunci = bacaKunci(db, bacaRahasia(), pemilik)
+  if (!kunci) {
+    // `kunciSiap` sudah lolos tapi barisnya hilang: hanya mungkin kalau ada
+    // yang menghapusnya di antara dua kueri. Bukan kegagalan AI.
     setAiStatus(db, job.run_id, 'skipped', null, null)
     return
   }
@@ -68,16 +81,16 @@ export async function ringkasanHandler(
     .all(siteId) as unknown as TemuanRingkas[]
 
   const prompt = susunPrompt({ nama: site.name, baseUrl: site.base_url, temuan })
-  const hasil = await panggil(penyedia, prompt)
+  const hasil = await panggil(kunci.apiKey, kunci.model, prompt)
 
   if (!hasil.ok) {
-    // Pesan CLI disimpan apa adanya, dan job TIDAK dilempar.
+    // Pesan galatnya disimpan apa adanya, dan job TIDAK dilempar.
     //
     // Pemindaiannya sendiri berhasil dan datanya benar; menggagalkan run
     // karena AI-nya gagal akan membuat dashboard menandai seluruh situs
     // "gagal", dan pemakainya menyimpulkan temuannya tidak bisa dipercaya.
     // Yang gagal cuma ringkasannya, dan `ai_status` yang menyampaikan itu.
-    setAiStatus(db, job.run_id, 'failed', penyedia, hasil.galat)
+    setAiStatus(db, job.run_id, 'failed', kunci.model, hasil.galat)
     return
   }
 
@@ -90,7 +103,7 @@ export async function ringkasanHandler(
     // `tokens_est` kasar dan sengaja: empat karakter per token cukup untuk
     // menjawab "apakah prompt ini membengkak", dan tokenizer yang benar
     // berarti dependensi baru untuk angka yang tidak dipakai menghitung apa pun.
-  ).run(job.run_id, hasil.teks, penyedia, Math.ceil((prompt.length + hasil.teks.length) / 4))
+  ).run(job.run_id, hasil.teks, kunci.model, Math.ceil((prompt.length + hasil.teks.length) / 4))
 
-  setAiStatus(db, job.run_id, 'ok', penyedia, null)
+  setAiStatus(db, job.run_id, 'ok', kunci.model, null)
 }

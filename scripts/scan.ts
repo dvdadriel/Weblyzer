@@ -13,7 +13,7 @@ import { listPages } from '../lib/repos/pages.ts'
 import { lighthouseHandler } from '../lib/jobs/lighthouse.ts'
 import { ringkasanHandler } from '../lib/jobs/ringkasan.ts'
 import { claudeSeoHandler, ASPEK, adalahAspek } from '../lib/jobs/claude-seo.ts'
-import { penyediaTerpilih } from '../lib/ai/penyedia.ts'
+import { kunciSiap } from '../lib/ai/kunci.ts'
 import { skorTerakhir } from '../lib/repos/lighthouse.ts'
 
 const HANDLERS = {
@@ -227,10 +227,16 @@ async function main(): Promise<number> {
         payload: kategori === undefined ? { siteId: site.id } : { siteId: site.id, only: kategori },
       })
 
-      // Ringkasan ikut diantrikan hanya bila ada penyedia terpilih. Antrian
-      // dikuras berurutan, jadi job ini pasti jalan setelah pemindaiannya —
-      // dan membaca temuan yang baru saja direkonsiliasi, bukan yang lama.
-      if (penyediaTerpilih(db) !== null) {
+      // Ringkasan ikut diantrikan hanya bila pemilik situs punya kunci AI
+      // yang sudah terverifikasi. Antrian dikuras berurutan, jadi job ini
+      // pasti jalan setelah pemindaiannya — dan membaca temuan yang baru saja
+      // direkonsiliasi, bukan yang lama.
+      //
+      // Situs guest dan situs warisan tanpa pemilik tidak punya kunci, jadi
+      // tidak pernah mengantrikan ringkasan. Mengantrikannya lalu membiarkan
+      // handler menandai `skipped` juga bisa, tapi itu satu baris job per run
+      // yang sudah diketahui tidak akan mengerjakan apa pun.
+      if (site.user_id !== null && kunciSiap(db, site.user_id)) {
         enqueue(db, { runId: run.id, type: 'ringkasan', payload: { siteId: site.id } })
       }
       console.log(`Run ${run.id}: memindai ${site.base_url} ...`)
@@ -282,9 +288,18 @@ async function main(): Promise<number> {
         console.error(`Situs ${args[0]} tidak ditemukan.`)
         return 1
       }
-      const penyedia = penyediaTerpilih(db)
-      if (penyedia === null) {
-        console.error('Belum ada penyedia AI yang dipilih. Buka halaman /model dulu.')
+      if (site.user_id === null) {
+        console.error(
+          `Situs ${site.name} belum punya pemilik, jadi tidak ada API key yang bisa dipakai. ` +
+            `Jalankan \`npm run seed\` atau tetapkan pemiliknya lewat UI.`,
+        )
+        return 1
+      }
+      if (!kunciSiap(db, site.user_id)) {
+        console.error(
+          'Pemilik situs ini belum menyimpan API key yang terverifikasi. ' +
+            'Buka halaman /model dulu.',
+        )
         return 1
       }
 
@@ -296,7 +311,7 @@ async function main(): Promise<number> {
       // dibangun — menyerobotnya sekarang berarti tabrakan nanti.
       const run = createRun(db, site.id, 'ringkasan')
       enqueue(db, { runId: run.id, type: 'ringkasan', payload: { siteId: site.id } })
-      console.log(`Run ${run.id}: meringkas ${site.name} dengan ${penyedia} ...`)
+      console.log(`Run ${run.id}: meringkas ${site.name} ...`)
 
       await drainQueue(db, HANDLERS, { concurrency: 1 })
       finishRun(db, run.id, 'done')
