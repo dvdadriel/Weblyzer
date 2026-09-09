@@ -3,14 +3,16 @@
 import { useActionState } from 'react'
 import { masuk } from '../app/masuk/aksi.ts'
 import { Ikon } from './Ikon.tsx'
+import { penerjemah, type Locale } from '../lib/i18n/index.ts'
 
-export function FormMasuk() {
+export function FormMasuk({ locale }: { locale: Locale }) {
   const [hasil, kirim, menunggu] = useActionState(masuk, null)
+  const t = penerjemah(locale)
 
   return (
     <form action={kirim} className="model-set">
       <label className="model-baris">
-        <span className="model-nama">Email</span>
+        <span className="model-nama">{t('masuk.email')}</span>
         <input
           type="email"
           name="email"
@@ -25,7 +27,7 @@ export function FormMasuk() {
       </label>
 
       <label className="model-baris">
-        <span className="model-nama">Password</span>
+        <span className="model-nama">{t('masuk.password')}</span>
         <input
           type="password"
           name="password"
@@ -36,7 +38,7 @@ export function FormMasuk() {
       </label>
 
       <button type="submit" className="tombol" disabled={menunggu}>
-        {menunggu ? 'Memeriksa…' : 'Masuk'}
+        {menunggu ? t('masuk.memeriksa') : t('masuk.tombol')}
       </button>
 
       {hasil?.error && (

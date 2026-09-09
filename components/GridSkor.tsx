@@ -1,3 +1,5 @@
+import { penerjemah, type Locale } from '../lib/i18n/index.ts'
+
 type BarisSkor = {
   url: string
   strategy: string
@@ -40,7 +42,16 @@ function SelSkor({ n }: { n: number | null }) {
   )
 }
 
-export function GridSkor({ baris, baseUrl }: { baris: BarisSkor[]; baseUrl: string }) {
+export function GridSkor({
+  baris,
+  baseUrl,
+  locale,
+}: {
+  baris: BarisSkor[]
+  baseUrl: string
+  locale: Locale
+}) {
+  const t = penerjemah(locale)
   /* Kolom yang isinya sama di setiap baris bukan informasi — dia cuma memakan
      lebar. Situs yang diukur hanya `mobile` menampilkan "mobile" enam kali;
      6,5rem itu justru lebar yang paling dibutuhkan di layar sempit. Kolomnya
@@ -67,12 +78,12 @@ export function GridSkor({ baris, baseUrl }: { baris: BarisSkor[]; baseUrl: stri
         </colgroup>
         <thead>
           <tr>
-            <th scope="col">Halaman</th>
-            {banyakStrategi && <th scope="col">Strategy</th>}
-            <th scope="col" className="th-skor">Perf</th>
-            <th scope="col" className="th-skor">A11y</th>
-            <th scope="col" className="th-skor">Best</th>
-            <th scope="col" className="th-skor">SEO</th>
+            <th scope="col">{t('tabel.halaman')}</th>
+            {banyakStrategi && <th scope="col">{t('lh.strategy')}</th>}
+            <th scope="col" className="th-skor">{t('lh.perf')}</th>
+            <th scope="col" className="th-skor">{t('lh.a11y')}</th>
+            <th scope="col" className="th-skor">{t('lh.best')}</th>
+            <th scope="col" className="th-skor">{t('lh.seo')}</th>
           </tr>
         </thead>
         <tbody>

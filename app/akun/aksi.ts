@@ -8,6 +8,7 @@ import { simpanKunci, tandaiTerverifikasi, hapusKunci } from '../../lib/ai/kunci
 import { validasiKunci } from '../../lib/ai/jalankan.ts'
 import { gantiPassword, buatUser } from '../../lib/auth/pengguna.ts'
 import { verifikasiPassword } from '../../lib/auth/password.ts'
+import { tServer } from '../../lib/i18n/server.ts'
 
 export type HasilForm = { ok: boolean; pesan: string } | null
 
@@ -41,7 +42,7 @@ export async function simpanDanUji(_sebelum: HasilForm, form: FormData): Promise
 
   tandaiTerverifikasi(getDb(), ctx.user.id)
   revalidatePath('/model')
-  return { ok: true, pesan: 'Kunci tersimpan dan berlaku. Ringkasan AI sekarang aktif.' }
+  return { ok: true, pesan: (await tServer())('model.tersimpanBerlaku') }
 }
 
 export async function lupakanKunci(): Promise<void> {
@@ -52,11 +53,12 @@ export async function lupakanKunci(): Promise<void> {
 
 export async function ubahPassword(_sebelum: HasilForm, form: FormData): Promise<HasilForm> {
   const ctx = await wajibUser()
+  const t = await tServer()
   const lama = String(form.get('lama') ?? '')
   const baru = String(form.get('baru') ?? '')
 
   if (baru.length < MIN_PASSWORD) {
-    return { ok: false, pesan: `Password baru minimal ${MIN_PASSWORD} karakter.` }
+    return { ok: false, pesan: t('akun.passwordPendek', { n: MIN_PASSWORD }) }
   }
 
   // Password lama diminta walau session sudah terbukti. Tanpa itu, laptop yang
@@ -64,7 +66,7 @@ export async function ubahPassword(_sebelum: HasilForm, form: FormData): Promise
   // permanen. Akun yang lahir dari Google tidak punya password lama untuk
   // diminta, jadi dilewati — di sana yang menjadi pengaman adalah Google.
   if (ctx.user.password_hash !== null && !verifikasiPassword(lama, ctx.user.password_hash)) {
-    return { ok: false, pesan: 'Password lama salah.' }
+    return { ok: false, pesan: t('akun.passwordLamaSalah') }
   }
 
   gantiPassword(getDb(), ctx.user.id, baru)
@@ -75,7 +77,7 @@ export async function ubahPassword(_sebelum: HasilForm, form: FormData): Promise
     // tidak punya tabel, jadi tidak ada yang bisa dicabut — lihat komentar di
     // `lib/auth/sesi.ts`. Membiarkan orang mengira dirinya sudah aman lebih
     // buruk daripada mengakui batasnya.
-    pesan: 'Password diganti. Sesi yang sudah terbit di perangkat lain tidak ikut tercabut.',
+    pesan: t('akun.passwordDiganti'),
   }
 }
 
@@ -88,18 +90,19 @@ export async function ubahPassword(_sebelum: HasilForm, form: FormData): Promise
  */
 export async function buatAkun(_sebelum: HasilForm, form: FormData): Promise<HasilForm> {
   await wajibAdmin()
+  const t = await tServer()
   const email = String(form.get('email') ?? '')
   const password = String(form.get('password') ?? '')
   const admin = form.get('admin') === 'on'
 
   if (password.length < MIN_PASSWORD) {
-    return { ok: false, pesan: `Password minimal ${MIN_PASSWORD} karakter.` }
+    return { ok: false, pesan: t('akun.passwordPendek', { n: MIN_PASSWORD }) }
   }
 
   try {
     const u = buatUser(getDb(), { email, password, role: admin ? 'admin' : 'user' })
     revalidatePath('/akun')
-    return { ok: true, pesan: `Akun ${u.email} dibuat.` }
+    return { ok: true, pesan: t('akun.dibuat', { email: u.email }) }
   } catch (err) {
     return { ok: false, pesan: err instanceof Error ? err.message : String(err) }
   }

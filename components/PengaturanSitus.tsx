@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import { simpanPengaturan } from '../app/actions.ts'
 import { perkiraanMenit } from '../lib/pengaturan-situs.ts'
 import { Ikon } from './Ikon.tsx'
+import { penerjemah, type Locale } from '../lib/i18n/index.ts'
 
 /**
  * Form pengaturan satu situs.
@@ -18,12 +19,14 @@ import { Ikon } from './Ikon.tsx'
 export function PengaturanSitus({
   siteId,
   awal,
-  sedangDipindai,
+  sedangDipindai,  locale,
 }: {
   siteId: number
   awal: { max_pages: number; lighthouse_mode: string; sitemap_url: string | null; enabled: number }
   sedangDipindai: boolean
+  locale: Locale
 }) {
+  const t = penerjemah(locale)
   const [hasil, kirim, menunggu] = useActionState(
     simpanPengaturan.bind(null, siteId),
     null,
@@ -32,10 +35,10 @@ export function PengaturanSitus({
   return (
     <form action={kirim} className="atur">
       <fieldset className="atur-set" disabled={menunggu || sedangDipindai}>
-        <legend className="model-legend">Pengaturan Situs</legend>
+        <legend className="model-legend">{t('atur.judul')}</legend>
 
         <label className="atur-baris">
-          <span className="atur-label">Batas halaman</span>
+          <span className="atur-label">{t('atur.maxPages')}</span>
           <input
             className="atur-input"
             type="number"
@@ -54,7 +57,7 @@ export function PengaturanSitus({
         </label>
 
         <label className="atur-baris">
-          <span className="atur-label">Mode Lighthouse</span>
+          <span className="atur-label">{t('atur.mode')}</span>
           <select className="atur-input" name="mode" defaultValue={awal.lighthouse_mode}>
             <option value="sample">sample — satu halaman per pola URL</option>
             <option value="full">full — setiap halaman</option>
@@ -66,7 +69,7 @@ export function PengaturanSitus({
         </label>
 
         <label className="atur-baris">
-          <span className="atur-label">Alamat sitemap</span>
+          <span className="atur-label">{t('atur.sitemap')}</span>
           <input
             className="atur-input"
             type="url"
@@ -87,7 +90,7 @@ export function PengaturanSitus({
         <label className="atur-baris atur-centang">
           <input type="checkbox" name="enabled" defaultChecked={awal.enabled === 1} />
           <span>
-            <span className="atur-label">Ikut pemindaian terjadwal</span>
+            <span className="atur-label">{t('atur.ikutJadwal')}</span>
             <span className="atur-catatan">
               dimatikan berarti dilewati{' '}
               <code className="akun-perintah">scan -- jadwal</code>; riwayat dan
@@ -98,7 +101,7 @@ export function PengaturanSitus({
 
         <button className="tombol" type="submit">
           <Ikon nama="ceklis" ukuran={15} />
-          {menunggu ? 'Menyimpan…' : 'Simpan'}
+          {menunggu ? t('atur.menyimpan') : t('atur.simpan')}
         </button>
       </fieldset>
 

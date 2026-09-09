@@ -34,7 +34,11 @@
     "scripts/**/*.ts",
     "*.ts",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "/var/folders/jz/5t7hzmxx29x1k72t2j_8qp740000gp/T/weblyzer-ui-w462ax/.next-uji/types/**/*.ts",
+    "/var/folders/jz/5t7hzmxx29x1k72t2j_8qp740000gp/T/weblyzer-ui-w462ax/.next-uji/dev/types/**/*.ts",
+    "/var/folders/jz/5t7hzmxx29x1k72t2j_8qp740000gp/T/weblyzer-ui-shq3Al/.next-uji/types/**/*.ts",
+    "/var/folders/jz/5t7hzmxx29x1k72t2j_8qp740000gp/T/weblyzer-ui-shq3Al/.next-uji/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

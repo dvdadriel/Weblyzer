@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { hapusSitus } from '../app/actions.ts'
 import { Ikon } from './Ikon.tsx'
+import { penerjemah, type Locale } from '../lib/i18n/index.ts'
 
 /**
  * Menghapus satu situs, dengan konfirmasi di tempat.
@@ -16,18 +17,20 @@ import { Ikon } from './Ikon.tsx'
  * halaman dan tidak bisa diberi gaya maupun dibaca konsisten oleh screen
  * reader.
  *
- * Yang disebut adalah jumlah yang akan hilang, bukan "Anda yakin?".
+ * Yang disebut adalah jumlah yang akan hilang, bukan {t('hapus.yakin')}.
  * Pertanyaan itu tidak menambah satu pun informasi; angkanya menambah.
  */
 export function HapusSitus({
   siteId,
   nama,
-  jumlahTemuan,
+  jumlahTemuan,  locale,
 }: {
   siteId: number
   nama: string
   jumlahTemuan: number
+  locale: Locale
 }) {
+  const t = penerjemah(locale)
   const [tanya, setTanya] = useState(false)
   const [galat, setGalat] = useState<string | null>(null)
   const [menunggu, mulai] = useTransition()
@@ -56,7 +59,7 @@ export function HapusSitus({
         <strong>Hapus {nama}?</strong>{' '}
         {jumlahTemuan > 0
           ? `${jumlahTemuan} temuan terbuka dan seluruh riwayat pemindaiannya ikut hilang.`
-          : 'Seluruh riwayat pemindaiannya ikut hilang.'}{' '}
+          : t('hapus.riwayat')}{' '}
         Tindakan ini tidak bisa dibatalkan.
       </p>
 
@@ -73,7 +76,7 @@ export function HapusSitus({
           }
         >
           <Ikon nama="hapus" ukuran={13} />
-          {menunggu ? 'Menghapus…' : 'Hapus Permanen'}
+          {menunggu ? t('hapus.menghapus') : t('hapus.konfirmasi')}
         </button>
         <button
           className="hapus-batal"

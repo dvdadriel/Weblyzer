@@ -3,6 +3,7 @@ import { getDb } from '../../../../lib/db.ts'
 import { getSite } from '../../../../lib/repos/sites.ts'
 import { runAktif } from '../../../../lib/ui/queries.ts'
 import { PengaturanSitus } from '../../../../components/PengaturanSitus.tsx'
+import { localeSekarang } from '../../../../lib/i18n/server.ts'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,7 @@ export default async function Pengaturan({
 }: {
   params: Promise<{ siteId: string }>
 }) {
+  const locale = await localeSekarang()
   const { siteId } = await params
   const id = Number(siteId)
   if (!Number.isInteger(id)) notFound()
@@ -31,7 +33,7 @@ export default async function Pengaturan({
   if (!s) notFound()
 
   return (
-    <PengaturanSitus
+    <PengaturanSitus locale={locale}
       siteId={s.id}
       awal={{
         max_pages: s.max_pages,

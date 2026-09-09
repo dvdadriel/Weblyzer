@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { jalankanScan } from '../app/actions.ts'
 import { Ikon } from './Ikon.tsx'
 import { GLIF_BERJALAN } from '../lib/glif.ts'
+import { penerjemah, type Locale, type Kunci } from '../lib/i18n/index.ts'
 
 export type Kategori =
   | 'bugs'
@@ -24,14 +25,14 @@ const LEWAT_AI = new Set<Kategori>(['geo', 'audit'])
  * tab — DESIGN.md mensyaratkan nama aksi yang sama sepanjang alur, dan kata
  * "scan" karena itu ikut dipakai di baris keadaan berjalan di bawah.
  */
-const LABEL: Record<Kategori, string> = {
-  bugs: 'Scan Bug',
-  console: 'Scan Console',
-  security: 'Scan Security',
-  seo: 'Scan SEO',
-  geo: 'Analisis GEO',
-  audit: 'Audit Full',
-  lighthouse: 'Scan Lighthouse',
+const LABEL: Record<Kategori, Kunci> = {
+  bugs: 'scan.bugs',
+  console: 'scan.console',
+  security: 'scan.security',
+  seo: 'scan.seo',
+  geo: 'scan.geo',
+  audit: 'scan.audit',
+  lighthouse: 'scan.lighthouse',
 }
 
 /**
@@ -52,15 +53,15 @@ const LAMA: Partial<Record<Kategori, string>> = {
  * sedang berjalan. `full` muncul hanya dari pemindaian lewat CLI tanpa argumen
  * kategori; dari UI selalu satu kategori.
  */
-const NAMA_RUN: Record<string, string> = {
-  bugs: 'Scan Bug',
-  console: 'Scan Console',
-  security: 'Scan Security',
-  seo: 'Scan SEO',
-  geo: 'Analisis GEO',
-  audit: 'Audit Full',
-  lighthouse: 'Scan Lighthouse',
-  full: 'Scan lengkap',
+const NAMA_RUN: Record<string, Kunci> = {
+  bugs: 'scan.bugs',
+  console: 'scan.console',
+  security: 'scan.security',
+  seo: 'scan.seo',
+  geo: 'scan.geo',
+  audit: 'scan.audit',
+  lighthouse: 'scan.lighthouse',
+  full: 'run.full',
 }
 
 /**
@@ -92,14 +93,16 @@ export function TombolScan({
   kategori,
   path,
   berjalan,
-  children,
+  children,  locale,
 }: {
   siteId: number
   kategori: Kategori
   path: string
   berjalan: { type: string; mulai: string } | null
   children?: React.ReactNode
+  locale: Locale
 }) {
+  const t = penerjemah(locale)
   const [galat, setGalat] = useState<string | null>(null)
   const [menunggu, mulai] = useTransition()
   const router = useRouter()
@@ -121,8 +124,10 @@ export function TombolScan({
           {GLIF_BERJALAN}
         </span>
         <span>
-          {NAMA_RUN[berjalan.type] ?? 'Scan'} berjalan sejak {berjalan.mulai}. Halaman
-          ini akan berganti sendiri saat selesai.
+          {t('scan.berjalan', {
+            nama: NAMA_RUN[berjalan.type] ? t(NAMA_RUN[berjalan.type]!) : 'Scan',
+            mulai: berjalan.mulai,
+          })}
           {NAMA_RUN[berjalan.type] !== LABEL[kategori] &&
             (berjalan.type === 'geo' || berjalan.type === 'audit' ? (
               <> Tab ini ikut menunggu supaya dua analisis tidak menimpa hasil satu sama lain.</>
@@ -163,7 +168,7 @@ export function TombolScan({
         }
       >
         <Ikon nama="scan" ukuran={15} />
-        {menunggu ? 'Memulai…' : LABEL[kategori]}
+        {menunggu ? t('scan.memulai') : t(LABEL[kategori])}
       </button>
 
       {children}

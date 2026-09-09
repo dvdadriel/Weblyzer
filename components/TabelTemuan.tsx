@@ -6,6 +6,7 @@ import { BISA_RECHECK, namaKategori } from '../lib/kategori.ts'
 import { SeverityChip } from './SeverityChip.tsx'
 import { ubahStatusTemuan, periksaTemuan } from '../app/actions.ts'
 import { Ikon } from './Ikon.tsx'
+import { penerjemah, type Locale, type T } from '../lib/i18n/index.ts'
 
 /**
  * Membuang awalan domain dari URL yang ditampilkan.
@@ -36,12 +37,16 @@ function BarisDetail({
   b,
   status,
   path,
-  lapor,
+  lapor,  t,
 }: {
   b: BarisTemuan
   status: 'open' | 'ignored'
   path: string
   lapor: (h: { keadaan: string; pesan?: string; error?: string }) => void
+  /** Penerjemah diteruskan sebagai prop, bukan diambil dari closure:
+   *  komponen ini dideklarasikan di luar `TabelTemuan`, jadi tidak ada
+   *  closure yang bisa dipinjam. */
+  t: T
 }) {
   const [pending, mulai] = useTransition()
   const [memeriksa, mulaiPeriksa] = useTransition()
@@ -75,7 +80,7 @@ function BarisDetail({
                 }
               >
                 <Ikon nama="scan" ukuran={13} />
-                {memeriksa ? 'Memeriksa…' : 'Periksa Lagi'}
+                {memeriksa ? t('temuan.memeriksa') : t('temuan.periksaLagi')}
               </button>
             )}
 
@@ -89,7 +94,7 @@ function BarisDetail({
                 })
               }
             >
-              {status === 'open' ? 'Abaikan' : 'Buka Lagi'}
+              {status === 'open' ? t('temuan.abaikan') : t('temuan.bukaLagi')}
             </button>
 
             {!bisaPeriksa && status === 'open' && (
@@ -110,14 +115,16 @@ export function TabelTemuan({
   baseUrl,
   status = 'open',
   path,
-  waktuScan,
+  waktuScan,  locale,
 }: {
   baris: BarisTemuan[]
   baseUrl: string
   status?: 'open' | 'ignored'
   path: string
   waktuScan: ScanKategori | null
+  locale: Locale
 }) {
+  const t = penerjemah(locale)
   const [terbuka, setTerbuka] = useState<number | null>(null)
   // Hasil pemeriksaan disimpan DI SINI, bukan di baris detailnya.
   //
@@ -137,9 +144,9 @@ export function TabelTemuan({
           className={`detail-hasil ${periksaan.keadaan === 'beres' ? 'beres' : periksaan.keadaan === 'masih-ada' ? 'masih' : 'galat'}`}
           role="status"
         >
-          {periksaan.keadaan === 'beres' && 'Sudah beres — temuan itu ditutup dan hilang dari daftar.'}
+          {periksaan.keadaan === 'beres' && t('temuan.beresPesan')}
           {periksaan.keadaan === 'masih-ada' &&
-            'Masih ada. Belum ada yang berubah di halaman itu.'}
+            t('temuan.masihAdaPesan')}
           {periksaan.keadaan === 'tak-terjangkau' &&
             `Halamannya tidak bisa dibuka, jadi statusnya tidak diketahui — bukan berarti sudah beres. ${periksaan.pesan ?? ''}`}
           {periksaan.keadaan === 'tak-didukung' && periksaan.pesan}
@@ -157,10 +164,10 @@ export function TabelTemuan({
         </colgroup>
         <thead>
           <tr>
-            <th scope="col">Severity</th>
-            <th scope="col">Aturan</th>
-            <th scope="col">Halaman</th>
-            <th scope="col">Terlihat</th>
+            <th scope="col">{t('tabel.severity')}</th>
+            <th scope="col">{t('tabel.aturan')}</th>
+            <th scope="col">{t('tabel.halaman')}</th>
+            <th scope="col">{t('tabel.terlihat')}</th>
           </tr>
         </thead>
         <tbody>
@@ -200,6 +207,7 @@ export function TabelTemuan({
               // sambil disembunyikan menunggu animasi.
               buka ? (
                 <BarisDetail
+                  t={t}
                   key={`d-${b.id}`}
                   b={b}
                   status={status}

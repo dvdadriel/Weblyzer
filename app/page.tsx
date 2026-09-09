@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { db } from '../lib/ui/db.ts'
 import { ringkasanSitus } from '../lib/ui/queries.ts'
 import { konteks } from '../lib/auth/konteks.ts'
+import { tServer, localeSekarang } from '../lib/i18n/server.ts'
 import { GLIF } from '../lib/glif.ts'
 import { TambahSitus } from '../components/TambahSitus.tsx'
 import { HapusSitus } from '../components/HapusSitus.tsx'
@@ -16,6 +17,8 @@ const URUT = ['critical', 'high', 'medium', 'low'] as const
 
 export default async function Dashboard() {
   const ctx = await konteks()
+  const t = await tServer()
+  const locale = await localeSekarang()
   const situs = ringkasanSitus(db(), ctx)
 
   const totalSitus = situs.length
@@ -27,26 +30,26 @@ export default async function Dashboard() {
       <header className="dashboard-header">
         <div className="dashboard-atas">
           <div className="dashboard-judul-grup">
-            <h1 className="halaman-judul">Situs</h1>
+            <h1 className="halaman-judul">{t('dash.judul')}</h1>
           </div>
         </div>
         <p className="halaman-teks">
-          Pantauan berkala kesehatan, performa, dan riwayat temuan situs Anda.
+          {t('dash.teks')}
         </p>
 
         {totalSitus > 0 && (
-          <div className="ringkasan-metrik" aria-label="Ringkasan pemantauan">
+          <div className="ringkasan-metrik" aria-label={t('dash.ringkasanLabel')}>
             <div className="metrik-chip">
-              <span className="metrik-angka">{totalSitus}</span> Situs Terdaftar
+              <span className="metrik-angka">{totalSitus}</span> {t('dash.metrikSitus')}
             </div>
             <div className="metrik-chip">
               <span className="metrik-angka" style={{ color: totalTemuan > 0 ? 'var(--sev-high)' : 'var(--sev-fixed)' }}>
                 {totalTemuan}
-              </span> Masalah Terbuka
+              </span> {t('dash.metrikTemuan')}
             </div>
             {situsBersih > 0 && (
               <div className="metrik-chip">
-                <span className="metrik-angka" style={{ color: 'var(--sev-fixed)' }}>{situsBersih}</span> Situs Bersih
+                <span className="metrik-angka" style={{ color: 'var(--sev-fixed)' }}>{situsBersih}</span> {t('dash.metrikBersih')}
               </div>
             )}
           </div>
@@ -58,10 +61,8 @@ export default async function Dashboard() {
           <div className="kosong-ikon">
             <Ikon nama="kompas" ukuran={24} />
           </div>
-          <h2 className="kosong-judul">Belum ada situs.</h2>
-          <p className="kosong-teks">
-            Tambahkan situs pertama Anda di bawah untuk mulai memindai bug, keamanan, dan performa.
-          </p>
+          <h2 className="kosong-judul">{t('dash.belumAdaSitus')}</h2>
+          <p className="kosong-teks">{t('dash.belumAdaSitusTeks')}</p>
         </div>
       ) : (
         <ul className="kartu-daftar">
@@ -132,13 +133,18 @@ export default async function Dashboard() {
                 )}
               </Link>
 
-              <HapusSitus siteId={s.id} nama={s.nama} jumlahTemuan={s.totalTerbuka} />
+              <HapusSitus
+                siteId={s.id}
+                nama={s.nama}
+                jumlahTemuan={s.totalTerbuka}
+                locale={locale}
+              />
             </li>
           ))}
         </ul>
       )}
 
-      <TambahSitus />
+      <TambahSitus locale={locale} />
     </>
   )
 }

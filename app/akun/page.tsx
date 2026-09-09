@@ -5,25 +5,29 @@ import { daftarUser } from '../../lib/auth/pengguna.ts'
 import { FormPassword, FormBuatAkun } from '../../components/FormAkun.tsx'
 import { KeadaanKosong } from '../../components/KeadaanKosong.tsx'
 import { Ikon } from '../../components/Ikon.tsx'
+import { tServer, localeSekarang } from '../../lib/i18n/server.ts'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Akun() {
   const ctx = await konteks()
+  const t = await tServer()
+  const locale = await localeSekarang()
 
   if (ctx.jenis !== 'user') {
     return (
       <>
         <header className="dashboard-header">
           <div className="dashboard-atas">
-            <h1 className="halaman-judul">Akun</h1>
+            <h1 className="halaman-judul">{t('akun.judul')}</h1>
           </div>
         </header>
         <KeadaanKosong
           keadaan="butuh-akun"
+          t={t}
           aksi={
             <Link href="/masuk" className="tombol">
-              Masuk
+              {t('masuk.tombol')}
             </Link>
           }
         />
@@ -37,37 +41,34 @@ export default async function Akun() {
     <>
       <header className="dashboard-header">
         <div className="dashboard-atas">
-          <h1 className="halaman-judul">Akun</h1>
+          <h1 className="halaman-judul">{t('akun.judul')}</h1>
         </div>
         <p className="halaman-teks">
-          Masuk sebagai <strong>{ctx.user.email}</strong>
+          {t('akun.masukSebagai')} <strong>{ctx.user.email}</strong>
           {ctx.user.role === 'admin' && ' · admin'}
         </p>
       </header>
 
       <section>
-        <h2 className="halaman-judul">Ganti password</h2>
+        <h2 className="halaman-judul">{t('akun.gantiPassword')}</h2>
         {ctx.user.password_hash === null && (
-          <p className="halaman-teks">
-            Akun ini masuk lewat Google dan belum punya password. Mengisi form ini
-            menambahkan satu, jadi Anda bisa masuk dengan cara mana pun.
-          </p>
+          <p className="halaman-teks">{t('akun.tanpaPassword')}</p>
         )}
-        <FormPassword punyaPassword={ctx.user.password_hash !== null} />
+        <FormPassword punyaPassword={ctx.user.password_hash !== null} locale={locale} />
       </section>
 
       {ctx.user.role === 'admin' && (
         <section style={{ marginTop: 'var(--s-6)' }}>
-          <h2 className="halaman-judul">Akun di instance ini</h2>
+          <h2 className="halaman-judul">{t('akun.daftarJudul')}</h2>
 
           <div className="tabel-bungkus">
             <table className="tabel">
               <thead>
                 <tr>
-                  <th scope="col">Email</th>
-                  <th scope="col">Peran</th>
-                  <th scope="col">Cara masuk</th>
-                  <th scope="col">Dibuat</th>
+                  <th scope="col">{t('akun.kolomEmail')}</th>
+                  <th scope="col">{t('akun.kolomPeran')}</th>
+                  <th scope="col">{t('akun.kolomCaraMasuk')}</th>
+                  <th scope="col">{t('akun.kolomDibuat')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -75,7 +76,7 @@ export default async function Akun() {
                   <tr key={u.id}>
                     <td>{u.email}</td>
                     <td>{u.role}</td>
-                    <td>{u.password_hash === null ? 'Google saja' : 'Password'}</td>
+                    <td>{u.password_hash === null ? t('akun.caraGoogle') : t('akun.caraPassword')}</td>
                     <td>{u.created_at}</td>
                   </tr>
                 ))}
@@ -84,25 +85,16 @@ export default async function Akun() {
           </div>
 
           <h2 className="halaman-judul" style={{ marginTop: 'var(--s-5)' }}>
-            Buat akun
+            {t('akun.buatJudul')}
           </h2>
-          <p className="halaman-teks">
-            Instance ini tidak menerima pendaftaran mandiri, jadi akun dibuat di sini.
-            Pendaftaran terbuka berarti moderasi, verifikasi email, dan penyalahgunaan
-            kuota — tiga masalah yang belum ada.
-          </p>
-          <FormBuatAkun />
+          <p className="halaman-teks">{t('akun.buatTeks')}</p>
+          <FormBuatAkun locale={locale} />
         </section>
       )}
 
       <div className="catatan-sumber" style={{ marginTop: 'var(--s-6)' }}>
         <Ikon nama="alert" ukuran={14} />
-        <span>
-          Sesi di proyek ini tidak punya tabel, jadi mengganti password{' '}
-          <strong>tidak</strong> mengeluarkan Anda dari perangkat lain yang sudah masuk.
-          Kalau ada perangkat yang hilang, hubungi pemilik instance untuk menghapus dan
-          membuat ulang akunnya.
-        </span>
+        <span>{t('akun.peringatanSesi')}</span>
       </div>
     </>
   )

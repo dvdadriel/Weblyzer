@@ -1,6 +1,7 @@
 import type { Keadaan } from '../lib/ui/queries.ts'
 import { Ikon } from './Ikon.tsx'
 import type { NamaIkon } from './Ikon.tsx'
+import type { Kunci, T } from '../lib/i18n/index.ts'
 
 /**
  * Keadaan kosong yang bukan berasal dari data, melainkan dari siapa yang
@@ -22,38 +23,33 @@ export type KeadaanKosongJenis = Exclude<Keadaan, 'ada-temuan'> | 'butuh-akun' |
 
 const ISI: Record<
   KeadaanKosongJenis,
-  { judul: string; teks: string; ikon: NamaIkon; warna?: string }
+  { judul: Kunci; teks: Kunci; ikon: NamaIkon; warna?: string }
 > = {
   'belum-dipindai': {
-    judul: 'Belum pernah dipindai',
-    teks: 'Jalankan pemindaian untuk melihat keadaan situs ini.',
+    judul: 'kosong.belumDipindai',
+    teks: 'kosong.belumDipindaiTeks',
     ikon: 'kompas',
   },
   bersih: {
-    judul: 'Tidak ada yang rusak di sini',
-    teks: 'Pemindaian terakhir tidak menemukan apa pun di kategori ini.',
+    judul: 'kosong.bersih',
+    teks: 'kosong.bersihTeks',
     ikon: 'perisai',
     warna: 'var(--sev-fixed)',
   },
   gagal: {
-    judul: 'Pemindaian terakhir gagal',
-    teks: 'Hasilnya tidak diketahui — ini bukan berarti situsnya bersih. Coba pindai lagi.',
+    judul: 'kosong.gagal',
+    teks: 'kosong.gagalTeks',
     ikon: 'alert',
     warna: 'var(--sev-critical)',
   },
   'butuh-akun': {
-    judul: 'Butuh akun',
-    teks:
-      'Aspek ini memakai API key milik Anda sendiri, jadi ia butuh tempat untuk ' +
-      'menyimpannya. Aspek pemindaian lainnya tetap jalan tanpa akun.',
+    judul: 'kosong.butuhAkun',
+    teks: 'kosong.butuhAkunTeks',
     ikon: 'sparkle',
   },
   'admin-saja': {
-    judul: 'Hanya untuk pemilik instance',
-    teks:
-      'Aspek ini dijalankan oleh CLI Claude di mesin server, bukan oleh API key Anda, ' +
-      'jadi hanya pemilik instance yang bisa memicunya. Temuan yang sudah ada tetap ' +
-      'terlihat di bawah.',
+    judul: 'kosong.adminSaja',
+    teks: 'kosong.adminSajaTeks',
     ikon: 'perisai',
   },
 }
@@ -61,8 +57,12 @@ const ISI: Record<
 export function KeadaanKosong({
   keadaan,
   aksi,
+  t,
 }: {
   keadaan: Keadaan | KeadaanKosongJenis
+  /** Penerjemah. Wajib: keadaan kosong adalah tempat prosa terpanjang di
+   *  aplikasi ini, dan prosa yang tidak diterjemahkan paling terlihat di sini. */
+  t: T
   /** Tautan atau tombol di bawah teks. Keadaan kosong yang mengajarkan
    *  antarmuka lebih berguna daripada yang cuma menyatakan ketiadaan. */
   aksi?: React.ReactNode
@@ -74,8 +74,8 @@ export function KeadaanKosong({
       <div className="kosong-ikon" style={warna ? { color: warna } : undefined}>
         <Ikon nama={ikon} ukuran={24} />
       </div>
-      <h2 className="kosong-judul">{judul}</h2>
-      <p className="kosong-teks">{teks}</p>
+      <h2 className="kosong-judul">{t(judul)}</h2>
+      <p className="kosong-teks">{t(teks)}</p>
       {aksi && <div style={{ marginTop: 'var(--s-4)' }}>{aksi}</div>}
     </div>
   )

@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react'
 import { ulangiRingkasan } from '../app/actions.ts'
 import { Ikon } from './Ikon.tsx'
 import type { RingkasanAi as Isi, StatusAi } from '../lib/ui/queries.ts'
+import { penerjemah, type Locale } from '../lib/i18n/index.ts'
 
 /**
  * Merender paragraf beserta `kode` inline-nya.
@@ -54,13 +55,15 @@ export function RingkasanAi({
   isi,
   status,
   siteId,
-  path,
+  path,  locale,
 }: {
   isi: Isi | null
   status: StatusAi | null
   siteId: number
   path: string
+  locale: Locale
 }) {
+  const t = penerjemah(locale)
   const [galat, setGalat] = useState<string | null>(null)
   const [menunggu, mulai] = useTransition()
   const router = useRouter()
@@ -81,11 +84,11 @@ export function RingkasanAi({
   }
 
   return (
-    <section className="ringkas" aria-label="Ringkasan AI">
+    <section className="ringkas" aria-label={t('ai.judul')}>
       {/* Kegagalan berada DI LUAR lipatan, dan itu bukan kebetulan: panel yang
           terlipat akan menyembunyikannya, dan kegagalan yang tak terlihat
           adalah kegagalan yang tak pernah diperbaiki. Pesan CLI-nya ditulis
-          mentah — inilah bedanya antara "AI gagal", yang tidak bisa
+          mentah — inilah bedanya antara t('ai.gagalTag'), yang tidak bisa
           ditindaklanjuti, dan "gemini butuh GEMINI_API_KEY", yang bisa. */}
       {gagal && (
         <p className="ringkas-gagal" role="alert">
@@ -107,7 +110,7 @@ export function RingkasanAi({
           <summary className="ringkas-label">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
               <Ikon nama="sparkle" ukuran={14} />
-              <span>Ringkasan AI</span>
+              <span>{t('ai.judul')}</span>
             </span>
             {isi.model !== null && <span className="ringkas-model-pill">{isi.model}</span>}
             {isi.waktu !== null && (
@@ -133,7 +136,7 @@ export function RingkasanAi({
       <p className="ringkas-aksi">
         <button className="ringkas-ulang" type="button" onClick={ulangi} disabled={menunggu}>
           <Ikon nama="segarkan" ukuran={13} />
-          {menunggu ? 'Meringkas…' : isi === null ? 'Ringkas Sekarang' : 'Ringkas Ulang'}
+          {menunggu ? t('ai.mengulang') : isi === null ? t('ai.ringkasSekarang') : t('ai.ulangi')}
         </button>
       </p>
 

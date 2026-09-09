@@ -7,15 +7,16 @@ import type { NamaIkon } from './Ikon.tsx'
 import { Logo } from './Logo.tsx'
 import { PilihTema } from './PilihTema.tsx'
 import type { Tema } from '../lib/tema.ts'
+import { penerjemah, type Locale, type Kunci } from '../lib/i18n/index.ts'
 
 /**
  * `/model` diletakkan sesudah Home karena itu urutan pemakaiannya: daftar
  * situs dibuka tiap hari, konfigurasi model sekali lalu ditinggalkan.
  */
-const NAV: { href: string; label: string; ikon: NamaIkon }[] = [
-  { href: '/', label: 'Home', ikon: 'home' },
-  { href: '/model', label: 'Model', ikon: 'model' },
-]
+const NAV = [
+  { href: '/', kunci: 'nav.home', ikon: 'home' },
+  { href: '/model', kunci: 'nav.model', ikon: 'model' },
+] as const satisfies readonly { href: string; kunci: Kunci; ikon: NamaIkon }[]
 
 /**
  * Navbar global: logo di kiri, tab dan identitas di kanan.
@@ -27,8 +28,20 @@ const NAV: { href: string; label: string; ikon: NamaIkon }[] = [
  * Tab Home inilah jalan kembali ke index dari halaman situs, dan karena
  * navbarnya ada di setiap halaman, jalan itu tidak pernah hilang.
  */
-export function Navbar({ email, tema }: { email: string | null; tema: Tema }) {
+export function Navbar({
+  email,
+  tema,
+  locale,
+}: {
+  email: string | null
+  tema: Tema
+  locale: Locale
+}) {
   const path = usePathname()
+  // Penerjemah dibuat di sini, bukan diterima sebagai prop: `T` adalah fungsi,
+  // dan fungsi tidak bisa diserialkan dari Server Component ke Client
+  // Component. Yang menyeberang adalah `locale`, yang cuma string.
+  const t = penerjemah(locale)
 
   return (
     <header className="navbar">
@@ -39,7 +52,7 @@ export function Navbar({ email, tema }: { email: string | null; tema: Tema }) {
           <span className="navbar-badge">audit</span>
         </Link>
 
-        <nav className="navbar-nav" aria-label="Bagian utama">
+        <nav className="navbar-nav" aria-label={t('nav.bagianUtama')}>
           {NAV.map((n) => (
             <Link
               key={n.href}
@@ -51,11 +64,11 @@ export function Navbar({ email, tema }: { email: string | null; tema: Tema }) {
               aria-current={path === n.href ? 'page' : undefined}
             >
               <Ikon nama={n.ikon} ukuran={15} />
-              {n.label}
+              {t(n.kunci)}
             </Link>
           ))}
 
-          <PilihTema tema={tema} />
+          <PilihTema tema={tema} locale={locale} t={t} />
 
           {email === null ? (
             <Link
@@ -64,7 +77,7 @@ export function Navbar({ email, tema }: { email: string | null; tema: Tema }) {
               aria-current={path === '/masuk' ? 'page' : undefined}
             >
               <Ikon nama="perisai" ukuran={15} />
-              Masuk
+              {t('nav.masuk')}
             </Link>
           ) : (
             <>
@@ -86,7 +99,7 @@ export function Navbar({ email, tema }: { email: string | null; tema: Tema }) {
                   mengarahkan kursor ke menu mendadak keluar dari akunnya. */}
               <form action="/keluar" method="post">
                 <button type="submit" className="navbar-item">
-                  Keluar
+                  {t('nav.keluar')}
                 </button>
               </form>
             </>

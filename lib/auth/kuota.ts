@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { Konteks } from './pemilik.ts'
+import type { Kunci } from '../i18n/index.ts'
 
 /**
  * Batas guest.
@@ -14,7 +15,17 @@ export const MAKS_SITUS_GUEST = 1
 export const MAKS_SCAN_GUEST = 3
 export const JENDELA_JAM = 24
 
-export type Izin = { boleh: true } | { boleh: false; alasan: string }
+/**
+ * Izin, dengan alasan sebagai KUNCI terjemahan alih-alih teks siap pakai.
+ *
+ * Berkas ini murni dan tidak boleh menyentuh `next/headers`, jadi ia tidak bisa
+ * membaca locale pemakainya. Mengembalikan kunci membuat penerjemahannya jadi
+ * urusan pemanggil — yang memang sudah punya penerjemah — dan membuat berkas
+ * ini tetap bisa diuji tanpa lingkungan request.
+ */
+export type Izin =
+  | { boleh: true }
+  | { boleh: false; alasan: Kunci; params: Record<string, string | number> }
 
 export function bolehTambahSitus(db: DatabaseSync, ctx: Konteks): Izin {
   if (ctx.jenis === 'user') return { boleh: true }
@@ -25,12 +36,7 @@ export function bolehTambahSitus(db: DatabaseSync, ctx: Konteks): Izin {
 
   return n < MAKS_SITUS_GUEST
     ? { boleh: true }
-    : {
-        boleh: false,
-        alasan:
-          `Tanpa akun, hanya ${MAKS_SITUS_GUEST} situs yang bisa dipantau. ` +
-          `Masuk untuk menambah lagi.`,
-      }
+    : { boleh: false, alasan: 'kuota.situs', params: { n: MAKS_SITUS_GUEST } }
 }
 
 /**
@@ -66,8 +72,7 @@ export function bolehScan(db: DatabaseSync, ctx: Konteks, sekarang: number = Dat
     ? { boleh: true }
     : {
         boleh: false,
-        alasan:
-          `Tanpa akun, ${MAKS_SCAN_GUEST} pemindaian per ${JENDELA_JAM} jam. ` +
-          `Masuk untuk memindai tanpa batas.`,
+        alasan: 'kuota.scan',
+        params: { n: MAKS_SCAN_GUEST, jam: JENDELA_JAM },
       }
 }

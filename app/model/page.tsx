@@ -6,11 +6,14 @@ import { bacaKunci } from '../../lib/ai/kunci.ts'
 import { PilihModel } from '../../components/PilihModel.tsx'
 import { KeadaanKosong } from '../../components/KeadaanKosong.tsx'
 import { Ikon } from '../../components/Ikon.tsx'
+import { tServer, localeSekarang } from '../../lib/i18n/server.ts'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Model() {
   const ctx = await konteks()
+  const t = await tServer()
+  const locale = await localeSekarang()
 
   // Guest tidak punya akun, jadi tidak punya tempat untuk menyimpan kunci.
   // Halamannya tetap ada dan menjelaskan itu — bukan 404, dan bukan form yang
@@ -20,14 +23,15 @@ export default async function Model() {
       <>
         <header className="dashboard-header">
           <div className="dashboard-atas">
-            <h1 className="halaman-judul">Model AI</h1>
+            <h1 className="halaman-judul">{t('model.judul')}</h1>
           </div>
         </header>
         <KeadaanKosong
           keadaan="butuh-akun"
+          t={t}
           aksi={
             <Link href="/masuk" className="tombol">
-              Masuk
+              {t('masuk.tombol')}
             </Link>
           }
         />
@@ -44,21 +48,14 @@ export default async function Model() {
     <>
       <header className="dashboard-header">
         <div className="dashboard-atas">
-          <h1 className="halaman-judul">Model AI</h1>
+          <h1 className="halaman-judul">{t('model.judul')}</h1>
         </div>
-        <p className="halaman-teks">
-          Ringkasan AI memakai API key Anthropic milik Anda sendiri, dan tagihannya
-          milik Anda. Kuncinya disimpan terenkripsi dan tidak pernah dikirim kembali ke
-          browser — yang ditampilkan di sini hanya empat karakter terakhirnya.
-        </p>
-        <p className="halaman-teks">
-          Kunci baru diperiksa dulu terhadap Anthropic sebelum dianggap berlaku, dan
-          ringkasan AI tetap mati sampai pemeriksaan itu lolos. Pemeriksaannya tidak
-          memakai token.
-        </p>
+        <p className="halaman-teks">{t('model.teks1')}</p>
+        <p className="halaman-teks">{t('model.teks2')}</p>
       </header>
 
       <PilihModel
+        locale={locale}
         info={
           kunci === null
             ? null
@@ -71,24 +68,13 @@ export default async function Model() {
         style={{ marginTop: 'var(--s-5)', borderLeftColor: 'var(--ink)' }}
       >
         <Ikon nama="sparkle" ukuran={14} />
-        <span>
-          Lapisan AI hanya menyusun rangkuman dari temuan yang sudah ada. Ketujuh aspek
-          pemindaian berjalan sendiri tanpa AI, dan skor Lighthouse tetap hasil
-          pengukuran — bukan tebakan model.
-        </span>
+        <span>{t('model.catatanAi')}</span>
       </div>
 
       {ctx.user.role === 'admin' && (
         <div className="catatan-sumber" style={{ marginTop: 'var(--s-4)' }}>
           <Ikon nama="perisai" ukuran={14} />
-          <span>
-            Aspek GEO dan Audit tidak memakai kunci ini. Keduanya menjalankan CLI{' '}
-            <code className="akun-perintah">claude</code> di mesin server dengan plugin
-            claude-seo, jadi kredensialnya milik mesin — <code className="akun-perintah">
-              claude auth login
-            </code>{' '}
-            di terminal server. Karena itu keduanya hanya bisa dipicu admin.
-          </span>
+          <span>{t('model.catatanAdmin')}</span>
         </div>
       )}
     </>

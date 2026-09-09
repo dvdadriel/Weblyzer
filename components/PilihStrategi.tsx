@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { aturStrategi } from '../app/actions.ts'
+import { penerjemah, type Locale } from '../lib/i18n/index.ts'
 
 /**
  * Menyalakan pengukuran desktop.
@@ -13,11 +14,13 @@ import { aturStrategi } from '../app/actions.ts'
  */
 export function PilihStrategi({
   siteId,
-  keduanya,
+  keduanya,  locale,
 }: {
   siteId: number
   keduanya: boolean
+  locale: Locale
 }) {
+  const t = penerjemah(locale)
   const [galat, setGalat] = useState<string | null>(null)
   const [menunggu, mulai] = useTransition()
   // Keadaan lokal, bukan langsung dari prop.
@@ -53,7 +56,7 @@ export function PilihStrategi({
             })
           }}
         />
-        <span className="strategi-teks">Ukur desktop juga</span>
+        <span className="strategi-teks">{t('lh.ukurDesktop')}</span>
         <span className="strategi-biaya">
           {nyala ? ' · pengukuran jadi dua kali lebih lama' : ' · ~2x waktu pengukuran'}
         </span>

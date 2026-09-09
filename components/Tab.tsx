@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { penerjemah, type Locale } from '../lib/i18n/index.ts'
 
 /**
  * Segmen URL dipisah dari labelnya. Rutenya sudah dipakai dan bisa
@@ -24,10 +25,11 @@ const TAB = [
   ['lighthouse', 'Lighthouse'],
 ] as const
 
-export function Tab({ siteId }: { siteId: number }) {
+export function Tab({ siteId, locale }: { siteId: number; locale: Locale }) {
   const path = usePathname()
+  const t = penerjemah(locale)
   return (
-    <nav className="tab" aria-label="Kategori">
+    <nav className="tab" aria-label={t('tab.kategori')}>
       {TAB.map(([t, label]) => {
         const href = `/sites/${siteId}/${t}`
         const aktif = path === href

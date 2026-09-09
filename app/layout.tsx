@@ -5,6 +5,8 @@ import './globals.css'
 import { Navbar } from '../components/Navbar.tsx'
 import { konteks } from '../lib/auth/konteks.ts'
 import { atributTema, temaSah, NAMA_COOKIE_TEMA } from '../lib/tema.ts'
+import { localeSah, NAMA_COOKIE_LOCALE } from '../lib/i18n/index.ts'
+import { tServer } from '../lib/i18n/server.ts'
 
 const ui = Instrument_Sans({
   subsets: ['latin'],
@@ -32,9 +34,16 @@ const num = Spline_Sans_Mono({
   display: 'swap',
 })
 
-export const metadata: Metadata = {
-  title: 'Weblyzer',
-  description: 'Apa yang rusak di situs saya, dan apa yang sudah beres.',
+/**
+ * `generateMetadata`, bukan `metadata` statis.
+ *
+ * Deskripsi halaman ikut bahasa pemakai, dan `metadata` statis dievaluasi satu
+ * kali saat build sehingga tidak bisa melihat locale request. Judulnya tetap
+ * "Weblyzer" di kedua bahasa: itu nama produk, bukan kalimat.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await tServer()
+  return { title: 'Weblyzer', description: t('meta.deskripsi') }
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -48,14 +57,24 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Sumbernya `users.theme` untuk yang masuk, cookie untuk guest: guest tidak
   // punya baris di tabel mana pun, jadi cookie adalah satu-satunya tempat
   // pilihannya bisa hidup.
+  const jar = await cookies()
   const tema =
     ctx.jenis === 'user'
       ? temaSah(ctx.user.theme)
-      : temaSah((await cookies()).get(NAMA_COOKIE_TEMA)?.value)
+      : temaSah(jar.get(NAMA_COOKIE_TEMA)?.value)
+
+  // Locale dari sumber yang sama dengan tema, dan alasannya sama: `users.locale`
+  // untuk yang masuk, cookie untuk guest. `<html lang>` ikut berubah, bukan
+  // dibiarkan "id" — screen reader memilih pelafalan dari atribut itu, dan
+  // halaman berbahasa Inggris yang mengaku Indonesia dibacakan salah.
+  const locale =
+    ctx.jenis === 'user'
+      ? localeSah(ctx.user.locale)
+      : localeSah(jar.get(NAMA_COOKIE_LOCALE)?.value)
 
   return (
     <html
-      lang="id"
+      lang={locale}
       className={`${ui.variable} ${num.variable}`}
       // `undefined` untuk pilihan `system`, dan itu disengaja: server tidak
       // bisa mengetahui `prefers-color-scheme` milik browser, jadi keputusannya
@@ -66,7 +85,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       {/* Navbar di layout, bukan di tiap halaman: itu yang membuat jalan
           kembali ke index tidak pernah hilang di halaman mana pun. */}
       <body>
-        <Navbar email={ctx.jenis === 'user' ? ctx.user.email : null} tema={tema} />
+        <Navbar
+          email={ctx.jenis === 'user' ? ctx.user.email : null}
+          tema={tema}
+          locale={locale}
+        />
         <main className="wrap">{children}</main>
       </body>
     </html>

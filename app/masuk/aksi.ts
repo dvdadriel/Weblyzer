@@ -6,6 +6,7 @@ import { getDb } from '../../lib/db.ts'
 import { bacaRahasia } from '../../lib/auth/rahasia.ts'
 import { masukDenganPassword, userLewatEmail } from '../../lib/auth/pengguna.ts'
 import { terbitkanSesi, NAMA_COOKIE_SESI, UMUR_SESI_MS } from '../../lib/auth/sesi.ts'
+import { tServer } from '../../lib/i18n/server.ts'
 
 /**
  * `email` ikut dikembalikan bersama galat, alasan yang sama dengan
@@ -17,9 +18,10 @@ import { terbitkanSesi, NAMA_COOKIE_SESI, UMUR_SESI_MS } from '../../lib/auth/se
 export type HasilMasuk = { error: string; email?: string } | null
 
 export async function masuk(_sebelum: HasilMasuk, form: FormData): Promise<HasilMasuk> {
+  const t = await tServer()
   const email = String(form.get('email') ?? '').trim()
   const password = String(form.get('password') ?? '')
-  if (!email || !password) return { error: 'Email dan password harus diisi.', email }
+  if (!email || !password) return { error: t('masuk.kosong'), email }
 
   const user = masukDenganPassword(getDb(), email, password)
   if (!user) {
@@ -33,9 +35,9 @@ export async function masuk(_sebelum: HasilMasuk, form: FormData): Promise<Hasil
     // menebak alamatnya dengan benar.
     const ada = userLewatEmail(getDb(), email)
     if (ada && ada.password_hash === null) {
-      return { error: 'Akun ini masuk lewat Google. Pakai tombol di bawah.', email }
+      return { error: t('masuk.lewatGoogle'), email }
     }
-    return { error: 'Email atau password salah.', email }
+    return { error: t('masuk.salah'), email }
   }
 
   const jar = await cookies()

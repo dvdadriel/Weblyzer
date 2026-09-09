@@ -8,6 +8,7 @@ import {
   MAKS_SCAN_GUEST,
 } from '../lib/auth/kuota.ts'
 import type { Konteks } from '../lib/auth/pemilik.ts'
+import { terjemah } from '../lib/i18n/index.ts'
 
 const KG: Konteks = { jenis: 'guest', guestId: 'g1' }
 const SEKARANG = Date.parse('2026-09-09T12:00:00Z')
@@ -37,9 +38,21 @@ describe('kuota situs', () => {
     situsGuest(d, 'https://a.com')
     const hasil = bolehTambahSitus(d, KG)
     expect(hasil.boleh).toBe(false)
-    expect(hasil.boleh === false && hasil.alasan).toMatch(new RegExp(String(MAKS_SITUS_GUEST)))
-    // Alasannya harus menyebut jalan keluarnya, bukan cuma menolak.
-    expect(hasil.boleh === false && hasil.alasan).toMatch(/Masuk/)
+    if (hasil.boleh) return
+    expect(hasil.alasan).toBe('kuota.situs')
+
+    // Kuncinya saja tidak cukup: yang dilihat pemakai adalah hasil
+    // terjemahannya, dan ia harus memuat angka batasnya serta menyebut jalan
+    // keluarnya — bukan cuma menolak. Diperiksa di KEDUA bahasa, karena
+    // placeholder yang tidak terpasang hanya muncul di salah satunya.
+    const id_ = terjemah('id', hasil.alasan, hasil.params)
+    const en_ = terjemah('en', hasil.alasan, hasil.params)
+    for (const teks of [id_, en_]) {
+      expect(teks).toContain(String(MAKS_SITUS_GUEST))
+      expect(teks).not.toContain('{')
+    }
+    expect(id_).toMatch(/Masuk/)
+    expect(en_).toMatch(/Sign in/)
   })
 
   it('tidak menghitung situs guest lain', () => {
@@ -70,7 +83,14 @@ describe('kuota scan', () => {
     }
     const hasil = bolehScan(d, KG, SEKARANG)
     expect(hasil.boleh).toBe(false)
-    expect(hasil.boleh === false && hasil.alasan).toMatch(/24 jam/)
+    if (hasil.boleh) return
+    expect(hasil.alasan).toBe('kuota.scan')
+    for (const locale of ['id', 'en'] as const) {
+      const teks = terjemah(locale, hasil.alasan, hasil.params)
+      expect(teks).toContain('24')
+      expect(teks).toContain(String(MAKS_SCAN_GUEST))
+      expect(teks).not.toContain('{')
+    }
   })
 
   it('scan lebih dari 24 jam lalu tidak dihitung', () => {

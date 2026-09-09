@@ -1,0 +1,49 @@
+{
+  "node": {
+    "4049fcca9db9e0db3e25cc6b0e770a4c0c624f1d91": {
+      "workers": {
+        "app/page": {
+          "moduleId": "[project]/.next-internal/server/app/page/actions.js { ACTIONS_MODULE0 => \"[project]/app/tema/aksi.ts [app-rsc] (ecmascript)\", ACTIONS_MODULE1 => \"[project]/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": true,
+          "codeHash": null
+        }
+      },
+      "exportedName": "aturLocale",
+      "filename": "app/tema/aksi.ts"
+    },
+    "406fffffc90100cdb170c006cc4a450d199189271d": {
+      "workers": {
+        "app/page": {
+          "moduleId": "[project]/.next-internal/server/app/page/actions.js { ACTIONS_MODULE0 => \"[project]/app/tema/aksi.ts [app-rsc] (ecmascript)\", ACTIONS_MODULE1 => \"[project]/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": true,
+          "codeHash": null
+        }
+      },
+      "exportedName": "aturTema",
+      "filename": "app/tema/aksi.ts"
+    },
+    "40c3cbca6b18661056b6d102f0693ae0d52c40a615": {
+      "workers": {
+        "app/page": {
+          "moduleId": "[project]/.next-internal/server/app/page/actions.js { ACTIONS_MODULE0 => \"[project]/app/tema/aksi.ts [app-rsc] (ecmascript)\", ACTIONS_MODULE1 => \"[project]/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": true,
+          "codeHash": null
+        }
+      },
+      "exportedName": "hapusSitus",
+      "filename": "app/actions.ts"
+    },
+    "6045e1168b9f56d11f4fc408c495502bb077a61aa2": {
+      "workers": {
+        "app/page": {
+          "moduleId": "[project]/.next-internal/server/app/page/actions.js { ACTIONS_MODULE0 => \"[project]/app/tema/aksi.ts [app-rsc] (ecmascript)\", ACTIONS_MODULE1 => \"[project]/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": true,
+          "codeHash": null
+        }
+      },
+      "exportedName": "tambahSitus",
+      "filename": "app/actions.ts"
+    }
+  },
+  "edge": {}
+}

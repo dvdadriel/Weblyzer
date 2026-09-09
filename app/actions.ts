@@ -12,6 +12,7 @@ import { konteks, konteksTulis } from '../lib/auth/konteks.ts'
 import { situsMilik, pasangPemilik, bolehCliHost } from '../lib/auth/pemilik.ts'
 import { bolehTambahSitus, bolehScan } from '../lib/auth/kuota.ts'
 import type { Konteks } from '../lib/auth/pemilik.ts'
+import { tServer } from '../lib/i18n/server.ts'
 
 /**
  * Menandai temuan diabaikan, atau membukanya kembali.
@@ -51,10 +52,15 @@ async function gerbangTemuan(
 
   // Temuan yang tidak ada dan temuan orang lain memberi pesan yang sama,
   // alasan yang sama dengan `situsMilik`.
-  if (!baris) return { ok: false, hasil: { error: `Temuan ${findingId} tidak ditemukan.` } }
+  const t = await tServer()
+  if (!baris) {
+    return { ok: false, hasil: { error: t('umum.temuanTidakDitemukan', { id: findingId }) } }
+  }
 
   const g = await gerbang(baris.site_id)
-  if (!g.ok) return { ok: false, hasil: { error: `Temuan ${findingId} tidak ditemukan.` } }
+  if (!g.ok) {
+    return { ok: false, hasil: { error: t('umum.temuanTidakDitemukan', { id: findingId }) } }
+  }
   return { ok: true, ctx: g.ctx, siteId: baris.site_id }
 }
 
@@ -86,10 +92,16 @@ async function gerbang(
   siteId: number,
 ): Promise<{ ok: true; ctx: Konteks } | { ok: false; hasil: HasilAksi }> {
   const ctx = await konteks()
+  const t = await tServer()
   try {
     situsMilik(getDb(), ctx, siteId)
   } catch (err) {
-    return { ok: false, hasil: { error: err instanceof Error ? err.message : String(err) } }
+    // Pesan dari `situsMilik` memuat id-nya, dan id itu masukan pemanggil
+    // sendiri. Diterjemahkan lewat kamus alih-alih diteruskan mentah supaya
+    // pemakai berbahasa Inggris tidak menerima satu kalimat Indonesia di
+    // tengah layar yang seluruhnya Inggris.
+    void err
+    return { ok: false, hasil: { error: t('umum.situsTidakDitemukan', { id: siteId }) } }
   }
   return { ok: true, ctx }
 }
@@ -102,10 +114,11 @@ async function gerbang(
  * pernah tersimpan dalam dua bentuk berbeda.
  */
 export async function tambahSitus(_sebelum: HasilAksi, form: FormData): Promise<HasilAksi> {
+  const t = await tServer()
   const nama = String(form.get('nama') ?? '').trim()
   const url = String(form.get('url') ?? '').trim()
-  if (!nama) return { error: 'Nama situs belum diisi.', nama, url }
-  if (!url) return { error: 'Alamat situs belum diisi.', nama, url }
+  if (!nama) return { error: t('tambah.namaKosong'), nama, url }
+  if (!url) return { error: t('tambah.urlKosong'), nama, url }
 
   // `konteksTulis`, bukan `konteks`: kalau pemanggilnya guest yang belum punya
   // cookie, cookie-nya ditulis sekarang. Tanpa itu situsnya dipasangkan ke id
@@ -114,7 +127,7 @@ export async function tambahSitus(_sebelum: HasilAksi, form: FormData): Promise<
   const ctx = await konteksTulis()
 
   const izin = bolehTambahSitus(getDb(), ctx)
-  if (!izin.boleh) return { error: izin.alasan, nama, url }
+  if (!izin.boleh) return { error: t(izin.alasan, izin.params), nama, url }
 
   try {
     createSite(getDb(), { name: nama, base_url: url, ...pasangPemilik(ctx) })
@@ -125,7 +138,7 @@ export async function tambahSitus(_sebelum: HasilAksi, form: FormData): Promise<
     // diterjemahkan.
     const pesan = err instanceof Error ? err.message : String(err)
     return {
-      error: /UNIQUE/.test(pesan) ? 'Anda sudah memantau situs dengan alamat itu.' : pesan,
+      error: /UNIQUE/.test(pesan) ? t('tambah.sudahAda') : pesan,
       nama,
       url,
     }
@@ -151,6 +164,7 @@ export async function jalankanScan(
   kategori: 'bugs' | 'console' | 'security' | 'seo' | 'geo' | 'audit' | 'lighthouse',
   path: string,
 ): Promise<HasilAksi> {
+  const t = await tServer()
   const g = await gerbang(siteId)
   if (!g.ok) return g.hasil
 
@@ -158,18 +172,14 @@ export async function jalankanScan(
   // Messages API dengan kunci pemakai. Itu bukan sesuatu yang boleh dipicu
   // orang tak dikenal — lihat `bolehCliHost`.
   if ((kategori === 'geo' || kategori === 'audit') && !bolehCliHost(g.ctx)) {
-    return {
-      error:
-        'Aspek ini berjalan di server dengan CLI-nya sendiri, jadi hanya pemilik instance ' +
-        'yang bisa memicunya.',
-    }
+    return { error: t('scan.adminSaja') }
   }
 
   const izin = bolehScan(getDb(), g.ctx)
-  if (!izin.boleh) return { error: izin.alasan }
+  if (!izin.boleh) return { error: t(izin.alasan, izin.params) }
 
   // Penjaga ganda-klik. Tanpa ini dua Chromium berebut satu situs.
-  if (runAktif(getDb(), siteId)) return { error: 'Pemindaian situs ini sedang berjalan.' }
+  if (runAktif(getDb(), siteId)) return { error: t('scan.sedangBerjalan') }
 
   // `geo` dan `audit` adalah subcommand-nya sendiri, bukan kategori dari
   // `scan`: keduanya tidak menjelajah dengan Chromium melainkan memanggil
@@ -198,7 +208,7 @@ export async function jalankanScan(
   // pernah jalan.
   const mulai = await tungguRun(siteId)
   if (!mulai) {
-    return { error: 'Pemindaian gagal dijalankan. Periksa log server.' }
+    return { error: t('scan.gagalJalan') }
   }
 
   revalidatePath(path)
@@ -230,6 +240,7 @@ async function tungguRun(siteId: number): Promise<boolean> {
  * gantinya adalah konfirmasi yang menyebut jumlah yang akan hilang.
  */
 export async function hapusSitus(siteId: number): Promise<HasilAksi> {
+  const t = await tServer()
   const g = await gerbang(siteId)
   if (!g.ok) return g.hasil
 
@@ -237,7 +248,7 @@ export async function hapusSitus(siteId: number): Promise<HasilAksi> {
   // pekerja yang masih menulis: crawl-nya lalu gagal di tengah dengan galat
   // foreign key yang tidak menjelaskan apa pun. Ditolak dengan alasan jelas.
   if (runAktif(getDb(), siteId)) {
-    return { error: 'Situs ini sedang dipindai. Tunggu sampai selesai, lalu hapus.' }
+    return { error: t('hapus.sedangDipindai') }
   }
 
   getDb().prepare('DELETE FROM sites WHERE id = ?').run(siteId)
@@ -254,11 +265,12 @@ export async function hapusSitus(siteId: number): Promise<HasilAksi> {
  * hanya untuk memperbaiki ringkasan yang gagal.
  */
 export async function ulangiRingkasan(siteId: number, path: string): Promise<HasilAksi> {
+  const t = await tServer()
   const g = await gerbang(siteId)
   if (!g.ok) return g.hasil
 
   if (runAktif(getDb(), siteId)) {
-    return { error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
+    return { error: t('scan.tungguSelesai') }
   }
 
   const anak = spawn(
@@ -286,13 +298,14 @@ export type HasilPeriksa = { keadaan: string; pesan?: string; error?: string }
  * crawl 141 halaman, bukan ini.
  */
 export async function periksaTemuan(findingId: number, path: string): Promise<HasilPeriksa> {
+  const t = await tServer()
   const g = await gerbangTemuan(findingId)
   if (!g.ok) return { keadaan: 'galat', error: g.hasil?.error }
 
   // Ditolak selagi pemindaian berjalan: dua Chromium pada satu situs saling
   // berebut, dan yang kalah melapor gagal seolah halamannya rusak.
   if (runAktif(getDb(), g.siteId)) {
-    return { keadaan: 'sibuk', error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
+    return { keadaan: 'sibuk', error: t('scan.tungguSelesai') }
   }
 
   try {
@@ -315,11 +328,12 @@ export async function periksaTemuan(findingId: number, path: string): Promise<Ha
  * untuk dua strategi pada satu halaman.
  */
 export async function aturStrategi(siteId: number, keduanya: boolean): Promise<HasilAksi> {
+  const t = await tServer()
   const g = await gerbang(siteId)
   if (!g.ok) return g.hasil
 
   if (runAktif(getDb(), siteId)) {
-    return { error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
+    return { error: t('scan.tungguSelesai') }
   }
   getDb()
     .prepare('UPDATE sites SET lighthouse_strategy = ? WHERE id = ?')
@@ -341,11 +355,12 @@ export async function simpanPengaturan(
   _sebelum: HasilAksi,
   form: FormData,
 ): Promise<HasilAksi> {
+  const t = await tServer()
   const g = await gerbang(siteId)
   if (!g.ok) return g.hasil
 
   if (runAktif(getDb(), siteId)) {
-    return { error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
+    return { error: t('scan.tungguSelesai') }
   }
 
   const hasil = validasi({

@@ -1,0 +1,9 @@
+{
+  "/akun/page": "app/akun/page.js",
+  "/masuk/page": "app/masuk/page.js",
+  "/model/page": "app/model/page.js",
+  "/page": "app/page.js",
+  "/sites/[siteId]/[kategori]/page": "app/sites/[siteId]/[kategori]/page.js",
+  "/sites/[siteId]/export/route": "app/sites/[siteId]/export/route.js",
+  "/sites/[siteId]/pengaturan/page": "app/sites/[siteId]/pengaturan/page.js"
+}

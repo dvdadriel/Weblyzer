@@ -14,6 +14,7 @@ import { KeadaanKosong } from '../../../../components/KeadaanKosong.tsx'
 import { TombolScan } from '../../../../components/TombolScan.tsx'
 import { sumberKategori } from '../../../../lib/kategori.ts'
 import { GLIF } from '../../../../lib/glif.ts'
+import { tServer, localeSekarang } from '../../../../lib/i18n/server.ts'
 import { konteks } from '../../../../lib/auth/konteks.ts'
 import { bolehCliHost } from '../../../../lib/auth/pemilik.ts'
 
@@ -34,6 +35,8 @@ export default async function Kategori({
   searchParams: Promise<{ status?: string }>
 }) {
   const { siteId, kategori } = await params
+  const t = await tServer()
+  const locale = await localeSekarang()
   const { status: q } = await searchParams
   if (!KATEGORI.includes(kategori)) notFound()
 
@@ -47,7 +50,7 @@ export default async function Kategori({
   // Saringan yang cuma punya satu sisi berisi adalah kebisingan: kalau belum
   // ada yang diabaikan, tidak ada yang perlu dipilih.
   const saringan = diabaikan.length > 0 && (
-    <nav className="saring" aria-label="Status temuan">
+    <nav className="saring" aria-label={t('saring.status')}>
       <Link
         href={path}
         className="saring-item"
@@ -81,11 +84,7 @@ export default async function Kategori({
       >
         {GLIF.high}
       </span>
-      <span>
-        Dinilai claude-seo, bukan diukur aturan. Jawabannya bisa bergeser antar
-        analisis walau situsnya tidak berubah, jadi &quot;sudah diperbaiki&quot; di sini
-        lebih tepat dibaca sebagai checklist Anda sendiri.
-      </span>
+      <span>{t('kategori.dinilaiAi')}</span>
     </div>
   )
 
@@ -93,6 +92,7 @@ export default async function Kategori({
   const waktuScan = waktuScanKategori(db(), id, kategori)
   const tombol = (
     <TombolScan
+      locale={locale}
       siteId={id}
       kategori={kategori as 'bugs' | 'console' | 'security' | 'seo' | 'geo' | 'audit'}
       path={path}
@@ -109,9 +109,10 @@ export default async function Kategori({
         {diabaikan.length === 0 ? (
           // Sengaja bukan KeadaanKosong: teks di sana bicara soal keadaan
           // pemindaian, sementara pertanyaan di sini murni soal saringan.
-          <p className="saring-kosong">Belum ada temuan yang diabaikan di kategori ini.</p>
+          <p className="saring-kosong">{t('saring.belumAdaDiabaikan')}</p>
         ) : (
           <TabelTemuan
+          locale={locale}
             baris={diabaikan}
             baseUrl={baseUrl}
             status="ignored"
@@ -140,7 +141,7 @@ export default async function Kategori({
         {tombol}
         {keterangan}
         {saringan}
-        <KeadaanKosong keadaan={perluAdmin ? 'admin-saja' : keadaan} />
+        <KeadaanKosong keadaan={perluAdmin ? 'admin-saja' : keadaan} t={t} />
       </>
     )
   }
@@ -151,6 +152,7 @@ export default async function Kategori({
       {keterangan}
       {saringan}
       <TabelTemuan
+          locale={locale}
         baris={temuanKategori(db(), id, kategori)}
         baseUrl={baseUrl}
         status="open"

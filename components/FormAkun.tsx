@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { ubahPassword, buatAkun } from '../app/akun/aksi.ts'
 import { Ikon } from './Ikon.tsx'
+import { penerjemah, type Locale } from '../lib/i18n/index.ts'
 
 function Hasil({ hasil }: { hasil: { ok: boolean; pesan: string } | null }) {
   if (!hasil) return null
@@ -13,8 +14,15 @@ function Hasil({ hasil }: { hasil: { ok: boolean; pesan: string } | null }) {
   )
 }
 
-export function FormPassword({ punyaPassword }: { punyaPassword: boolean }) {
+export function FormPassword({
+  punyaPassword,
+  locale,
+}: {
+  punyaPassword: boolean
+  locale: Locale
+}) {
   const [hasil, kirim, menunggu] = useActionState(ubahPassword, null)
+  const t = penerjemah(locale)
 
   return (
     <form action={kirim} className="model-set">
@@ -23,7 +31,7 @@ export function FormPassword({ punyaPassword }: { punyaPassword: boolean }) {
           secara permanen. Akun Google belum punya password lama untuk diminta. */}
       {punyaPassword && (
         <label className="model-baris">
-          <span className="model-nama">Password sekarang</span>
+          <span className="model-nama">{t('akun.passwordSekarang')}</span>
           <input
             type="password"
             name="lama"
@@ -35,7 +43,7 @@ export function FormPassword({ punyaPassword }: { punyaPassword: boolean }) {
       )}
 
       <label className="model-baris">
-        <span className="model-nama">Password baru</span>
+        <span className="model-nama">{t('akun.passwordBaru')}</span>
         <input
           type="password"
           name="baru"
@@ -47,7 +55,7 @@ export function FormPassword({ punyaPassword }: { punyaPassword: boolean }) {
       </label>
 
       <button type="submit" className="tombol" disabled={menunggu}>
-        {menunggu ? 'Menyimpan…' : 'Ganti Password'}
+        {menunggu ? t('akun.menyimpan') : t('akun.tombolGanti')}
       </button>
 
       <Hasil hasil={hasil} />
@@ -55,18 +63,19 @@ export function FormPassword({ punyaPassword }: { punyaPassword: boolean }) {
   )
 }
 
-export function FormBuatAkun() {
+export function FormBuatAkun({ locale }: { locale: Locale }) {
   const [hasil, kirim, menunggu] = useActionState(buatAkun, null)
+  const t = penerjemah(locale)
 
   return (
     <form action={kirim} className="model-set">
       <label className="model-baris">
-        <span className="model-nama">Email</span>
+        <span className="model-nama">{t('masuk.email')}</span>
         <input type="email" name="email" required disabled={menunggu} />
       </label>
 
       <label className="model-baris">
-        <span className="model-nama">Password awal</span>
+        <span className="model-nama">{t('akun.passwordAwal')}</span>
         <input
           type="password"
           name="password"
@@ -79,12 +88,12 @@ export function FormBuatAkun() {
 
       <label className="model-baris">
         <input type="checkbox" name="admin" disabled={menunggu} />
-        <span className="model-nama">Jadikan admin</span>
-        <span className="model-versi">bisa memicu aspek GEO dan Audit</span>
+        <span className="model-nama">{t('akun.jadikanAdmin')}</span>
+        <span className="model-versi">{t('akun.jadikanAdminTeks')}</span>
       </label>
 
       <button type="submit" className="tombol" disabled={menunggu}>
-        {menunggu ? 'Membuat…' : 'Buat Akun'}
+        {menunggu ? t('akun.membuat') : t('akun.buatTombol')}
       </button>
 
       <Hasil hasil={hasil} />

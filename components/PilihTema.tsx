@@ -1,46 +1,74 @@
 'use client'
 
 import { useTransition } from 'react'
-import { aturTema } from '../app/tema/aksi.ts'
+import { aturTema, aturLocale } from '../app/tema/aksi.ts'
 import { TEMA, type Tema } from '../lib/tema.ts'
-
-const LABEL: Record<Tema, string> = {
-  system: 'Sistem',
-  light: 'Terang',
-  dark: 'Gelap',
-}
+import { LOCALE, type Locale, type T } from '../lib/i18n/index.ts'
 
 /**
- * Pemilih tema: tiga pilihan, bukan tombol dua keadaan.
+ * Pemilih tema dan bahasa.
  *
- * Tombol yang cuma membalik terang dan gelap menghapus pilihan `system`, dan
- * `system` adalah pilihan yang sah — ia berarti "ikuti apa pun yang sedang
- * dipakai perangkat saya", termasuk saat perangkat itu berganti sendiri di
- * malam hari.
+ * Tema: tiga pilihan, bukan tombol dua keadaan. Tombol yang cuma membalik
+ * terang dan gelap menghapus pilihan `system`, dan `system` adalah pilihan yang
+ * sah — ia berarti "ikuti apa pun yang sedang dipakai perangkat saya", termasuk
+ * saat perangkat itu berganti sendiri di malam hari.
  *
- * `<select>`, bukan tiga tombol: tiga tombol memakan lebar navbar untuk sesuatu
- * yang disentuh sekali lalu ditinggalkan.
+ * `<select>`, bukan tombol berjajar: keduanya disentuh sekali lalu ditinggalkan,
+ * dan enam tombol di navbar memakan lebar yang dibutuhkan alamat email.
+ *
+ * Label bahasa TIDAK diterjemahkan — "Indonesia" dan "English" ditulis dalam
+ * bahasanya sendiri. Pemakai yang tidak paham bahasa yang sedang aktif justru
+ * paling butuh menemukan pilihan ini, dan menerjemahkan namanya menyembunyikan
+ * pilihan itu dari orang yang paling membutuhkannya.
  */
-export function PilihTema({ tema }: { tema: Tema }) {
+export function PilihTema({
+  tema,
+  locale,
+  t,
+}: {
+  tema: Tema
+  locale: Locale
+  t: T
+}) {
   const [menunggu, mulai] = useTransition()
 
   return (
-    <label className="pilih-tema">
-      <span className="pilih-tema-label">Tema</span>
-      <select
-        value={tema}
-        disabled={menunggu}
-        onChange={(e) => {
-          const nilai = e.target.value
-          mulai(() => void aturTema(nilai))
-        }}
-      >
-        {TEMA.map((t) => (
-          <option key={t} value={t}>
-            {LABEL[t]}
-          </option>
-        ))}
-      </select>
-    </label>
+    <>
+      <label className="pilih-tema">
+        <span className="pilih-tema-label">{t('nav.tema')}</span>
+        <select
+          value={tema}
+          disabled={menunggu}
+          onChange={(e) => {
+            const nilai = e.target.value
+            mulai(() => void aturTema(nilai))
+          }}
+        >
+          {TEMA.map((x) => (
+            <option key={x} value={x}>
+              {t(`tema.${x}`)}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="pilih-tema">
+        <span className="pilih-tema-label">{t('locale.label')}</span>
+        <select
+          value={locale}
+          disabled={menunggu}
+          onChange={(e) => {
+            const nilai = e.target.value
+            mulai(() => void aturLocale(nilai))
+          }}
+        >
+          {LOCALE.map((x) => (
+            <option key={x} value={x}>
+              {t(`locale.${x}`)}
+            </option>
+          ))}
+        </select>
+      </label>
+    </>
   )
 }

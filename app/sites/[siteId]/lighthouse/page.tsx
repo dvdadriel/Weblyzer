@@ -6,6 +6,7 @@ import { PilihStrategi } from '../../../../components/PilihStrategi.tsx'
 import { Ikon } from '../../../../components/Ikon.tsx'
 import type { NamaIkon } from '../../../../components/Ikon.tsx'
 import Link from 'next/link'
+import { localeSekarang, tServer } from '../../../../lib/i18n/server.ts'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,6 +52,8 @@ export default async function Lighthouse({
   params: Promise<{ siteId: string }>
   searchParams: Promise<{ strategy?: string }>
 }) {
+  const locale = await localeSekarang()
+  const t = await tServer()
   const { siteId } = await params
   const { strategy: q } = await searchParams
   const id = Number(siteId)
@@ -66,11 +69,11 @@ export default async function Lighthouse({
     return (
       <>
         <Kosong
-          judul="Belum pernah dipindai"
-          teks="Halamannya pun belum diketahui. Lighthouse mengukur halaman yang sudah tersimpan, jadi pemindaian harus jalan lebih dulu."
+          judul={t('lh.belumCrawl')}
+          teks={t('lh.belumCrawlTeks')}
         />
         <p className="kosong-teks" style={{ textAlign: 'center' }}>
-          <Link href={`/sites/${id}/bugs`}>Buka tab Bug untuk memindai</Link>
+          <Link href={`/sites/${id}/bugs`}>{t('lh.bukaTabBug')}</Link>
         </p>
       </>
     )
@@ -84,19 +87,20 @@ export default async function Lighthouse({
   return (
     <>
       <TombolScan
+      locale={locale}
         siteId={id}
         kategori="lighthouse"
         path={`/sites/${id}/lighthouse`}
         berjalan={runAktif(db(), id) ?? null}
       >
-        <PilihStrategi siteId={id} keduanya={keduanya} />
+        <PilihStrategi locale={locale} siteId={id} keduanya={keduanya} />
       </TombolScan>
 
       {/* Sub-tab sebagai tautan berparameter, sama seperti saringan status di
           tab temuan: bisa di-bookmark, tombol back berfungsi, dan skor mobile
           tidak pernah tertukar dengan desktop karena keduanya tidak pernah
           berada di satu tabel. */}
-      <nav className="saring" aria-label="Strategi pengukuran">
+      <nav className="saring" aria-label={t('lh.strategiPengukuran')}>
         {STRATEGI.map(([nilai, label]) => (
           <Link
             key={nilai}
@@ -119,19 +123,19 @@ export default async function Lighthouse({
       </nav>
 
       {baris.length > 0 ? (
-        <GridSkor baris={baris} baseUrl={s?.base_url ?? ''} />
+        <GridSkor locale={locale} baris={baris} baseUrl={s?.base_url ?? ''} />
       ) : aktif === 'desktop' && !keduanya ? (
         // Dua sebab berbeda untuk tabel desktop yang kosong, dan dibedakan:
         // belum dinyalakan, atau sudah dinyalakan tapi belum diukur. Yang
         // pertama butuh centang, yang kedua butuh tombol ukur.
         <Kosong
-          judul="Pengukuran desktop belum dinyalakan"
+          judul={t('lh.desktopMati')}
           teks="Centang “Ukur desktop juga” di atas, lalu jalankan Scan Lighthouse. Skor desktop kerap jauh berbeda dari mobile — pada halaman utama Springair, perf 35 di desktop melawan 63 di mobile."
         />
       ) : keadaan === 'gagal' ? (
         <Kosong
-          judul="Pemindaian terakhir gagal"
-          teks="Skornya tidak diketahui — ini bukan berarti halamannya cepat. Ukur lagi."
+          judul={t('lh.gagal')}
+          teks={t('lh.gagalTeks')}
           ikon="alert"
           warna="var(--sev-critical)"
         />
@@ -140,8 +144,8 @@ export default async function Lighthouse({
           judul={`Belum ada pengukuran ${aktif}`}
           teks={
             aktif === 'desktop'
-              ? 'Desktop sudah dinyalakan tapi belum sempat terukur. Jalankan Scan Lighthouse.'
-              : 'Halamannya sudah diketahui, tapi belum satu pun diukur.'
+              ? t('lh.desktopBelumTerukur')
+              : t('lh.belumSatuPun')
           }
           ikon="kompas"
         />

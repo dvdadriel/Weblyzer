@@ -5,6 +5,7 @@ import { simpanDanUji, lupakanKunci } from '../app/akun/aksi.ts'
 import type { InfoKunci } from '../lib/ai/kunci.ts'
 import { MODEL, MODEL_BAWAAN } from '../lib/ai/penyedia.ts'
 import { Ikon } from './Ikon.tsx'
+import { penerjemah, type Locale } from '../lib/i18n/index.ts'
 
 /**
  * Memilih model dan menyimpan API key, dalam satu form.
@@ -19,8 +20,15 @@ import { Ikon } from './Ikon.tsx'
  * dibiarkan kosong dengan placeholder yang menjelaskan bahwa mengisinya berarti
  * mengganti.
  */
-export function PilihModel({ info }: { info: (InfoKunci & { ekor: string }) | null }) {
+export function PilihModel({
+  info,
+  locale,
+}: {
+  info: (InfoKunci & { ekor: string }) | null
+  locale: Locale
+}) {
   const [hasil, kirim, menunggu] = useActionState(simpanDanUji, null)
+  const t = penerjemah(locale)
   const [melupakan, mulaiLupa] = useTransition()
 
   return (
@@ -29,17 +37,16 @@ export function PilihModel({ info }: { info: (InfoKunci & { ekor: string }) | nu
         <p className="model-status">
           {info.terverifikasi ? (
             <span className="model-hasil ok">
-              <Ikon nama="ceklis" ukuran={13} /> Kunci berlaku untuk{' '}
-              <strong>{namaModel(info.model)}</strong>
-              {info.ekor !== '' && <> &middot; berakhiran {info.ekor}</>}
+              <Ikon nama="ceklis" ukuran={13} />{' '}
+              {t('model.berlaku', { model: namaModel(info.model) })}
+              {info.ekor !== '' && <> &middot; {t('model.berakhiran', { ekor: info.ekor })}</>}
             </span>
           ) : (
             /* Tersimpan tapi belum lolos validasi adalah keadaan tersendiri,
                dan harus terlihat begitu: fitur AI-nya mati, dan sebabnya bukan
                "belum dikonfigurasi". */
             <span className="model-hasil gagal">
-              <Ikon nama="alert" ukuran={13} /> Kunci tersimpan tapi belum terbukti berlaku.
-              Ringkasan AI mati sampai ia lolos pemeriksaan.
+              <Ikon nama="alert" ukuran={13} /> {t('model.belumTerbukti')}
             </span>
           )}
         </p>
@@ -47,7 +54,7 @@ export function PilihModel({ info }: { info: (InfoKunci & { ekor: string }) | nu
 
       <form action={kirim} className="model-set">
         <label className="model-baris">
-          <span className="model-nama">Model</span>
+          <span className="model-nama">{t('model.labelModel')}</span>
           <select name="model" defaultValue={info?.model ?? MODEL_BAWAAN} disabled={menunggu}>
             {MODEL.map((m) => (
               <option key={m.id} value={m.id}>
@@ -58,19 +65,19 @@ export function PilihModel({ info }: { info: (InfoKunci & { ekor: string }) | nu
         </label>
 
         <label className="model-baris">
-          <span className="model-nama">API key</span>
+          <span className="model-nama">{t('model.labelKunci')}</span>
           <input
             type="password"
             name="apiKey"
             autoComplete="off"
             required
             disabled={menunggu}
-            placeholder={info ? 'Isi untuk mengganti kunci yang tersimpan' : 'sk-ant-...'}
+            placeholder={info ? t('model.gantiPetunjuk') : 'sk-ant-...'}
           />
         </label>
 
         <button type="submit" className="model-uji" disabled={menunggu}>
-          {menunggu ? 'Memeriksa…' : 'Simpan & Periksa'}
+          {menunggu ? t('model.memeriksa') : t('model.simpanUji')}
         </button>
       </form>
 
@@ -90,7 +97,7 @@ export function PilihModel({ info }: { info: (InfoKunci & { ekor: string }) | nu
           disabled={melupakan}
           onClick={() => mulaiLupa(() => void lupakanKunci())}
         >
-          {melupakan ? 'Menghapus…' : 'Lupakan kunci'}
+          {melupakan ? t('model.menghapus') : t('model.lupakan')}
         </button>
       )}
     </div>

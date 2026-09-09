@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { tambahSitus } from '../app/actions.ts'
 import { Ikon } from './Ikon.tsx'
+import { penerjemah, type Locale } from '../lib/i18n/index.ts'
 
 /**
  * Form tambah situs, disembunyikan di balik `<details>`.
@@ -17,7 +18,8 @@ import { Ikon } from './Ikon.tsx'
  * daftar situs pekerjaan harian. Yang harian tidak boleh digeser ke bawah oleh
  * yang sesekali.
  */
-export function TambahSitus() {
+export function TambahSitus({ locale }: { locale: Locale }) {
+  const t = penerjemah(locale)
   const [hasil, kirim, menunggu] = useActionState(tambahSitus, null)
 
   return (
@@ -39,7 +41,7 @@ export function TambahSitus() {
             className="kontrol"
             id="nama"
             name="nama"
-            placeholder="Misal: Toko Online Saya"
+            placeholder={t('tambah.contoh')}
             defaultValue={hasil?.nama ?? ''}
             required
             autoComplete="off"
@@ -68,7 +70,7 @@ export function TambahSitus() {
         <p className="tambah-aksi">
           <button className="tombol" type="submit" disabled={menunggu}>
             <Ikon nama="ceklis" ukuran={14} />
-            {menunggu ? 'Menyimpan…' : 'Simpan Situs'}
+            {menunggu ? t('tambah.menyimpan') : t('tambah.simpan')}
           </button>
         </p>
 

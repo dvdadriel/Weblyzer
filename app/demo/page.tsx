@@ -11,6 +11,7 @@ import { KATEGORI, namaKategori, sumberKategori } from '../../lib/kategori.ts'
 import { TabelDemo } from '../../components/TabelDemo.tsx'
 import { GridSkor } from '../../components/GridSkor.tsx'
 import { Ikon } from '../../components/Ikon.tsx'
+import { localeSekarang } from '../../lib/i18n/server.ts'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,7 @@ export default async function Demo({
 }: {
   searchParams: Promise<{ situs?: string; kategori?: string }>
 }) {
+  const locale = await localeSekarang()
   if (!adaDemo()) {
     return (
       <div className="kosong">
@@ -139,7 +141,7 @@ export default async function Demo({
 
       {tidakDijalankan ? null : kategori === 'lighthouse' ? (
         <>
-          <GridSkor baris={skorDemo(situs.id)} baseUrl={situs.base_url} />
+          <GridSkor locale={locale} baris={skorDemo(situs.id)} baseUrl={situs.base_url} />
           <TabelDemo
             baris={temuanDemo(situs.id, 'lighthouse')}
             baseUrl={situs.base_url}

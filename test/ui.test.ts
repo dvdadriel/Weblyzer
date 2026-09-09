@@ -160,6 +160,14 @@ beforeAll(async () => {
         DB_PATH: join(dir, 'uji.db'),
         NODE_ENV: 'development',
         WEBLYZER_SECRET: RAHASIA_UI,
+        // Direktori build sendiri, di dalam folder sementara test ini.
+        //
+        // Next 16 menolak server dev kedua di satu direktori build, dan
+        // lock-nya ada di `<distDir>/dev/lock`. Tanpa pemisahan ini, seluruh
+        // berkas ini gagal begitu ada `npm run dev` yang sedang jalan — dan
+        // pesannya cuma "server dev tidak siap dalam 180 detik", yang tidak
+        // menyebut sebabnya sama sekali.
+        WEBLYZER_DIST_DIR: join(dir, '.next-uji'),
         // OAuth sengaja TIDAK dikonfigurasi: salah satu test memastikan
         // tombol Google tidak muncul tanpa kredensial.
         WEBLYZER_GOOGLE_CLIENT_ID: '',
@@ -169,13 +177,35 @@ beforeAll(async () => {
     },
   )
 
+  // Log dipasang SEBELUM penungguan, bukan sesudah.
+  //
+  // Terurut begitu karena log inilah satu-satunya tempat sebab kegagalan start
+  // tertulis, dan kalau ia dipasang sesudah loop penungguan maka pada saat
+  // gagal ia masih kosong — persis saat ia paling dibutuhkan.
+  const logPath = join(dir, 'server.log')
+  const logStream = createWriteStream(logPath)
+  server.stdout?.pipe(logStream)
+  server.stderr?.pipe(logStream)
+  process.env.WEBLYZER_UI_LOG = logPath
+
   // Ditunggu sampai benar-benar menjawab, bukan sampai proses ada. `spawn`
   // kembali seketika sedangkan Next butuh beberapa detik untuk siap, dan test
   // pertama yang menabrak server yang belum siap gagal dengan ECONNREFUSED
   // yang tidak menyebut sebabnya.
   const batas = Date.now() + 180_000
   for (;;) {
-    if (Date.now() > batas) throw new Error(`Server dev tidak siap dalam 180 detik di ${asal}`)
+    if (Date.now() > batas) {
+      // Log-nya dibaca dan disertakan: sebab paling sering bukan server yang
+      // lambat, melainkan server lain yang memegang lock build — dan itu
+      // tertulis jelas di log yang tanpa ini tidak pernah dilihat siapa pun.
+      let log = ''
+      try {
+        log = readFileSync(join(dir, 'server.log'), 'utf8').slice(-1200)
+      } catch {
+        // log belum ada
+      }
+      throw new Error(`Server dev tidak siap dalam 180 detik di ${asal}\n--- log ---\n${log}`)
+    }
     try {
       const r = await fetch(asal)
       if (r.ok) break
@@ -184,14 +214,6 @@ beforeAll(async () => {
     }
     await new Promise((r) => setTimeout(r, 500))
   }
-
-  // Log server disimpan supaya kegagalan bisa didiagnosis tanpa menjalankan
-  // ulang — pelajaran yang sama dari claude-seo.
-  const logPath = join(dir, 'server.log')
-  const logStream = createWriteStream(logPath)
-  server.stdout?.pipe(logStream)
-  server.stderr?.pipe(logStream)
-  process.env.WEBLYZER_UI_LOG = logPath
 
   // Rute dihangatkan lewat fetch SEBELUM browser dipakai.
   //
