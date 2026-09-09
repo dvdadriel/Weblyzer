@@ -1,56 +1,169 @@
+/* ============================================================================
+   TOKEN — arah "Monolitik Minimalis Swiss". Lihat docs/DESIGN.md.
+   ============================================================================
+
+   NAMA token dipertahankan dari arah sebelumnya, NILAINYA diganti seluruhnya.
+   Itu keputusan yang disengaja: nama-nama ini dipakai di lebih dari dua ratus
+   tempat di berkas ini, dan mengganti semuanya menghasilkan diff besar tanpa
+   satu pun manfaat tambahan — yang menentukan tampilan adalah nilainya.
+   Konsekuensinya beberapa nama sekarang terbaca ganjil (`--r-panel: 2px`,
+   `--shadow-card: none`), dan komentar di masing-masing menjelaskannya.
+
+   ATURAN PENGUKURAN, dan ini yang lebih penting daripada paletnya:
+   setiap warna diukur terhadap permukaan TERKETAT tempat ia benar-benar duduk,
+   yaitu `--surface` (baris tabel yang di-hover), bukan terhadap `--bg`.
+
+   Aturan itu lahir dari kesalahan yang sudah terjadi dua kali. Palet pertama
+   hanya diukur terhadap `--bg` dan lolos; begitu barisnya di-hover, empat dari
+   enam warna jatuh ke 3,78–3,88 : 1 dan gagal AA. Kesalahan yang sama nyaris
+   terulang saat palet ini disusun: #DC2626, #B45309, #A16207, dan #15803D
+   semuanya enak dipandang dan semuanya GAGAL terhadap baris hover
+   (3,90 / 4,06 / 3,98 / 4,05 : 1). Keempatnya dibuang.
+
+   Angka di komentar adalah HASIL UKUR terhadap `--surface` tema itu.
+   `test/kontras.test.ts` membaca token ini langsung dan memeriksa KEDUA tema.
+*/
 :root {
-  /* Permukaan dan tinta — colorhunt 1d4533/f7eae0/f9d2ba/5e3122 */
-  --bg:        oklch(94.5% 0.019 60);
-  --surface:   oklch(89.1% 0.055 53);
-  --ink:       oklch(35.6% 0.056 162);   /* 9.12:1 di atas --bg */
-  --ink-2:     oklch(36.8% 0.070 39);    /* 9.18:1 di atas --bg */
-  --line:      oklch(35.6% 0.056 162 / 0.16);
-  --line-kuat: oklch(35.6% 0.056 162 / 0.38);
+  /* ── TEMA TERANG ──────────────────────────────────────────────────────── */
+  --bg:        #F8F9FA;
+  --surface:   #E5E7EB;   /* baris hover — PERMUKAAN TERKETAT */
+  --ink:       #111827;   /* 14.33 : 1 */
+  --ink-2:     #4B5563;   /*  6.10 : 1 */
+  --accent:    #1D4ED8;   /*  5.41 : 1 */
+  --line:      #E5E7EB;
+  --line-kuat: #D1D5DB;
 
-  /* Severity — diukur terhadap --surface, latar paling ketat tempat lencana
-     ini muncul (baris tabel yang di-hover). Lolos --surface berarti lolos --bg.
-                                            di --surface / di --bg  */
-  --sev-critical: oklch(49.9% 0.147 33);   /* 4.60:1 / 5.47:1 */
-  --sev-high:     oklch(49.7% 0.120 57);   /* 4.50:1 / 5.36:1 */
-  --sev-medium:   oklch(48.8% 0.100 91);   /* 4.50:1 / 5.36:1 */
-  --sev-low:      oklch(48.2% 0.075 127);  /* 4.50:1 / 5.36:1 */
-  --sev-fixed:    oklch(35.6% 0.056 162);  /* 7.66:1 / 9.12:1 */
-  --sev-ignored:  oklch(48.8% 0.031 50);   /* 4.55:1 / 5.41:1 */
+  --sev-critical: #B91C1C;  /* 5.23 : 1 */
+  --sev-high:     #92400E;  /* 5.73 : 1 */
+  --sev-medium:   #854D0E;  /* 5.53 : 1 */
+  --sev-low:      #166534;  /* 5.76 : 1 */
+  --sev-info:     #4B5563;  /* 6.10 : 1 */
+  --sev-fixed:    #166534;  /* 5.76 : 1 */
+  --sev-ignored:  #5B6270;  /* 4.95 : 1 */
 
-  /* Permukaan kartu & bayangan bertingkat */
-  --surface-card:       oklch(96.8% 0.012 55);
-  --surface-card-hover: oklch(98.2% 0.008 55);
-  --surface-subtle:     oklch(92.0% 0.030 54);
-  --surface-active:     oklch(87.0% 0.060 52);
-  --line-subtle:        oklch(35.6% 0.056 162 / 0.10);
+  /* Permukaan kartu. Nilainya kini nyaris rata dengan `--bg`: kedalaman
+     disampaikan lewat nilai permukaan, bukan lewat bayangan. */
+  --surface-card:       #FFFFFF;
+  --surface-card-hover: #FFFFFF;
+  --surface-subtle:     #F1F3F5;
+  --surface-active:     #E5E7EB;
+  --line-subtle:        #EDEFF2;
 
-  /* Tint latar severity untuk pill dan chip */
-  --sev-critical-bg: oklch(49.9% 0.147 33 / 0.12);
-  --sev-high-bg:     oklch(49.7% 0.120 57 / 0.12);
-  --sev-medium-bg:   oklch(48.8% 0.100 91 / 0.14);
-  --sev-low-bg:      oklch(48.2% 0.075 127 / 0.14);
-  --sev-fixed-bg:    oklch(35.6% 0.056 162 / 0.12);
-  --sev-ignored-bg:  oklch(48.8% 0.031 50 / 0.12);
+  /* Tint latar severity. Sangat tipis: lencana di arah ini dibawa glif dan
+     warna teksnya, bukan oleh kotak berwarna di belakangnya. */
+  --sev-critical-bg: color-mix(in srgb, var(--sev-critical) 8%, transparent);
+  --sev-high-bg:     color-mix(in srgb, var(--sev-high) 8%, transparent);
+  --sev-medium-bg:   color-mix(in srgb, var(--sev-medium) 8%, transparent);
+  --sev-low-bg:      color-mix(in srgb, var(--sev-low) 8%, transparent);
+  --sev-fixed-bg:    color-mix(in srgb, var(--sev-fixed) 8%, transparent);
+  --sev-ignored-bg:  color-mix(in srgb, var(--sev-ignored) 8%, transparent);
 
-  /* Bayangan lembut bernuansa hangat */
-  --shadow-sm:       0 1px 2px oklch(35.6% 0.056 162 / 0.05);
-  --shadow-card:     0 2px 5px oklch(35.6% 0.056 162 / 0.05), 0 6px 16px oklch(35.6% 0.056 162 / 0.03);
-  --shadow-hover:    0 4px 12px oklch(35.6% 0.056 162 / 0.08), 0 12px 28px -4px oklch(35.6% 0.056 162 / 0.08);
-  --shadow-dropdown: 0 12px 32px -4px oklch(35.6% 0.056 162 / 0.14);
+  /* Bayangan DIHAPUS, bukan dilemahkan. Nilainya `none` dan namanya tetap
+     supaya tiga puluh satu pemakaian di bawah tidak perlu disentuh.
+     Bayangan pada permukaan gelap netral menghasilkan kabur kelabu yang
+     merusak kesan monolitiknya. */
+  --shadow-sm:       none;
+  --shadow-card:     none;
+  --shadow-hover:    none;
+  --shadow-dropdown: none;
 
   --s-1: 0.5rem;  --s-2: 0.75rem; --s-3: 1rem;   --s-4: 1.5rem;
   --s-5: 2rem;    --s-6: 3rem;    --s-7: 4rem;
 
-  --r-panel: 16px; --r-kontrol: 10px; --r-chip: 6px;
+  /* Ketiganya sama nilainya, dan itu disengaja: tiga langkah radius ada untuk
+     membedakan bentuk pada radius besar, dan pada 2px pembedaan itu tidak
+     terlihat. Versi lama memakai 16px sebagai radius tanda tangan; arah itu
+     ditarik. */
+  --r-panel: 2px; --r-kontrol: 2px; --r-chip: 2px;
 
-  --t-mark: 1.5rem;    --t-judul: 1.25rem;  --t-sub: 1.0625rem;
-  --t-body: 0.9375rem; --t-data: 0.8125rem; --t-mikro: 0.75rem;
+  /* Naik di setiap tingkat atas permintaan pemilik proyek:
+     prosa 15 → 17px, sel tabel 13 → 15px, angka metrik 30 → 40px. */
+  --t-mark: 1.25rem;   --t-judul: 2rem;      --t-sub: 1.1875rem;
+  --t-body: 1.0625rem; --t-data: 0.9375rem;  --t-mikro: 0.8125rem;
+  --t-metrik: 2.5rem;  --t-th: 0.75rem;
 
   --e-out: cubic-bezier(0.22, 1, 0.36, 1);
   --d-cepat: 150ms; --d-normal: 220ms;
 
   --z-dropdown: 10; --z-sticky: 20; --z-backdrop: 30;
   --z-dialog: 40;   --z-toast: 50;
+}
+
+/* ── TEMA GELAP ──────────────────────────────────────────────────────────────
+   Netral sepenuhnya, nol rona. Kandidat bernuansa biru diukur berdampingan dan
+   ditolak: ronanya menambah suasana yang arah ini tidak minta, dan tugas
+   permukaan di sini adalah menghilang.
+
+   Aksennya sian, dan itu BUKAN pilihan bebas: severity sudah memakai merah,
+   oranye, kuning, hijau, dan abu, jadi hue yang tersisa tinggal biru dan sian.
+   Kandidat teal #5EEAD4 ditolak karena terlalu dekat dengan `--sev-low` —
+   aksen yang bisa tertukar dengan severity adalah aksen yang berhenti berarti.
+
+   Dipasang di `[data-theme]` pada <html>, BUKAN lewat `prefers-color-scheme`
+   saja: tema gelap diminta sebagai pilihan pemakai, bukan sebagai akibat
+   setelan sistemnya. `prefers-color-scheme` hanya menentukan nilai awal untuk
+   pilihan `system` — lihat `lib/tema.ts`. */
+[data-theme='dark'] {
+  --bg:        #0D0D0F;
+  --surface:   #212127;   /* baris hover — PERMUKAAN TERKETAT */
+  --ink:       #F4F4F5;   /* 14.57 : 1 */
+  --ink-2:     #A1A1AA;   /*  6.25 : 1 */
+  --accent:    #22D3EE;   /*  8.86 : 1 */
+  --line:      #212127;
+  --line-kuat: #2E2E36;
+
+  --sev-critical: #FF8A8A;  /*  7.06 : 1 */
+  --sev-high:     #FFAB6B;  /*  8.61 : 1 */
+  --sev-medium:   #E8C15A;  /*  9.31 : 1 */
+  --sev-low:      #6EE7A0;  /* 10.37 : 1 */
+  --sev-info:     #A1A1AA;  /*  6.25 : 1 */
+  --sev-fixed:    #6EE7A0;  /* 10.37 : 1 */
+  --sev-ignored:  #909099;  /*  5.06 : 1 */
+
+  --surface-card:       #16161A;
+  --surface-card-hover: #1A1A1F;
+  --surface-subtle:     #16161A;
+  --surface-active:     #212127;
+  --line-subtle:        #1A1A1F;
+}
+
+/* Pilihan `system`: ikut setelan sistem, tanpa JS dan tanpa kedipan.
+   Selectornya menolak KEDUA nilai eksplisit, jadi pilihan pemakai selalu
+   menang atas setelan sistemnya.
+
+   Nilainya digandakan dari blok di atas, dan itu keputusan sadar. Alternatifnya
+   `light-dark()`, yang menghapus duplikasi ini sepenuhnya — tapi kalau
+   fungsinya tidak didukung, SEMUA warna hilang sekaligus dan halamannya jadi
+   teks hitam di atas putih tanpa satu pun token. Untuk alat yang tampilan
+   datanya adalah intinya, kegagalan total adalah harga yang terlalu mahal
+   dibanding dua puluh baris duplikat.
+
+   Yang menjaga keduanya tidak menyimpang adalah `test/kontras.test.ts`: ia
+   membandingkan kedua blok token dan gagal kalau ada satu nilai yang berbeda. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='dark']) {
+  --bg:        #0D0D0F;
+  --surface:   #212127;   /* baris hover — PERMUKAAN TERKETAT */
+  --ink:       #F4F4F5;   /* 14.57 : 1 */
+  --ink-2:     #A1A1AA;   /*  6.25 : 1 */
+  --accent:    #22D3EE;   /*  8.86 : 1 */
+  --line:      #212127;
+  --line-kuat: #2E2E36;
+
+  --sev-critical: #FF8A8A;  /*  7.06 : 1 */
+  --sev-high:     #FFAB6B;  /*  8.61 : 1 */
+  --sev-medium:   #E8C15A;  /*  9.31 : 1 */
+  --sev-low:      #6EE7A0;  /* 10.37 : 1 */
+  --sev-info:     #A1A1AA;  /*  6.25 : 1 */
+  --sev-fixed:    #6EE7A0;  /* 10.37 : 1 */
+  --sev-ignored:  #909099;  /*  5.06 : 1 */
+
+  --surface-card:       #16161A;
+  --surface-card-hover: #1A1A1F;
+  --surface-subtle:     #16161A;
+  --surface-active:     #212127;
+  --line-subtle:        #1A1A1F;
+  }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -70,9 +183,9 @@ p { text-wrap: pretty; }
 
 /* Fokus terlihat di mana pun. Tidak pernah dimatikan tanpa pengganti. */
 :focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 2px;
 }
 
 a { color: inherit; }
@@ -86,16 +199,17 @@ a { color: inherit; }
 }
 
 .wrap {
-  max-width: 1180px;
+  max-width: 1240px;
   margin: 0 auto;
   padding: var(--s-5) var(--s-4) var(--s-7);
 }
 
 .wordmark-teks {
-  font-family: var(--font-mark);
+  /* Space Mono dihapus bersama arah terminal. Wordmark memakai font UI pada
+     bobot 600 dan tracking negatif — satu keluarga untuk seluruh antarmuka. */
   font-size: var(--t-mark);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  letter-spacing: -0.022em;
 }
 
 /* ── Navbar ─────────────────────────────────────────────────────────────── */
@@ -104,7 +218,7 @@ a { color: inherit; }
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  background: oklch(94.5% 0.019 60 / 0.90);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
@@ -113,7 +227,7 @@ a { color: inherit; }
 }
 
 .navbar-inner {
-  max-width: 1180px;
+  max-width: 1240px;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -322,14 +436,14 @@ a { color: inherit; }
 .kartu-status.bersih {
   color: var(--sev-fixed);
   background: var(--sev-fixed-bg);
-  border-color: oklch(35.6% 0.056 162 / 0.25);
+  border-color: color-mix(in srgb, var(--ink) 25%, transparent);
   font-weight: 500;
 }
 
 .kartu-status.gagal {
   color: var(--sev-critical);
   background: var(--sev-critical-bg);
-  border-color: oklch(49.9% 0.147 33 / 0.25);
+  border-color: color-mix(in srgb, var(--sev-critical) 30%, transparent);
   font-weight: 500;
 }
 
@@ -342,7 +456,7 @@ a { color: inherit; }
   background: var(--sev-high-bg);
   padding: 0.2rem 0.5rem;
   border-radius: var(--r-chip);
-  border: 1px solid oklch(49.7% 0.120 57 / 0.25);
+  border: 1px solid color-mix(in srgb, var(--sev-high) 30%, transparent);
   width: fit-content;
   font-weight: 500;
 }
@@ -479,8 +593,8 @@ a { color: inherit; }
   color: var(--bg);
 }
 .tombol-bahaya:hover {
-  background: oklch(43% 0.147 33);
-  border-color: oklch(43% 0.147 33);
+  background: var(--sev-critical);
+  border-color: var(--sev-critical);
 }
 .tombol-bahaya:active {
   background: var(--sev-critical);
@@ -583,7 +697,7 @@ a { color: inherit; }
 }
 
 .tombol:hover:not(:disabled) {
-  background: oklch(35.6% 0.056 162 / 0.88);
+  background: color-mix(in srgb, var(--ink) 88%, transparent);
   box-shadow: var(--shadow-card);
   transform: translateY(-1px);
 }
@@ -771,7 +885,7 @@ a { color: inherit; }
 
 .tab-item:hover {
   color: var(--ink);
-  background: oklch(89.1% 0.055 53 / 0.35);
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
 }
 
 .tab-item[aria-current='page'] {
@@ -801,7 +915,6 @@ a { color: inherit; }
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
   box-shadow: var(--shadow-card);
-  border-left: 4px solid var(--ink);
 }
 
 .ringkas-header-bar {
@@ -894,7 +1007,7 @@ a { color: inherit; }
   font-size: var(--t-data);
   color: var(--sev-critical);
   background: var(--sev-critical-bg);
-  border: 1px solid oklch(49.9% 0.147 33 / 0.25);
+  border: 1px solid color-mix(in srgb, var(--sev-critical) 30%, transparent);
   padding: var(--s-2) var(--s-3);
   border-radius: var(--r-kontrol);
   max-width: 68ch;
@@ -936,7 +1049,7 @@ a { color: inherit; }
 
 .saring-item:hover {
   color: var(--ink);
-  background: oklch(96.8% 0.012 55 / 0.5);
+  background: color-mix(in srgb, var(--surface-card) 50%, transparent);
 }
 
 .saring-item[aria-current] {
@@ -980,8 +1093,7 @@ a { color: inherit; }
   margin-top: var(--s-3);
   padding: var(--s-2) var(--s-3);
   background: var(--surface-card);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--sev-high);
+  border: 1px solid color-mix(in srgb, var(--sev-high) 40%, var(--line));
   border-radius: var(--r-kontrol);
   font-size: var(--t-mikro);
   color: var(--ink-2);
@@ -994,10 +1106,6 @@ a { color: inherit; }
 .tabel-bungkus {
   overflow-x: auto;
   margin-top: var(--s-4);
-  background: var(--surface-card);
-  border: 1px solid var(--line);
-  border-radius: var(--r-panel);
-  box-shadow: var(--shadow-card);
 }
 
 .tabel {
@@ -1014,20 +1122,32 @@ a { color: inherit; }
 
 .tabel th {
   text-align: left;
-  font-weight: 600;
-  font-size: var(--t-mikro);
+  font-family: var(--font-num);
+  font-weight: 400;
+  font-size: var(--t-th);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.65rem var(--s-3);
-  background: var(--surface);
+  letter-spacing: 0.1em;
+  padding: 0 var(--s-3) 0.75rem 0;
   border-bottom: 1px solid var(--line-kuat);
-  color: var(--ink);
+  color: var(--ink-2);
 }
 
 .tabel td {
-  padding: 0.65rem var(--s-3);
-  border-bottom: 1px solid var(--line-subtle);
-  vertical-align: middle;
+  padding: 0.875rem var(--s-3) 0.875rem 0;
+  vertical-align: top;
+}
+
+/* PENGECUALIAN, dan satu-satunya di seluruh berkas ini.
+   Tabel Lighthouse punya tujuh kolom dan memuat URL panjang. Diuji di mockup:
+   tanpa pembeda baris, mata kehilangan jejak horizontal saat melacak satu
+   halaman dari kolom URL ke kolom SEO — dan itu layar terlebar sekaligus salah
+   satu yang paling sering dibaca. Arahnya tetap "tanpa garis"; harganya
+   dibayar di satu tempat yang benar-benar membutuhkannya. */
+.tabel-lebar tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
+}
+.tabel-lebar tbody td {
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
 }
 
 .tabel tbody tr {
@@ -1038,7 +1158,8 @@ a { color: inherit; }
 }
 
 .sel-rule {
-  font-weight: 600;
+  font-family: var(--font-num);
+  font-size: var(--t-mikro);
   color: var(--ink);
 }
 
@@ -1049,10 +1170,18 @@ a { color: inherit; }
 }
 
 .sel-mikro {
+  font-family: var(--font-num);
   font-size: var(--t-mikro);
   color: var(--ink-2);
   white-space: nowrap;
   text-align: right;
+}
+
+/* Angka adalah muatan utama aplikasi ini. `tabular-nums` yang membuat kolom
+   skor tidak bergeser saat berpindah tab, dan pergeseran itu adalah keluhan
+   yang mudah muncul lalu sulit ditelusuri. */
+.tabel td, .tabel th, .sel-skor, .metrik-angka, .skor-pill {
+  font-variant-numeric: tabular-nums;
 }
 
 .tag-run {
@@ -1090,16 +1219,26 @@ a { color: inherit; }
 
 /* ── Severity Chip / Lencana ───────────────────────────────────────────── */
 
+/* Lencana tanpa kotak: border dan latar dihapus. Di arah ini lencana dibawa
+   glif dan warna teksnya, dan kotak di sekeliling tiap severity menambahkan
+   lima kotak kecil per baris tabel — kebisingan yang justru menutupi datanya. */
 .chip {
   display: inline-flex;
-  gap: 0.3rem;
-  align-items: center;
-  font-size: var(--t-mikro);
-  font-weight: 600;
-  padding: 0.2rem 0.5rem;
-  border-radius: var(--r-chip);
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: var(--t-data);
+  font-weight: 400;
   white-space: nowrap;
-  border: 1px solid currentColor;
+  text-transform: capitalize;
+}
+
+/* Lebar tetap. Tanpa ini kolom severity bergeser antar baris, karena kelima
+   glif punya lebar alami yang berbeda. */
+.chip-glif {
+  font-family: var(--font-num);
+  width: 1.15em;
+  display: inline-block;
+  flex: none;
 }
 
 .tombol-sev {
@@ -1114,8 +1253,10 @@ a { color: inherit; }
   text-align: left;
 }
 .tombol-sev:hover .chip {
-  transform: scale(1.03);
-  transition: transform var(--d-cepat) var(--e-out);
+  /* `scale` pada teks tanpa kotak menghasilkan teks yang bergoyang dan
+     menggeser tetangganya. Garis bawah tidak menggeser apa pun. */
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* ── Baris Detail Temuan ───────────────────────────────────────────────── */
@@ -1205,7 +1346,7 @@ a { color: inherit; }
 .detail-hasil.beres {
   color: var(--sev-fixed);
   background: var(--sev-fixed-bg);
-  border: 1px solid oklch(35.6% 0.056 162 / 0.3);
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
 }
 .detail-hasil.masih {
   color: var(--ink);
@@ -1215,7 +1356,7 @@ a { color: inherit; }
 .detail-hasil.galat {
   color: var(--sev-critical);
   background: var(--sev-critical-bg);
-  border: 1px solid oklch(49.9% 0.147 33 / 0.3);
+  border: 1px solid color-mix(in srgb, var(--sev-critical) 35%, transparent);
 }
 
 /* ── Grid Skor Lighthouse ────────────────────────────────────────────────── */
@@ -1577,8 +1718,7 @@ code {
   margin-top: var(--s-3);
   padding: var(--s-2) var(--s-3);
   background: var(--surface-card);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--ink-2);
+  border: 1px solid var(--line-kuat);
   border-radius: var(--r-kontrol);
   font-size: var(--t-mikro);
   color: var(--ink-2);
@@ -1639,7 +1779,7 @@ code {
   display: flex; align-items: flex-start; gap: var(--s-2);
   margin-top: var(--s-3); padding: var(--s-2) var(--s-3);
   font-size: var(--t-mikro); line-height: 1.5;
-  border: 1px solid var(--line); border-left: 3px solid var(--sev-high);
+  border: 1px solid color-mix(in srgb, var(--sev-high) 40%, var(--line));
   border-radius: var(--r-kontrol);
   background: var(--surface-card); color: var(--ink-2);
 }
@@ -1650,3 +1790,51 @@ code {
    ditonjolkan: ia BUKAN masalah baru dan bukan kabar buruk — justru mungkin
    sudah beres. Yang dijawabnya cuma "kenapa baris ini masih di sini". */
 .sel-terlewat { color: var(--ink-2); font-style: italic; }
+
+/* ── Pemilih Tema ───────────────────────────────────────────────────────────
+   Di navbar, bukan di halaman pengaturan: tema adalah hal yang dicoba beberapa
+   kali sampai terasa pas, dan menyembunyikannya di halaman lain berarti tiga
+   navigasi per percobaan. */
+.pilih-tema {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.pilih-tema-label {
+  font-family: var(--font-num);
+  font-size: var(--t-th);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.pilih-tema select {
+  font: inherit;
+  font-size: var(--t-mikro);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line-kuat);
+  border-radius: var(--r-kontrol);
+  padding: 0.25rem 0.4rem;
+  cursor: pointer;
+}
+.pilih-tema select:disabled { opacity: 0.5; cursor: wait; }
+
+/* Tombol Keluar memakai `.navbar-item`, yang dirancang untuk `<a>`.
+   `<button>` mewarisi latar bawaan browser (#EFEFEF di Chromium), dan itu
+   tidak terlihat di tema terang tapi menghasilkan 2,23 : 1 di tema gelap —
+   abu-abu terang di belakang teks abu-abu. Terukur di browser, bukan diduga.
+
+   Reset ini dipasang sebagai selector `button.navbar-item` alih-alih menambah
+   class baru: yang perlu diperbaiki adalah elemennya, bukan penamaannya. */
+button.navbar-item {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+button.navbar-item:hover { color: var(--ink); }

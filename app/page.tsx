@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { db } from '../lib/ui/db.ts'
 import { ringkasanSitus } from '../lib/ui/queries.ts'
 import { konteks } from '../lib/auth/konteks.ts'
+import { GLIF } from '../lib/glif.ts'
 import { TambahSitus } from '../components/TambahSitus.tsx'
 import { HapusSitus } from '../components/HapusSitus.tsx'
 
@@ -11,12 +12,7 @@ export const dynamic = 'force-dynamic'
 
 const URUT = ['critical', 'high', 'medium', 'low'] as const
 
-const PENANDA: Record<(typeof URUT)[number], string> = {
-  critical: '[!!]',
-  high: '[!]',
-  medium: '[~]',
-  low: '[.]',
-}
+
 
 export default async function Dashboard() {
   const ctx = await konteks()
@@ -119,7 +115,7 @@ export default async function Dashboard() {
                   <span className="kartu-hitungan">
                     {URUT.filter((k) => s.terbuka[k] > 0).map((k) => (
                       <span key={k} className={`kartu-chip-hitung kartu-chip-${k}`}>
-                        <span aria-hidden="true">{PENANDA[k]}</span>
+                        <span aria-hidden="true" className="chip-glif">{GLIF[k]}</span>
                         {s.terbuka[k]} {k}
                       </span>
                     ))}

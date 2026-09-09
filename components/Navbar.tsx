@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation'
 import { Ikon } from './Ikon.tsx'
 import type { NamaIkon } from './Ikon.tsx'
 import { Logo } from './Logo.tsx'
+import { PilihTema } from './PilihTema.tsx'
+import type { Tema } from '../lib/tema.ts'
 
 /**
  * `/model` diletakkan sesudah Home karena itu urutan pemakaiannya: daftar
@@ -25,7 +27,7 @@ const NAV: { href: string; label: string; ikon: NamaIkon }[] = [
  * Tab Home inilah jalan kembali ke index dari halaman situs, dan karena
  * navbarnya ada di setiap halaman, jalan itu tidak pernah hilang.
  */
-export function Navbar({ email }: { email: string | null }) {
+export function Navbar({ email, tema }: { email: string | null; tema: Tema }) {
   const path = usePathname()
 
   return (
@@ -52,6 +54,8 @@ export function Navbar({ email }: { email: string | null }) {
               {n.label}
             </Link>
           ))}
+
+          <PilihTema tema={tema} />
 
           {email === null ? (
             <Link

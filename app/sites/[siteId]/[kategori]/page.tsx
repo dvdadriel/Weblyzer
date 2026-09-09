@@ -13,6 +13,7 @@ import { TabelTemuan } from '../../../../components/TabelTemuan.tsx'
 import { KeadaanKosong } from '../../../../components/KeadaanKosong.tsx'
 import { TombolScan } from '../../../../components/TombolScan.tsx'
 import { sumberKategori } from '../../../../lib/kategori.ts'
+import { GLIF } from '../../../../lib/glif.ts'
 import { konteks } from '../../../../lib/auth/konteks.ts'
 import { bolehCliHost } from '../../../../lib/auth/pemilik.ts'
 
@@ -74,8 +75,11 @@ export default async function Kategori({
    */
   const keterangan = sumberKategori(kategori) === 'claude-seo' && (
     <div className="catatan-sumber" role="note">
-      <span style={{ color: 'var(--sev-high)', marginTop: '2px', flexShrink: 0 }}>
-        [!]
+      <span
+        aria-hidden="true"
+        style={{ color: 'var(--sev-high)', flexShrink: 0, fontFamily: 'var(--font-num)' }}
+      >
+        {GLIF.high}
       </span>
       <span>
         Dinilai claude-seo, bukan diukur aturan. Jawabannya bisa bergeser antar

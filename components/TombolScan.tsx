@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
 import { jalankanScan } from '../app/actions.ts'
 import { Ikon } from './Ikon.tsx'
+import { GLIF_BERJALAN } from '../lib/glif.ts'
 
 export type Kategori =
   | 'bugs'
@@ -82,8 +83,8 @@ const JEDA_SEGARKAN_MS = 5000
  * kebohongan yang dilarang PRODUCT.md. Yang kita tahu cuma dua hal, dan cuma
  * itu yang ditulis: sedang berjalan, dan sejak jam berapa.
  *
- * Penandanya `[..]`, meneruskan kosakata penanda yang sudah ada
- * (`[!!] [!] [~] [.] [ok] [--]`) alih-alih memperkenalkan ikon. Titik ganda
+ * Penandanya elipsis, sejalan dengan glif severity di `lib/glif.ts`
+ * alih-alih memperkenalkan ikon. Elipsis
  * terbaca sebagai "belum selesai" tanpa perlu animasi.
  */
 export function TombolScan({
@@ -117,7 +118,7 @@ export function TombolScan({
     const jalanEl = (
       <p className="jalan" role="status">
         <span className="jalan-tanda" aria-hidden="true">
-          [..]
+          {GLIF_BERJALAN}
         </span>
         <span>
           {NAMA_RUN[berjalan.type] ?? 'Scan'} berjalan sejak {berjalan.mulai}. Halaman

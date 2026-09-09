@@ -49,7 +49,12 @@ export function GridSkor({ baris, baseUrl }: { baris: BarisSkor[]; baseUrl: stri
 
   return (
     <div className="tabel-bungkus">
-      <table className="tabel grid-skor">
+      {/* `tabel-lebar` mengaktifkan pengecualian zebra + garis samar.
+          Tabel ini punya delapan kolom dan memuat URL panjang; diuji di mockup,
+          tanpa pembeda baris mata kehilangan jejak horizontal saat melacak satu
+          halaman dari kolom URL ke kolom SEO. Satu-satunya tempat pengecualian
+          itu dipakai — lihat docs/DESIGN.md. */}
+      <table className="tabel tabel-lebar grid-skor">
         {/* Hanya `halaman` yang lentur; empat kolom skor berlebar sama supaya
             angkanya berbaris per kolom. */}
         <colgroup>
