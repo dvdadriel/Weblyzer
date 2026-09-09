@@ -38,6 +38,19 @@ Everything else: Excel export with a ready-to-paste fix prompt per problem,
 Lighthouse scores measured locally for both mobile and desktop, per-finding
 recheck without recrawling the site, and optional AI summaries.
 
+## Demo
+
+A read-only demo page at `/demo` ships with the repository, backed by a bundled
+`demo.db` of two real scans: Weblyzer pointed at itself, and apple.com as a
+public comparison. Deployable to Vercel as-is — the page opens its own
+read-only connection and there is no write path on it.
+
+The full app is not deployable to a serverless host, and that is architectural
+rather than a configuration gap: findings live in a local SQLite file whose
+`open` → `fixed` history is the point of the tool, scans spawn a detached
+process that outlives the request, and the job queue needs something long-lived
+to drain it. Use the Dockerfile on a host with a volume instead.
+
 ## Requirements
 
 - **Node 24+** (per `engines`; developed on 26) — uses `node:sqlite` and runs
@@ -151,7 +164,7 @@ worker that started before it. This happened for real.
 ## Tests
 
 ```bash
-npm test               # 420 tests
+npm test               # 434 tests
 npx tsc --noEmit       # must be clean
 ```
 
@@ -176,7 +189,7 @@ No keyword research, SERP data, backlinks, or rank tracking — this audits page
 it does not do market analysis. No scheduler is installed for you (the CLI
 command exists; wiring it to cron is yours).
 
-Around 8,800 lines of source and 5,500 lines of tests. Two runtime dependencies
+Around 9,300 lines of source and 5,700 lines of tests. Two runtime dependencies
 outside Next, React, Playwright, and Lighthouse: `write-excel-file` and
 `nodemailer`.
 
