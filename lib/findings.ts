@@ -59,15 +59,49 @@ function dedupeBySeverity(incoming: NewFinding[]): { fp: string; finding: NewFin
 }
 
 /**
+ * Berapa kali sebuah temuan harus TIDAK dilaporkan sebelum ditandai beres,
+ * pada kategori yang dinilai model.
+ *
+ * Ini mekanisme yang sama dengan Lighthouse yang diukur dua kali dan hanya
+ * melaporkan audit yang gagal di kedua pengukuran (§2.1) — dipakai di arah
+ * sebaliknya. Alasannya juga sama: satu pengukuran tidak cukup jadi dasar.
+ *
+ * Kenapa perlu, terukur: setelah audit disuruh berhenti melaporkan apa yang
+ * sudah dilaporkan GEO, `reconcile` menandai enam temuan sebagai `fixed` —
+ * `tanpa-heading-pertanyaan`, `product-schema-tanpa-penawaran`, dan empat
+ * lainnya. Tidak ada satu pun yang diperbaiki; audit cuma berhenti
+ * menyebutnya. `fixed` berubah arti menjadi "berhenti dilaporkan", dan itu
+ * persis kebohongan yang §2.1 dibangun untuk mencegah.
+ *
+ * Dua kali berturut-turut bukan bukti sempurna, tapi jauh lebih kuat daripada
+ * sekali — dan yang tertinggal satu kali tetap `open` serta disebut apa adanya
+ * di layar: tidak dilaporkan pada analisis terakhir.
+ */
+export const AMBANG_HILANG = 2
+
+export type ModeRekonsiliasi =
+  /** Tidak dilaporkan = beres, seketika. Benar untuk aturan deterministik:
+   *  `judul-hilang` yang tidak muncul lagi berarti judulnya benar-benar ada. */
+  | 'tegas'
+  /** Tidak dilaporkan = belum tentu beres. Untuk kategori yang dinilai model,
+   *  di mana absennya sebuah temuan bisa berarti beres, bisa berarti model
+   *  berubah pikiran, bisa berarti ia diminta tidak mengulang kategori lain. */
+  | 'lunak'
+
+/**
  * Menyelaraskan temuan tersimpan dengan hasil satu scan.
  *
- * Strateginya: tandai semua temuan open pada kategori ini sebagai fixed lebih
- * dulu, lalu buka kembali yang benar-benar dilaporkan. Ini menghindari klausa
- * `NOT IN (...)` yang akan menabrak batas jumlah parameter SQLite pada situs
- * besar.
+ * Mode `tegas` (bawaan): tandai semua temuan open pada kategori ini sebagai
+ * fixed lebih dulu, lalu buka kembali yang benar-benar dilaporkan. Ini
+ * menghindari klausa `NOT IN (...)` yang akan menabrak batas jumlah parameter
+ * SQLite pada situs besar.
  *
- * Temuan berstatus `ignored` tidak pernah disentuh — keputusan manual pengguna
- * bersifat lengket.
+ * Mode `lunak`: temuan yang tidak dilaporkan TETAP `open`, dan hanya
+ * `last_seen_run`-nya yang tertinggal. Ia baru ditandai `fixed` setelah tidak
+ * dilaporkan `AMBANG_HILANG` analisis berturut-turut.
+ *
+ * Temuan berstatus `ignored` tidak pernah disentuh di kedua mode — keputusan
+ * manual pengguna bersifat lengket.
  */
 export function reconcile(
   db: DatabaseSync,
@@ -75,6 +109,7 @@ export function reconcile(
   runId: number,
   category: string,
   incoming: NewFinding[],
+  mode: ModeRekonsiliasi = 'tegas',
 ): ReconcileResult {
   const result: ReconcileResult = { opened: 0, reopened: 0, stillOpen: 0, fixed: 0 }
   const deduped = dedupeBySeverity(incoming)
@@ -88,10 +123,12 @@ export function reconcile(
       .all(siteId, category) as { fingerprint: string; status: FindingStatus }[]
     const prior = new Map(priorRows.map((r) => [r.fingerprint, r.status]))
 
-    db.prepare(
-      `UPDATE findings SET status = 'fixed'
-       WHERE site_id = ? AND category = ? AND status = 'open'`,
-    ).run(siteId, category)
+    if (mode === 'tegas') {
+      db.prepare(
+        `UPDATE findings SET status = 'fixed'
+         WHERE site_id = ? AND category = ? AND status = 'open'`,
+      ).run(siteId, category)
+    }
 
     const insert = db.prepare(
       `INSERT INTO findings (site_id, page_id, category, severity, rule, title,
@@ -134,8 +171,31 @@ export function reconcile(
       }
     }
 
-    for (const [fp, status] of prior) {
-      if (status === 'open' && !seen.has(fp)) result.fixed += 1
+    if (mode === 'tegas') {
+      for (const [fp, status] of prior) {
+        if (status === 'open' && !seen.has(fp)) result.fixed += 1
+      }
+    } else {
+      // Mode lunak: yang tidak dilaporkan baru ditandai beres setelah
+      // AMBANG_HILANG analisis berturut-turut melewatkannya.
+      //
+      // Dihitung dari jumlah RUN kategori ini yang lewat sejak temuan itu
+      // terakhir dilaporkan, bukan dari selisih nomor run: nomor run global
+      // dan naik karena situs lain juga dipindai, jadi selisihnya tidak
+      // mengatakan apa pun tentang berapa kali kategori INI dianalisis.
+      const hilang = db
+        .prepare(
+          `UPDATE findings SET status = 'fixed'
+           WHERE site_id = ? AND category = ? AND status = 'open'
+             AND (SELECT COUNT(*) FROM runs
+                  WHERE runs.site_id = findings.site_id
+                    AND runs.type = ?
+                    AND runs.id > findings.last_seen_run
+                    AND runs.id <= ?) >= ?
+           RETURNING id`,
+        )
+        .all(siteId, category, category, runId, AMBANG_HILANG) as { id: number }[]
+      result.fixed = hilang.length
     }
 
     db.exec('COMMIT')

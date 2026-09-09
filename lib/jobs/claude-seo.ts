@@ -54,25 +54,10 @@ export async function claudeSeoHandler(job: Job, db: DatabaseSync): Promise<void
     )
     .all(site.id, aspek) as { rule: string; title: string }[]
 
-  // Temuan GEO yang terbuka, diberikan ke audit supaya tidak mengulanginya.
-  // Terukur pada iSleep: 5 dari 11 temuan GEO muncul lagi di Audit, satu
-  // dengan nama aturan yang identik persis. Audit yang menghindar, bukan GEO —
-  // GEO lebih sempit dan lebih murah dijalankan.
-  const kategoriLain =
-    aspek === 'audit'
-      ? (db
-          .prepare(
-            `SELECT rule, title FROM findings
-             WHERE site_id = ? AND category = 'geo' AND status IN ('open', 'ignored')
-             ORDER BY rule`,
-          )
-          .all(site.id) as { rule: string; title: string }[])
-      : []
-
   const prompt =
     aspek === 'geo'
       ? promptGeo(site.name, site.base_url, sebelumnya)
-      : promptAudit(site.name, site.base_url, site.max_pages, sebelumnya, kategoriLain)
+      : promptAudit(site.name, site.base_url, site.max_pages, sebelumnya)
 
   const hasil = await jalankanClaudeSeo(prompt, site.id, BATAS_MS[aspek])
   if (!hasil.ok) throw new Error(`claude-seo ${aspek} gagal: ${hasil.galat}`)
@@ -85,5 +70,11 @@ export async function claudeSeoHandler(job: Job, db: DatabaseSync): Promise<void
   const dibaca = bacaTemuan(hasil.teks, halaman, site.base_url)
   if (!dibaca.ok) throw new Error(`claude-seo ${aspek}: ${dibaca.galat}`)
 
-  reconcile(db, site.id, job.run_id, aspek, dibaca.temuan)
+  // Mode LUNAK, bukan tegas. Absennya sebuah temuan dari analisis model bisa
+  // berarti beres, bisa berarti model berubah pikiran, bisa berarti ia diminta
+  // tidak mengulang apa yang sudah dilaporkan kategori lain — dan ketiganya
+  // tidak bisa dibedakan dari luar. Menandainya beres seketika membuat `fixed`
+  // berarti "berhenti dilaporkan", yang terukur terjadi: enam temuan audit
+  // ditandai beres semata karena dedup lintas kategori mulai bekerja.
+  reconcile(db, site.id, job.run_id, aspek, dibaca.temuan, 'lunak')
 }

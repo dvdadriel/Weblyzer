@@ -1645,3 +1645,8 @@ code {
 }
 .atur-galat svg { flex: none; position: relative; top: 0.2em; }
 .atur-galat strong { color: var(--ink); }
+
+/* Temuan yang analisis terakhir tidak sebutkan lagi. Diredam, bukan
+   ditonjolkan: ia BUKAN masalah baru dan bukan kabar buruk — justru mungkin
+   sudah beres. Yang dijawabnya cuma "kenapa baris ini masih di sini". */
+.sel-terlewat { color: var(--ink-2); font-style: italic; }

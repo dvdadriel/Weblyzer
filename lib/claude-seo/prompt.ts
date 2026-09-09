@@ -137,43 +137,31 @@ export function promptGeo(
 }
 
 /**
- * Aturan yang sudah dilaporkan kategori LAIN, supaya audit tidak mengulanginya.
+ * DIBATALKAN: menyuruh audit tidak mengulang temuan GEO.
  *
- * Diukur pada iSleep: 5 dari 11 temuan GEO muncul lagi di Audit, satu di
- * antaranya dengan nama aturan yang **identik persis**
- * (`tanpa-heading-pertanyaan`), dan satu lagi cuma beda urutan kata
- * (`schema-produk-tanpa-penawaran` melawan `product-schema-tanpa-penawaran`).
+ * Ide awalnya masuk akal — 5 dari 11 temuan GEO muncul lagi di Audit, satu
+ * dengan nama aturan identik persis — tapi pelaksanaannya bertentangan dengan
+ * `reconcile` secara struktural, dan itu terukur: enam temuan audit ditandai
+ * `fixed` semata karena audit berhenti menyebutnya. Tidak satu pun diperbaiki.
  *
- * Itu merusak justru hal yang membuat fitur ini berguna: dua tab menyuruh
- * mengerjakan satu pekerjaan, dan menandainya beres di satu tab tidak menutup
- * yang di tab lain. Checklist yang menghitung ganda bukan checklist.
+ * Mode lunak (`AMBANG_HILANG` di findings.ts) hanya MENUNDA itu dua analisis;
+ * temuan yang sengaja tidak dilaporkan akan tetap berakhir `fixed`. Tidak ada
+ * ambang yang bisa memperbaikinya, karena masalahnya bukan seberapa lama kita
+ * menunggu — melainkan bahwa kita menyuruh model menyembunyikan sesuatu yang
+ * masih ada, lalu menyimpulkan dari ketiadaannya.
  *
- * Audit yang menghindar, bukan GEO — GEO lebih sempit, lebih murah dijalankan,
- * dan lebih dulu ada. Ini juga meneruskan pola yang sudah dipakai promptnya:
- * ia memang sudah diberi tahu apa yang sudah diperiksa pemindai deterministik.
+ * Jadi kedua kategori sekarang melaporkan apa yang mereka temukan. Harganya:
+ * satu masalah bisa muncul di dua tab. Itu menjengkelkan; `fixed` yang
+ * berbohong merusak fondasi seluruh alat. Duplikasinya ditangani di tempat
+ * yang tidak menyentuh riwayat — kolom Sumber di sheet Prompt Perbaikan
+ * menyebutkan asal tiap baris.
  */
-function bagianKategoriLain(lain: TemuanSebelumnya[]): string[] {
-  if (lain.length === 0) return []
-  return [
-    'Aspek berikut SUDAH dilaporkan oleh analisis GEO untuk situs ini, dan',
-    'muncul di tab tersendiri. Jangan melaporkannya lagi — pemakainya akan',
-    'melihat satu pekerjaan sebagai dua, dan menandainya beres di satu tempat',
-    'tidak menutup yang di tempat lain.',
-    '',
-    ...lain.slice(0, BATAS_SEBELUMNYA).map((t) => `- ${t.rule} — ${t.title.slice(0, 120)}`),
-    '',
-    'Kalau temuan Anda mirip tapi tidak sama, sebutkan bedanya di "detail"',
-    'supaya jelas ia bukan duplikat.',
-    '',
-  ]
-}
 
 export function promptAudit(
   nama: string,
   baseUrl: string,
   maxPages: number,
   sebelumnya: TemuanSebelumnya[] = [],
-  kategoriLain: TemuanSebelumnya[] = [],
 ): string {
   return [
     `Gunakan skill claude-seo:seo-audit untuk mengaudit situs "${nama}" (${baseUrl}).`,
@@ -193,7 +181,6 @@ export function promptAudit(
     'schema markup, kecocokan jenis halaman dengan intent pencarian, konten',
     'tipis atau kembar, cakupan sitemap, dan hal khas industrinya.',
     '',
-    ...bagianKategoriLain(kategoriLain),
     ...bagianSebelumnya(sebelumnya),
     ...ATURAN,
   ].join('\n')

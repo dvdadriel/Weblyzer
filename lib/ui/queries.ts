@@ -40,6 +40,17 @@ export type BarisTemuan = {
   url: string | null
   first_seen_run: number
   last_seen_run: number
+  /**
+   * Berapa analisis kategori ini melewatkan temuan ini sejak terakhir
+   * dilaporkan. 0 berarti analisis terakhir masih menyebutnya.
+   *
+   * Hanya bermakna untuk kategori claude-seo, yang direkonsiliasi dengan mode
+   * lunak: di sana temuan yang tidak dilaporkan tetap `open` sampai dua
+   * analisis berturut-turut melewatkannya. Tanpa kolom ini, temuan yang sudah
+   * tidak disebut model terlihat persis sama dengan yang baru dikonfirmasi —
+   * dan itu perbedaan yang menentukan apakah layak dikerjakan.
+   */
+  terlewat: number
 }
 
 const NOL: Record<Severity, number> = {
@@ -168,7 +179,10 @@ export function temuanKategori(
   return polos(db
     .prepare(
       `SELECT f.id, f.category, f.severity, f.rule, f.title, f.detail_json, f.status,
-              p.url AS url, f.first_seen_run, f.last_seen_run
+              p.url AS url, f.first_seen_run, f.last_seen_run,
+              (SELECT COUNT(*) FROM runs
+               WHERE runs.site_id = f.site_id AND runs.type = f.category
+                 AND runs.id > f.last_seen_run) AS terlewat
        FROM findings f
        LEFT JOIN pages p ON p.id = f.page_id
        WHERE f.site_id = ? AND f.category = ? AND f.status = ?
