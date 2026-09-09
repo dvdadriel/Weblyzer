@@ -1,154 +1,102 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { simpanPenyedia, ujiKoneksi } from '../app/actions.ts'
-import type { Ketersediaan } from '../lib/ai/penyedia.ts'
+import { useActionState, useTransition } from 'react'
+import { simpanDanUji, lupakanKunci } from '../app/akun/aksi.ts'
+import type { InfoKunci } from '../lib/ai/kunci.ts'
+import { MODEL, MODEL_BAWAAN } from '../lib/ai/penyedia.ts'
 import { Ikon } from './Ikon.tsx'
 
 /**
- * Memilih penyedia AI dari yang benar-benar terpasang di mesin ini.
+ * Memilih model dan menyimpan API key, dalam satu form.
  *
- * Yang tidak terpasang tetap ditampilkan, tapi dimatikan dan diberi perintah
- * pemasangannya. Menyembunyikannya akan membuat daftar yang berbeda-beda di
- * tiap mesin tanpa penjelasan — dan pertanyaan "kenapa Gemini tidak ada?"
- * tidak punya jawaban di layar.
+ * Satu tombol, bukan "Simpan" lalu "Uji" terpisah. "Tersimpan" yang berhasil
+ * untuk kunci yang salah adalah kebohongan yang baru ketahuan saat pemindaian
+ * tengah malam gagal — dan itu persis kegagalan yang halaman ini ada untuk
+ * mencegahnya.
+ *
+ * Kunci yang sudah ada tidak pernah dikirim balik ke browser. Yang ditampilkan
+ * hanya model, empat karakter terakhir, dan status verifikasinya; field-nya
+ * dibiarkan kosong dengan placeholder yang menjelaskan bahwa mengisinya berarti
+ * mengganti.
  */
-export function PilihModel({
-  tersedia,
-  terpilih,
-}: {
-  tersedia: Ketersediaan[]
-  terpilih: string | null
-}) {
-  const [nilai, setNilai] = useState(terpilih ?? '')
-  const [galat, setGalat] = useState<string | null>(null)
-  const [tersimpan, setTersimpan] = useState(false)
-  const [menunggu, mulai] = useTransition()
-  // Hasil uji per penyedia, bukan satu untuk semua: dua penyedia bisa gagal
-  // karena alasan berbeda, dan satu slot akan menimpa yang satunya.
-  const [uji, setUji] = useState<Record<string, { ok: boolean; pesan: string } | 'jalan'>>({})
-
-  function pilih(v: string) {
-    setNilai(v)
-    setTersimpan(false)
-    mulai(async () => {
-      const hasil = await simpanPenyedia(v)
-      if (hasil?.error) {
-        setGalat(hasil.error)
-        // Dikembalikan ke nilai yang tersimpan: radio yang tetap menunjuk
-        // pilihan gagal akan terbaca seperti pilihan yang berlaku.
-        setNilai(terpilih ?? '')
-        return
-      }
-      setGalat(null)
-      setTersimpan(true)
-    })
-  }
+export function PilihModel({ info }: { info: (InfoKunci & { ekor: string }) | null }) {
+  const [hasil, kirim, menunggu] = useActionState(simpanDanUji, null)
+  const [melupakan, mulaiLupa] = useTransition()
 
   return (
     <div className="model">
-      <fieldset className="model-set" disabled={menunggu}>
-        <legend className="model-legend">Penyedia</legend>
+      {info && (
+        <p className="model-status">
+          {info.terverifikasi ? (
+            <span className="model-hasil ok">
+              <Ikon nama="ceklis" ukuran={13} /> Kunci berlaku untuk{' '}
+              <strong>{namaModel(info.model)}</strong>
+              {info.ekor !== '' && <> &middot; berakhiran {info.ekor}</>}
+            </span>
+          ) : (
+            /* Tersimpan tapi belum lolos validasi adalah keadaan tersendiri,
+               dan harus terlihat begitu: fitur AI-nya mati, dan sebabnya bukan
+               "belum dikonfigurasi". */
+            <span className="model-hasil gagal">
+              <Ikon nama="alert" ukuran={13} /> Kunci tersimpan tapi belum terbukti berlaku.
+              Ringkasan AI mati sampai ia lolos pemeriksaan.
+            </span>
+          )}
+        </p>
+      )}
 
-        {tersedia.map((p) => {
-          const hasilUji = uji[p.id]
-          return (
-          <label key={p.id} className="model-baris" data-mati={!p.ada || undefined}>
-            <input
-              type="radio"
-              name="penyedia"
-              value={p.id}
-              checked={nilai === p.id}
-              disabled={!p.ada}
-              onChange={() => pilih(p.id)}
-            />
-            <span className="model-nama">{p.nama}</span>
-
-            {p.ada && <span className="model-versi">{p.versi}</span>}
-
-            {/* Di luar `fieldset` yang dimatikan? Tidak — tombolnya memang ikut
-                mati selagi penyimpanan berjalan, dan itu benar: dua pemanggilan
-                CLI bersamaan tidak menambah informasi apa pun. */}
-            {p.ada && (
-              <button
-                type="button"
-                className="model-uji"
-                onClick={(e) => {
-                  // Label membungkus radio, jadi klik apa pun di dalamnya akan
-                  // ikut memilih penyedia. Tombol uji tidak boleh mengubah
-                  // pilihan — menguji bukan memilih.
-                  e.preventDefault()
-                  setUji((u) => ({ ...u, [p.id]: 'jalan' }))
-                  void ujiKoneksi(p.id).then((h) => setUji((u) => ({ ...u, [p.id]: h })))
-                }}
-              >
-                Uji
-              </button>
-            )}
-
-            {/* Tiga keadaan yang berbeda artinya, dan dibedakan: terpasang,
-                tidak terpasang, dan terpasang tapi tidak menjawab. Yang
-                terakhir paling mudah disalahartikan sebagai yang kedua. */}
-            {!p.ada && p.galat === null && (
-              <span className="model-tiada">
-                belum terpasang &middot; <code>{p.perintah}</code> tidak ditemukan di PATH
-              </span>
-            )}
-            {p.galat !== null && <span className="model-galat">{p.galat}</span>}
-
-            {/* Hasil uji ditulis mentah, termasuk saat gagal. Inilah bedanya
-                antara "Gemini tidak jalan" dan "Gemini butuh GEMINI_API_KEY" —
-                yang pertama tidak bisa ditindaklanjuti, yang kedua bisa. */}
-            {hasilUji === 'jalan' && (
-              <span className="model-hasil" role="status">
-                menguji…
-              </span>
-            )}
-            {hasilUji !== undefined && hasilUji !== 'jalan' && (
-              <span className={hasilUji.ok ? 'model-hasil ok' : 'model-hasil gagal'} role="status">
-                {hasilUji.ok ? `Menjawab: ${hasilUji.pesan}` : hasilUji.pesan}
-              </span>
-            )}
-          </label>
-          )
-        })}
+      <form action={kirim} className="model-set">
+        <label className="model-baris">
+          <span className="model-nama">Model</span>
+          <select name="model" defaultValue={info?.model ?? MODEL_BAWAAN} disabled={menunggu}>
+            {MODEL.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.nama} — {m.catatan}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <label className="model-baris">
+          <span className="model-nama">API key</span>
           <input
-            type="radio"
-            name="penyedia"
-            value=""
-            checked={nilai === ''}
-            onChange={() => pilih('')}
+            type="password"
+            name="apiKey"
+            autoComplete="off"
+            required
+            disabled={menunggu}
+            placeholder={info ? 'Isi untuk mengganti kunci yang tersimpan' : 'sk-ant-...'}
           />
-          <span className="model-nama">Tanpa AI</span>
-          <span className="model-versi">pemindaian jalan tanpa rangkuman</span>
         </label>
-      </fieldset>
 
-      {/* Disimpan begitu dipilih, jadi tidak ada tombol Simpan yang bisa
-          dilupakan. Yang menggantinya adalah penanda bahwa penyimpanan sudah
-          terjadi — tanpa itu, tidak ada cara membedakan "tersimpan" dari
-          "belum diklik". */}
-      <p className="model-status" role="status">
-        {menunggu && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <Ikon nama="segarkan" ukuran={13} /> Menyimpan…
-          </span>
-        )}
-        {!menunggu && tersimpan && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--sev-fixed)' }}>
-            <Ikon nama="ceklis" ukuran={13} /> Tersimpan.
-          </span>
-        )}
-      </p>
+        <button type="submit" className="model-uji" disabled={menunggu}>
+          {menunggu ? 'Memeriksa…' : 'Simpan & Periksa'}
+        </button>
+      </form>
 
-      {galat && (
-        <p className="model-galat" role="alert" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-          <Ikon nama="alert" ukuran={13} />
-          {galat}
+      {/* Hasilnya ditulis mentah, termasuk saat gagal. Inilah bedanya antara
+          "gagal" dan "API key ini tidak punya izin untuk model yang dipilih" —
+          yang pertama tidak bisa ditindaklanjuti, yang kedua bisa. */}
+      {hasil && (
+        <p className={hasil.ok ? 'model-hasil ok' : 'model-hasil gagal'} role="status">
+          <Ikon nama={hasil.ok ? 'ceklis' : 'alert'} ukuran={13} /> {hasil.pesan}
         </p>
+      )}
+
+      {info && (
+        <button
+          type="button"
+          className="model-uji"
+          disabled={melupakan}
+          onClick={() => mulaiLupa(() => void lupakanKunci())}
+        >
+          {melupakan ? 'Menghapus…' : 'Lupakan kunci'}
+        </button>
       )}
     </div>
   )
+}
+
+function namaModel(id: string): string {
+  return MODEL.find((m) => m.id === id)?.nama ?? id
 }

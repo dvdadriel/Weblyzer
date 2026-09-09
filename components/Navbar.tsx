@@ -16,16 +16,16 @@ const NAV: { href: string; label: string; ikon: NamaIkon }[] = [
 ]
 
 /**
- * Navbar global: logo di kiri, dua tab di kanan.
+ * Navbar global: logo di kiri, tab dan identitas di kanan.
  *
  * Wordmark teks berdampingan dengan logo, dan `aria-hidden="true"` pada logo
- * sengaja dipasang — logonya duduk di dalam tautan yang teksnya sudah berbunyi "weblyzer",
- * jadi tidak membuat screen reader mengumumkan nama itu dua kali.
+ * sengaja dipasang — logonya duduk di dalam tautan yang teksnya sudah berbunyi
+ * "weblyzer", jadi tidak membuat screen reader mengumumkan nama itu dua kali.
  *
  * Tab Home inilah jalan kembali ke index dari halaman situs, dan karena
  * navbarnya ada di setiap halaman, jalan itu tidak pernah hilang.
  */
-export function Navbar() {
+export function Navbar({ email }: { email: string | null }) {
   const path = usePathname()
 
   return (
@@ -52,6 +52,41 @@ export function Navbar() {
               {n.label}
             </Link>
           ))}
+
+          {email === null ? (
+            <Link
+              href="/masuk"
+              className="navbar-item"
+              aria-current={path === '/masuk' ? 'page' : undefined}
+            >
+              <Ikon nama="perisai" ukuran={15} />
+              Masuk
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/akun"
+                className="navbar-item"
+                aria-current={path === '/akun' ? 'page' : undefined}
+                /* Emailnya yang jadi label, bukan kata "Akun": di instance
+                   yang dipakai beberapa orang, pertanyaan yang muncul lebih
+                   dulu adalah "saya masuk sebagai siapa". */
+                title={email}
+              >
+                <Ikon nama="model" ukuran={15} />
+                {email}
+              </Link>
+
+              {/* Form POST, bukan tautan. Tautan keluar yang bisa dipicu GET
+                  akan dijalankan prefetcher browser, dan orang yang cuma
+                  mengarahkan kursor ke menu mendadak keluar dari akunnya. */}
+              <form action="/keluar" method="post">
+                <button type="submit" className="navbar-item">
+                  Keluar
+                </button>
+              </form>
+            </>
+          )}
         </nav>
       </div>
     </header>

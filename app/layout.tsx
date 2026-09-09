@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { IBM_Plex_Mono, Space_Mono } from 'next/font/google'
 import './globals.css'
 import { Navbar } from '../components/Navbar.tsx'
+import { konteks } from '../lib/auth/konteks.ts'
 
 const ui = IBM_Plex_Mono({
   subsets: ['latin'],
@@ -24,13 +25,18 @@ export const metadata: Metadata = {
   description: 'Apa yang rusak di situs saya, dan apa yang sudah beres.',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Konteks dibaca sekali di sini, bukan di tiap komponen. Yang diteruskan ke
+  // Navbar cuma emailnya — komponen itu tidak butuh objek user, dan mengirim
+  // seluruhnya berarti hash password ikut menyeberang ke bundel klien.
+  const ctx = await konteks()
+
   return (
     <html lang="id" className={`${ui.variable} ${mark.variable}`}>
       {/* Navbar di layout, bukan di tiap halaman: itu yang membuat jalan
           kembali ke index tidak pernah hilang di halaman mana pun. */}
       <body>
-        <Navbar />
+        <Navbar email={ctx.jenis === 'user' ? ctx.user.email : null} />
         <main className="wrap">{children}</main>
       </body>
     </html>

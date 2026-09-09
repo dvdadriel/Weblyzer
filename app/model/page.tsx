@@ -1,28 +1,44 @@
+import Link from 'next/link'
 import { db } from '../../lib/ui/db.ts'
-import { periksaPenyedia, penyediaTerpilih, PENYEDIA } from '../../lib/ai/penyedia.ts'
-import { statusAkun } from '../../lib/ai/akun.ts'
-import { StatusAkun } from '../../components/StatusAkun.tsx'
+import { bacaRahasia } from '../../lib/auth/rahasia.ts'
+import { konteks } from '../../lib/auth/konteks.ts'
+import { bacaKunci } from '../../lib/ai/kunci.ts'
 import { PilihModel } from '../../components/PilihModel.tsx'
+import { KeadaanKosong } from '../../components/KeadaanKosong.tsx'
 import { Ikon } from '../../components/Ikon.tsx'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Model() {
-  // Dideteksi pada tiap kunjungan, bukan disimpan: CLI dipasang, dihapus, dan
-  // diperbarui di luar aplikasi ini. Ketersediaan yang di-cache akan berbohong
-  // tepat pada hari pemakai memasang Gemini lalu bertanya kenapa masih mati.
-  const tersedia = await periksaPenyedia()
-  const terpilih = penyediaTerpilih(db())
+  const ctx = await konteks()
 
-  // Status akun diperiksa hanya untuk penyedia yang CLI-nya memang ada.
-  // Menanyakannya pada yang tidak terpasang berarti empat detik menunggu
-  // ENOENT yang sudah diketahui jawabannya.
-  const akun = await Promise.all(
-    PENYEDIA.filter((p) => tersedia.find((t) => t.id === p.id)?.ada === true).map(async (p) => ({
-      nama: p.nama,
-      status: await statusAkun(p.id, p.perintah),
-    })),
-  )
+  // Guest tidak punya akun, jadi tidak punya tempat untuk menyimpan kunci.
+  // Halamannya tetap ada dan menjelaskan itu — bukan 404, dan bukan form yang
+  // menolak setelah diisi.
+  if (ctx.jenis !== 'user') {
+    return (
+      <>
+        <header className="dashboard-header">
+          <div className="dashboard-atas">
+            <h1 className="halaman-judul">Model AI</h1>
+          </div>
+        </header>
+        <KeadaanKosong
+          keadaan="butuh-akun"
+          aksi={
+            <Link href="/masuk" className="tombol">
+              Masuk
+            </Link>
+          }
+        />
+      </>
+    )
+  }
+
+  // Ekornya butuh dekripsi, dan halaman ini memang menampilkannya — empat
+  // karakter terakhir adalah satu-satunya cara pemakai memastikan kunci mana
+  // yang sedang tersimpan tanpa menempel ulang.
+  const kunci = bacaKunci(db(), bacaRahasia(), ctx.user.id)
 
   return (
     <>
@@ -31,31 +47,50 @@ export default async function Model() {
           <h1 className="halaman-judul">Model AI</h1>
         </div>
         <p className="halaman-teks">
-          Weblyzer memanggil CLI yang sudah terpasang di mesin ini, jadi tidak ada
-          API key yang perlu disimpan dan langganan yang sudah dibayar ikut
-          terpakai. Yang tidak terpasang tidak bisa dipilih.
+          Ringkasan AI memakai API key Anthropic milik Anda sendiri, dan tagihannya
+          milik Anda. Kuncinya disimpan terenkripsi dan tidak pernah dikirim kembali ke
+          browser — yang ditampilkan di sini hanya empat karakter terakhirnya.
         </p>
         <p className="halaman-teks">
-          Login-nya milik CLI itu, bukan aplikasi ini:{' '}
-          <code className="akun-perintah">claude auth login</code> di terminal, dan
-          kredensialnya disimpan sistem. Weblyzer hanya membaca siapa yang sedang
-          masuk.
+          Kunci baru diperiksa dulu terhadap Anthropic sebelum dianggap berlaku, dan
+          ringkasan AI tetap mati sampai pemeriksaan itu lolos. Pemeriksaannya tidak
+          memakai token.
         </p>
       </header>
 
-      {akun.map((a) => (
-        <StatusAkun key={a.nama} nama={a.nama} status={a.status} />
-      ))}
+      <PilihModel
+        info={
+          kunci === null
+            ? null
+            : { model: kunci.model, ekor: kunci.ekor, terverifikasi: kunci.terverifikasi }
+        }
+      />
 
-      <PilihModel tersedia={tersedia} terpilih={terpilih} />
-
-      <div className="catatan-sumber" style={{ marginTop: 'var(--s-5)', borderLeftColor: 'var(--ink)' }}>
+      <div
+        className="catatan-sumber"
+        style={{ marginTop: 'var(--s-5)', borderLeftColor: 'var(--ink)' }}
+      >
         <Ikon nama="sparkle" ukuran={14} />
         <span>
-          Lapisan AI memanfaatkan model CLI lokal untuk menyusun ringkasan analisis
-          situs secara otomatis. Tab audit standar berjalan independen tanpa AI.
+          Lapisan AI hanya menyusun rangkuman dari temuan yang sudah ada. Ketujuh aspek
+          pemindaian berjalan sendiri tanpa AI, dan skor Lighthouse tetap hasil
+          pengukuran — bukan tebakan model.
         </span>
       </div>
+
+      {ctx.user.role === 'admin' && (
+        <div className="catatan-sumber" style={{ marginTop: 'var(--s-4)' }}>
+          <Ikon nama="perisai" ukuran={14} />
+          <span>
+            Aspek GEO dan Audit tidak memakai kunci ini. Keduanya menjalankan CLI{' '}
+            <code className="akun-perintah">claude</code> di mesin server dengan plugin
+            claude-seo, jadi kredensialnya milik mesin — <code className="akun-perintah">
+              claude auth login
+            </code>{' '}
+            di terminal server. Karena itu keduanya hanya bisa dipicu admin.
+          </span>
+        </div>
+      )}
     </>
   )
 }

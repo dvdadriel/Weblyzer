@@ -3,8 +3,9 @@
 A web audit tool for one person looking after a handful of their own sites.
 
 It crawls each site, then splits what it found across seven tabs: Bug, Console,
-Security, SEO, GEO, Audit, and Lighthouse. Runs locally, no authentication, no
-API keys.
+Security, SEO, GEO, Audit, and Lighthouse. Runs as a small multi-user instance:
+sign in to use the AI layer with your own API key, or use everything else
+without an account at all.
 
 The question its screen answers every morning: **what broke last night, and
 what is already fixed?**
@@ -34,6 +35,12 @@ passage citability, brand entity signals) and **Audit** (content architecture,
 E-E-A-T, schema, search intent). These are judgements rather than measurements
 and the UI says so.
 
+Both are **admin-only**, and that is a security boundary rather than a
+preference. They run Claude Code with `Bash`, `Task`, and `WebFetch` enabled on
+the server itself, so they cannot be driven by a visitor's API key — and
+letting a stranger trigger them would hand them a shell. Their tab stays
+visible to everyone and says exactly that.
+
 Everything else: Excel export with a ready-to-paste fix prompt per problem,
 Lighthouse scores measured locally for both mobile and desktop, per-finding
 recheck without recrawling the site, and optional AI summaries.
@@ -42,8 +49,11 @@ recheck without recrawling the site, and optional AI summaries.
 
 A read-only demo page at `/demo` ships with the repository, backed by a bundled
 `demo.db` of two real scans: Weblyzer pointed at itself, and apple.com as a
-public comparison. Deployable to Vercel as-is — the page opens its own
-read-only connection and there is no write path on it.
+public comparison. Deployable to Vercel — the page opens its own read-only
+connection and there is no write path on it. It needs `WEBLYZER_SECRET` set
+like any other deploy: the app validates it at startup rather than at the first
+sign-in attempt, so a misconfigured instance fails loudly instead of looking
+healthy until someone tries to log in.
 
 The full app is not deployable to a serverless host, and that is architectural
 rather than a configuration gap: findings live in a local SQLite file whose
@@ -51,25 +61,69 @@ rather than a configuration gap: findings live in a local SQLite file whose
 process that outlives the request, and the job queue needs something long-lived
 to drain it. Use the Dockerfile on a host with a volume instead.
 
+## Who can do what
+
+| | Guest, no account | User | Admin |
+|---|---|---|---|
+| Add sites | 1 | unlimited | unlimited |
+| Scans per 24h | 3 | unlimited | unlimited |
+| Bug / Console / Security / SEO / Lighthouse | yes | yes | yes |
+| Excel export | yes | yes | yes |
+| AI summaries | no | after saving an API key | after saving an API key |
+| GEO / Audit | no | no | yes |
+
+A guest is **not an account**: no sign-up, no row in any table, no session
+table. What identifies one is a single signed `httpOnly` cookie, and the server
+stores nothing about it beyond `sites.guest_id` on the sites it created.
+
+That cookie exists for one reason that cannot be designed away: a scan fires at
+third-party sites from this server's IP. Without a per-guest limit, a public
+instance is an open crawler, and the address in the victim's logs is the
+instance owner's.
+
 ## Requirements
 
 - **Node 24+** (per `engines`; developed on 26) — uses `node:sqlite` and runs
   TypeScript directly, so the scanner has no build step and no `tsx`
 - Chromium, installed by Playwright
-- Optional: the `claude` CLI, for AI summaries and the GEO/Audit tabs
+- An Anthropic API key **per person who wants AI summaries** — each user brings
+  their own, and their own bill
+- Optional: the `claude` CLI on the server, for the admin-only GEO/Audit tabs
 
 ## Running it
 
 ```bash
+export WEBLYZER_SECRET=$(openssl rand -hex 32)   # required
 npm install
 npm run dev            # http://localhost:3000
+npm run seed           # creates the first admin account
 ```
 
-No `.env`, no database setup. `data.db` creates itself on first use and
-migrations run automatically.
+`data.db` creates itself on first use and migrations run automatically.
+
+**`WEBLYZER_SECRET` is required and the app refuses to start without it.** It
+signs the session and guest cookies and derives the key that encrypts stored
+API keys. Generate it once and keep it: losing it signs everyone out and makes
+every stored API key undecryptable. There is deliberately no random fallback —
+a secret generated at startup would change on every restart and lose that data
+silently.
+
+`npm run seed` is idempotent and only touches a database with no users at all.
+It creates the first admin and adopts any sites that predate multi-user, which
+would otherwise be invisible to everyone while their scheduled scans kept
+running.
+
+Optional, for signing in with Google. Without all three the Google button is
+not rendered at all, rather than rendered and then failing:
+
+```bash
+export WEBLYZER_BASE_URL=https://weblyzer.example.com
+export WEBLYZER_GOOGLE_CLIENT_ID=...
+export WEBLYZER_GOOGLE_CLIENT_SECRET=...
+```
 
 Optional email for scheduled scans, from the environment rather than a
-settings page — this app stores no credentials:
+settings page:
 
 ```bash
 export WEBLYZER_SMTP_URL=smtps://user:pass@smtp.example.com:465
@@ -104,22 +158,28 @@ time the container is replaced, and that history is the whole point of the
 tool. It is a directory rather than a file because WAL writes `data.db-wal` and
 `data.db-shm` alongside it.
 
-**The AI layer does not work in a container**, and that cannot be patched from
-the Dockerfile. AI summaries, the GEO tab, and the Audit tab call the `claude`
-CLI, which needs an interactive OAuth login — a browser and a terminal, neither
-of which exists in a container. Copying host credentials into the image would
-put tokens in a pushable layer. Everything else runs: the four deterministic
-categories, Lighthouse, the Excel export, the scheduler, and email.
+**AI summaries now work in a container; the GEO and Audit tabs still do not.**
+Summaries go over HTTPS with the user's own API key, which a container has no
+trouble with. GEO and Audit call the `claude` CLI, which needs an interactive
+OAuth login — a browser and a terminal, neither of which exists in a container
+— and copying host credentials into the image would put tokens in a pushable
+layer. Everything else runs: the five deterministic categories, Lighthouse, the
+Excel export, the scheduler, and email.
 
-Email is read from the environment at run time, never baked into the image:
+Secrets are read from the environment at run time, never baked into the image:
 
 ```bash
 docker run -d -p 3000:3000 -v ~/weblyzer-data:/data \
+  -e WEBLYZER_SECRET=... \
   -e WEBLYZER_SMTP_URL=smtps://user:pass@smtp.example.com:465 \
   -e WEBLYZER_MAIL_FROM=weblyzer@example.com \
   -e WEBLYZER_MAIL_TO=you@example.com \
   weblyzer
 ```
+
+`WEBLYZER_SECRET` must be the **same value** across container replacements. A
+new one means everyone is signed out and every stored API key can no longer be
+decrypted — keep it wherever you keep the volume.
 
 For the scheduled scan, point host cron at the running container rather than
 adding a second scheduler inside it:
@@ -135,10 +195,38 @@ and the web server serving them.
 
 ## Decisions worth knowing about
 
-**No API keys.** The AI layer calls CLIs that are already installed and already
-signed in, so there is no key to store and a subscription you have already paid
-for gets used. The consequence is stated plainly in the app: no CLI, no
-feature.
+**Each person brings their own API key, and this reverses an earlier decision.**
+The AI layer used to call CLIs already installed and signed in on the machine,
+so there was no key to store — and that was right for a tool one person ran on
+their own laptop. It stops being right the moment a second person uses the
+instance: CLI credentials belong to the machine, so everyone would share one
+Claude account with no way to tell whose usage was whose, and the owner's
+subscription would quietly pay for every visitor's summaries.
+
+So keys are now per user, AES-256-GCM encrypted in `data.db`, and validated
+against Anthropic before the AI layer will touch them — a key that saves
+successfully but does not work is a lie that surfaces at 3am when the scheduled
+scan fails. Validation uses `GET /v1/models`, which is free and spends no
+tokens.
+
+What did **not** change: CLI credentials still belong to the machine and are
+still never stored by this app. They are what the admin-only GEO and Audit tabs
+use.
+
+**"Zero credentials in `data.db`" is no longer true, and the file is not
+encrypted.** It now holds scrypt password hashes and encrypted API keys. The
+encryption key is derived from `WEBLYZER_SECRET`, so a stolen `data.db` alone
+does not yield the keys — a stolen `data.db` *plus* the environment does. Treat
+the volume and the secret as one thing.
+
+**Sessions have no table, so there is no global sign-out.** A signed cookie is
+the session. Changing a password does not revoke sessions already issued on
+other devices, and there is no list of active sessions to inspect. For an
+instance whose handful of users know each other that is a fair trade against a
+table plus its cleanup; the account page says so rather than letting anyone
+believe otherwise. The way out, if it stops being fair, is one column
+(`users.sesi_epoch`, signed into the cookie and bumped on password change) —
+not a table.
 
 **Findings must be deterministic.** A checker whose answer drifts between runs
 makes the `open` → `fixed` history lie — a finding that comes and goes with
