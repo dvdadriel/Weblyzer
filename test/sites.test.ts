@@ -29,10 +29,31 @@ test('base_url tanpa skema ditolak', () => {
   db.close()
 })
 
-test('base_url duplikat ditolak setelah normalisasi', () => {
+test('base_url duplikat ditolak setelah normalisasi, per pemilik', () => {
+  // Keunikannya per pemilik sejak multi-user, bukan global lagi: dua orang
+  // yang memantau situs yang sama adalah keadaan normal, dan constraint lama
+  // menolak yang kedua dengan galat SQLite yang terbaca seperti kerusakan.
   const db = openDb(':memory:')
-  createSite(db, { name: 'A', base_url: 'https://a.test' })
-  expect(() => createSite(db, { name: 'B', base_url: 'https://a.test/' })).toThrow()
+  db.prepare("INSERT INTO users (email) VALUES ('a@x.com'), ('b@x.com')").run()
+
+  createSite(db, { name: 'A', base_url: 'https://a.test', user_id: 1 })
+  expect(() =>
+    createSite(db, { name: 'B', base_url: 'https://a.test/', user_id: 1 }),
+  ).toThrow(/UNIQUE/)
+
+  // Pemilik lain: boleh.
+  expect(() =>
+    createSite(db, { name: 'B', base_url: 'https://a.test/', user_id: 2 }),
+  ).not.toThrow()
+  db.close()
+})
+
+test('situs tidak boleh dimiliki user dan guest sekaligus', () => {
+  const db = openDb(':memory:')
+  db.prepare("INSERT INTO users (email) VALUES ('a@x.com')").run()
+  expect(() =>
+    createSite(db, { name: 'A', base_url: 'https://a.test', user_id: 1, guest_id: 'g1' }),
+  ).toThrow(/sekaligus/)
   db.close()
 })
 

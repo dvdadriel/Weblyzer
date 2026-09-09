@@ -13,6 +13,16 @@ export type Site = {
   lighthouse_strategy: LighthouseStrategy
   enabled: number
   created_at: string
+  /**
+   * Pemilik situs. Tepat satu dari keduanya terisi pada situs baru.
+   *
+   * Keduanya bisa NULL pada situs warisan — yang dibuat sebelum multi-user
+   * ada. `scripts/seed-akun.ts` memberikannya ke admin pertama; sampai itu
+   * jalan, situs itu tidak terlihat oleh siapa pun kecuali admin (lihat
+   * `filterPemilik`).
+   */
+  user_id: number | null
+  guest_id: string | null
 }
 
 export type SiteInput = {
@@ -23,6 +33,8 @@ export type SiteInput = {
   lighthouse_mode?: LighthouseMode
   lighthouse_strategy?: LighthouseStrategy
   enabled?: number
+  user_id?: number | null
+  guest_id?: string | null
 }
 
 /**
@@ -42,14 +54,25 @@ export function normalizeBaseUrl(raw: string): string {
 }
 
 const COLUMNS = `id, name, base_url, sitemap_url, max_pages,
-                 lighthouse_mode, lighthouse_strategy, enabled, created_at`
+                 lighthouse_mode, lighthouse_strategy, enabled, created_at,
+                 user_id, guest_id`
 
 export function createSite(db: DatabaseSync, input: SiteInput): Site {
+  // Dua pemilik sekaligus berarti pemanggil salah memasang konteks, dan
+  // akibatnya situs yang muncul di dua tempat dengan dua aturan kuota.
+  // Ditolak di sini karena SQLite tidak bisa menahannya: baris warisan
+  // punya kedua kolom NULL, jadi CHECK "tepat satu" akan menggagalkan
+  // migrasi 002 sebelum seed sempat jalan.
+  if (input.user_id != null && input.guest_id != null) {
+    throw new Error('Situs tidak boleh dimiliki user dan guest sekaligus.')
+  }
+
   const row = db
     .prepare(
       `INSERT INTO sites (name, base_url, sitemap_url, max_pages,
-                          lighthouse_mode, lighthouse_strategy, enabled)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+                          lighthouse_mode, lighthouse_strategy, enabled,
+                          user_id, guest_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING ${COLUMNS}`,
     )
     .get(
@@ -60,10 +83,19 @@ export function createSite(db: DatabaseSync, input: SiteInput): Site {
       input.lighthouse_mode ?? 'sample',
       input.lighthouse_strategy ?? 'mobile',
       input.enabled ?? 1,
+      input.user_id ?? null,
+      input.guest_id ?? null,
     )
   return row as unknown as Site
 }
 
+/**
+ * Seluruh situs, tanpa penyaring pemilik.
+ *
+ * Dipakai penjadwal dan CLI, yang memang harus melihat semuanya — pemindaian
+ * tengah malam tidak punya session. UI TIDAK memakai ini: lihat
+ * `ringkasanSitus` di `lib/ui/queries.ts`, yang lewat `filterPemilik`.
+ */
 export function listSites(db: DatabaseSync): Site[] {
   return db.prepare(`SELECT ${COLUMNS} FROM sites ORDER BY id`).all() as unknown as Site[]
 }

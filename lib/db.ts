@@ -24,6 +24,22 @@ export function migrate(db: DatabaseSync): void {
       db.exec(readFileSync(join(MIGRATIONS_DIR, file), 'utf8'))
       db.prepare('INSERT INTO schema_migrations (name) VALUES (?)').run(file)
       db.exec('COMMIT')
+
+      // Diperiksa SESUDAH commit, dan sengaja: `foreign_key_check` hanya
+      // melaporkan, tidak menolak, dan sebagian migrasi (mis. 002_auth)
+      // memang harus mematikan `foreign_keys` untuk bisa membangun ulang
+      // tabel tanpa CASCADE menghapus tabel anak. Yang dijaga di sini adalah
+      // hasil akhirnya: kalau rebuild meninggalkan baris anak yang menunjuk
+      // ke induk yang tidak ada lagi, migrasi berikutnya tidak boleh jalan di
+      // atas database yang sudah rusak.
+      const menggantung = db.prepare('PRAGMA foreign_key_check').all()
+      if (menggantung.length > 0) {
+        throw new Error(
+          `Migrasi ${file} meninggalkan ${menggantung.length} referensi menggantung. ` +
+            `Database sudah ter-commit dan HARUS dipulihkan dari backup. ` +
+            `Contoh: ${JSON.stringify(menggantung[0])}`,
+        )
+      }
     } catch (err) {
       // ROLLBACK sendiri bisa melempar bila file migrasi memuat COMMIT-nya
       // sendiri sehingga tidak ada lagi transaksi aktif. Kalau itu dibiarkan,
