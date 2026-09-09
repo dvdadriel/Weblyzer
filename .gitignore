@@ -20,3 +20,8 @@ ruvector.db
 agentdb.rvf
 agentdb.rvf.lock
 claude-seo-out/
+
+# demo.db SENGAJA ter-track — ia data demo yang dibundel untuk halaman /demo,
+# bukan database kerja. WAL-nya tidak: berkas itu artefak runtime.
+demo.db-wal
+demo.db-shm

@@ -38,9 +38,21 @@ let page: Page
 let asal: string
 let siteId: number
 
-/** Tiap test punya batas sendiri karena server dev mengompilasi tiap rute saat
- *  pertama diminta, dan itu beberapa detik yang tidak ada di produksi. */
-const BATAS_TEST = 60_000
+/**
+ * Batas per test, dan sengaja longgar.
+ *
+ * Dua hal menumpuk di sini. Server dev mengompilasi tiap rute saat pertama
+ * diminta — beberapa detik yang tidak ada di produksi. Dan di `npm test`
+ * berkas ini berjalan PARALEL dengan tiga puluh delapan berkas lain, beberapa
+ * di antaranya menjalankan Chromium sendiri (`lighthouse-*.test.ts`), jadi
+ * server dev-nya berebut CPU.
+ *
+ * Terukur: berkas ini lolos tiga kali berturut-turut saat dijalankan sendiri,
+ * lalu sepuluh test-nya timeout satu kali di dalam suite penuh. Batas yang
+ * longgar menutup itu tanpa menyembunyikan kerusakan sungguhan — server yang
+ * benar-benar mati tetap gagal, hanya lebih lambat sampai laporannya.
+ */
+const BATAS_TEST = 120_000
 
 /**
  * Menunggu satu elemen terlihat, dan melempar bila tidak.
@@ -124,9 +136,9 @@ beforeAll(async () => {
   // kembali seketika sedangkan Next butuh beberapa detik untuk siap, dan test
   // pertama yang menabrak server yang belum siap gagal dengan ECONNREFUSED
   // yang tidak menyebut sebabnya.
-  const batas = Date.now() + 60_000
+  const batas = Date.now() + 180_000
   for (;;) {
-    if (Date.now() > batas) throw new Error(`Server dev tidak siap dalam 60 detik di ${asal}`)
+    if (Date.now() > batas) throw new Error(`Server dev tidak siap dalam 180 detik di ${asal}`)
     try {
       const r = await fetch(asal)
       if (r.ok) break
@@ -164,7 +176,7 @@ beforeAll(async () => {
   )
 
   browser = await chromium.launch()
-}, 240_000)
+}, 300_000)
 
 /**
  * Page baru untuk SETIAP test, bukan satu yang dibagi.
@@ -178,8 +190,8 @@ beforeAll(async () => {
 beforeEach(async () => {
   page = await browser.newPage()
   // Batas Playwright sendiri, terpisah dari batas vitest.
-  page.setDefaultNavigationTimeout(60_000)
-  page.setDefaultTimeout(15_000)
+  page.setDefaultNavigationTimeout(120_000)
+  page.setDefaultTimeout(30_000)
 })
 
 afterEach(async () => {
