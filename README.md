@@ -151,7 +151,7 @@ worker that started before it. This happened for real.
 ## Tests
 
 ```bash
-npm test               # 401 tests
+npm test               # 420 tests
 npx tsc --noEmit       # must be clean
 ```
 
@@ -160,17 +160,23 @@ ordering, the stuck-run threshold, the no-inventing rule in AI prompts, the
 non-2xx guard in the SEO analyzer, null scores staying blank in Excel, and the
 guarantee that rechecking one finding does not touch the others.
 
-The check that matters most is not automated: **run a scan twice without
+The UI has eleven end-to-end tests over a dev server and its own throwaway
+database, covering the write paths — server action, SQLite write,
+`revalidatePath` — that unit tests never reach.
+
+The check that matters most is still not automated: **run a scan twice without
 changing anything.** If a finding moves to `fixed` and reopens, some checker is
-not deterministic.
+not deterministic. For the model-judged categories a finding is only marked
+fixed after two consecutive analyses miss it, for the same reason Lighthouse is
+measured twice: one observation is not a basis.
 
 ## What it does not do
 
 No keyword research, SERP data, backlinks, or rank tracking — this audits pages,
 it does not do market analysis. No scheduler is installed for you (the CLI
-command exists; wiring it to cron is yours). The UI has no automated tests.
+command exists; wiring it to cron is yours).
 
-Around 8,800 lines of source and 4,900 lines of tests. Two runtime dependencies
+Around 8,800 lines of source and 5,500 lines of tests. Two runtime dependencies
 outside Next, React, Playwright, and Lighthouse: `write-excel-file` and
 `nodemailer`.
 
