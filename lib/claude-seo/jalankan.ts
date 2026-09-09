@@ -55,8 +55,17 @@ const TOOLS = [
  * folder sementara — tapi juga tidak boleh mengotori repo, jadi seluruhnya
  * di-gitignore di satu tempat.
  */
-export function direktoriKerja(siteId: number): string {
-  const dir = join(process.cwd(), 'claude-seo-out', String(siteId))
+export function direktoriKerja(pemilikId: number | null, siteId: number): string {
+  // `pemilikId` masuk ke jalurnya karena dua akun bisa memantau situs yang
+  // sama. Tanpa itu keluaran satu akun menimpa keluaran akun lain, dan yang
+  // membaca temuannya tidak akan pernah tahu bahwa yang dibacanya milik orang
+  // lain. `bersama` untuk situs warisan yang belum punya pemilik.
+  const dir = join(
+    process.cwd(),
+    'claude-seo-out',
+    pemilikId === null ? 'bersama' : String(pemilikId),
+    String(siteId),
+  )
   mkdirSync(dir, { recursive: true })
   return dir
 }
@@ -147,10 +156,11 @@ export function tafsirkan(
  */
 export function jalankanClaudeSeo(
   prompt: string,
+  pemilikId: number | null,
   siteId: number,
   batasMs: number,
 ): Promise<HasilJalan> {
-  const cwd = direktoriKerja(siteId)
+  const cwd = direktoriKerja(pemilikId, siteId)
   const hasil = join(cwd, NAMA_HASIL)
 
   // Hasil run SEBELUMNYA dihapus lebih dulu, dan ini bukan kebersihan —

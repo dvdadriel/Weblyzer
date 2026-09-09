@@ -7,10 +7,11 @@ import { getDb } from '../lib/db.ts'
 import { validasi } from '../lib/pengaturan-situs.ts'
 import { createSite, updateSite } from '../lib/repos/sites.ts'
 import { runAktif } from '../lib/ui/queries.ts'
-import { pilihPenyedia, PENYEDIA } from '../lib/ai/penyedia.ts'
-import { ujiPenyedia } from '../lib/ai/jalankan.ts'
 import { recheck } from '../lib/recheck.ts'
-import type { IdPenyedia } from '../lib/ai/penyedia.ts'
+import { konteks, konteksTulis } from '../lib/auth/konteks.ts'
+import { situsMilik, pasangPemilik, bolehCliHost } from '../lib/auth/pemilik.ts'
+import { bolehTambahSitus, bolehScan } from '../lib/auth/kuota.ts'
+import type { Konteks } from '../lib/auth/pemilik.ts'
 
 /**
  * Menandai temuan diabaikan, atau membukanya kembali.
@@ -24,8 +25,37 @@ export async function ubahStatusTemuan(
   status: 'open' | 'ignored',
   path: string,
 ): Promise<void> {
+  // Gerbangnya lewat situs temuan itu. Tanpa ini, satu `findingId` yang
+  // ditebak cukup untuk menandai temuan orang lain "diabaikan" — dan
+  // pemiliknya tidak akan pernah tahu kenapa temuan itu hilang dari layarnya.
+  const g = await gerbangTemuan(findingId)
+  if (!g.ok) throw new Error(g.hasil?.error ?? 'Temuan tidak ditemukan.')
+
   getDb().prepare('UPDATE findings SET status = ? WHERE id = ?').run(status, findingId)
   revalidatePath(path)
+}
+
+/**
+ * Gerbang untuk aksi yang bekerja pada satu temuan.
+ *
+ * Temuan tidak punya kolom pemilik — kepemilikan dinyatakan sekali di
+ * `sites`, dan temuan mewarisinya lewat `site_id`. Jadi yang dilakukan di
+ * sini adalah mencari situsnya lalu menyerahkannya ke gerbang yang sama.
+ */
+async function gerbangTemuan(
+  findingId: number,
+): Promise<{ ok: true; ctx: Konteks; siteId: number } | { ok: false; hasil: HasilAksi }> {
+  const baris = getDb()
+    .prepare('SELECT site_id FROM findings WHERE id = ?')
+    .get(findingId) as { site_id: number } | undefined
+
+  // Temuan yang tidak ada dan temuan orang lain memberi pesan yang sama,
+  // alasan yang sama dengan `situsMilik`.
+  if (!baris) return { ok: false, hasil: { error: `Temuan ${findingId} tidak ditemukan.` } }
+
+  const g = await gerbang(baris.site_id)
+  if (!g.ok) return { ok: false, hasil: { error: `Temuan ${findingId} tidak ditemukan.` } }
+  return { ok: true, ctx: g.ctx, siteId: baris.site_id }
 }
 
 /**
@@ -41,6 +71,30 @@ export async function ubahStatusTemuan(
 export type HasilAksi = { error: string; nama?: string; url?: string } | null
 
 /**
+ * Gerbang kepemilikan untuk aksi bersitus.
+ *
+ * Setiap aksi yang menerima `siteId` melewatinya, dan hasilnya dikembalikan
+ * sebagai `HasilAksi` alih-alih dilempar: form action yang melempar
+ * menghasilkan layar galat Next, sedangkan pesan di panel adalah yang
+ * memang sudah dipakai seluruh berkas ini.
+ *
+ * Diletakkan SEBELUM setiap pemeriksaan lain — termasuk `runAktif`. Menjawab
+ * "situs ini sedang dipindai" untuk situs orang lain sudah membocorkan bahwa
+ * situs itu ada.
+ */
+async function gerbang(
+  siteId: number,
+): Promise<{ ok: true; ctx: Konteks } | { ok: false; hasil: HasilAksi }> {
+  const ctx = await konteks()
+  try {
+    situsMilik(getDb(), ctx, siteId)
+  } catch (err) {
+    return { ok: false, hasil: { error: err instanceof Error ? err.message : String(err) } }
+  }
+  return { ok: true, ctx }
+}
+
+/**
  * Menambahkan situs dari form dashboard.
  *
  * Validasi URL-nya dipinjam dari `normalizeBaseUrl`, yang sudah dipakai CLI dan
@@ -53,8 +107,17 @@ export async function tambahSitus(_sebelum: HasilAksi, form: FormData): Promise<
   if (!nama) return { error: 'Nama situs belum diisi.', nama, url }
   if (!url) return { error: 'Alamat situs belum diisi.', nama, url }
 
+  // `konteksTulis`, bukan `konteks`: kalau pemanggilnya guest yang belum punya
+  // cookie, cookie-nya ditulis sekarang. Tanpa itu situsnya dipasangkan ke id
+  // sementara yang menghilang bersama request ini — dan pada klik berikutnya
+  // situs itu menjadi milik tidak seorang pun.
+  const ctx = await konteksTulis()
+
+  const izin = bolehTambahSitus(getDb(), ctx)
+  if (!izin.boleh) return { error: izin.alasan, nama, url }
+
   try {
-    createSite(getDb(), { name: nama, base_url: url })
+    createSite(getDb(), { name: nama, base_url: url, ...pasangPemilik(ctx) })
   } catch (err) {
     // Pesan aslinya sudah menyebut apa yang salah dan apa yang diterima
     // ("base_url harus diawali http:// atau https:// — diterima: situs.com"),
@@ -62,7 +125,7 @@ export async function tambahSitus(_sebelum: HasilAksi, form: FormData): Promise<
     // diterjemahkan.
     const pesan = err instanceof Error ? err.message : String(err)
     return {
-      error: /UNIQUE/.test(pesan) ? 'Situs dengan alamat itu sudah ada.' : pesan,
+      error: /UNIQUE/.test(pesan) ? 'Anda sudah memantau situs dengan alamat itu.' : pesan,
       nama,
       url,
     }
@@ -88,6 +151,23 @@ export async function jalankanScan(
   kategori: 'bugs' | 'console' | 'security' | 'seo' | 'geo' | 'audit' | 'lighthouse',
   path: string,
 ): Promise<HasilAksi> {
+  const g = await gerbang(siteId)
+  if (!g.ok) return g.hasil
+
+  // GEO dan Audit menjalankan Claude Code dengan Bash di mesin ini, bukan
+  // Messages API dengan kunci pemakai. Itu bukan sesuatu yang boleh dipicu
+  // orang tak dikenal — lihat `bolehCliHost`.
+  if ((kategori === 'geo' || kategori === 'audit') && !bolehCliHost(g.ctx)) {
+    return {
+      error:
+        'Aspek ini berjalan di server dengan CLI-nya sendiri, jadi hanya pemilik instance ' +
+        'yang bisa memicunya.',
+    }
+  }
+
+  const izin = bolehScan(getDb(), g.ctx)
+  if (!izin.boleh) return { error: izin.alasan }
+
   // Penjaga ganda-klik. Tanpa ini dua Chromium berebut satu situs.
   if (runAktif(getDb(), siteId)) return { error: 'Pemindaian situs ini sedang berjalan.' }
 
@@ -150,6 +230,9 @@ async function tungguRun(siteId: number): Promise<boolean> {
  * gantinya adalah konfirmasi yang menyebut jumlah yang akan hilang.
  */
 export async function hapusSitus(siteId: number): Promise<HasilAksi> {
+  const g = await gerbang(siteId)
+  if (!g.ok) return g.hasil
+
   // Menghapus situs yang sedang dipindai akan menarik baris dari bawah proses
   // pekerja yang masih menulis: crawl-nya lalu gagal di tengah dengan galat
   // foreign key yang tidak menjelaskan apa pun. Ditolak dengan alasan jelas.
@@ -163,38 +246,6 @@ export async function hapusSitus(siteId: number): Promise<HasilAksi> {
 }
 
 /**
- * Menyimpan penyedia AI pilihan. String kosong berarti dimatikan.
- *
- * Validasinya ada di `pilihPenyedia`, bukan di sini: form bisa mengirim apa
- * saja, dan `config` bertipe TEXT bebas yang akan menerima nilai sampah tanpa
- * keluhan — lalu memunculkannya sebagai nama perintah yang di-spawn.
- */
-export async function simpanPenyedia(id: string): Promise<HasilAksi> {
-  try {
-    pilihPenyedia(getDb(), id === '' ? null : (id as IdPenyedia))
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) }
-  }
-  revalidatePath('/model')
-  return null
-}
-
-/**
- * Menguji penyedia dengan benar-benar memanggil CLI-nya.
- *
- * Tidak dijalankan saat halaman dimuat, dan itu keputusan: satu uji butuh
- * beberapa detik per penyedia, jadi memuat halaman konfigurasi akan terasa
- * macet. Yang dijalankan otomatis cuma `--version` yang instan — dan justru
- * karena itu tidak cukup, tombol ini ada.
- */
-export async function ujiKoneksi(id: string): Promise<{ ok: boolean; pesan: string }> {
-  if (!PENYEDIA.some((p) => p.id === id)) {
-    return { ok: false, pesan: `penyedia tidak dikenal: ${id}` }
-  }
-  return ujiPenyedia(id as IdPenyedia)
-}
-
-/**
  * Menjalankan ulang ringkasan tanpa memindai ulang.
  *
  * Terpisah dari `jalankanScan` karena memang pekerjaan yang berbeda: crawl
@@ -203,6 +254,9 @@ export async function ujiKoneksi(id: string): Promise<{ ok: boolean; pesan: stri
  * hanya untuk memperbaiki ringkasan yang gagal.
  */
 export async function ulangiRingkasan(siteId: number, path: string): Promise<HasilAksi> {
+  const g = await gerbang(siteId)
+  if (!g.ok) return g.hasil
+
   if (runAktif(getDb(), siteId)) {
     return { error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
   }
@@ -232,12 +286,12 @@ export type HasilPeriksa = { keadaan: string; pesan?: string; error?: string }
  * crawl 141 halaman, bukan ini.
  */
 export async function periksaTemuan(findingId: number, path: string): Promise<HasilPeriksa> {
+  const g = await gerbangTemuan(findingId)
+  if (!g.ok) return { keadaan: 'galat', error: g.hasil?.error }
+
   // Ditolak selagi pemindaian berjalan: dua Chromium pada satu situs saling
   // berebut, dan yang kalah melapor gagal seolah halamannya rusak.
-  const situsTemuan = getDb()
-    .prepare('SELECT site_id FROM findings WHERE id = ?')
-    .get(findingId) as { site_id: number } | undefined
-  if (situsTemuan && runAktif(getDb(), situsTemuan.site_id)) {
+  if (runAktif(getDb(), g.siteId)) {
     return { keadaan: 'sibuk', error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
   }
 
@@ -261,6 +315,9 @@ export async function periksaTemuan(findingId: number, path: string): Promise<Ha
  * untuk dua strategi pada satu halaman.
  */
 export async function aturStrategi(siteId: number, keduanya: boolean): Promise<HasilAksi> {
+  const g = await gerbang(siteId)
+  if (!g.ok) return g.hasil
+
   if (runAktif(getDb(), siteId)) {
     return { error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
   }
@@ -284,6 +341,9 @@ export async function simpanPengaturan(
   _sebelum: HasilAksi,
   form: FormData,
 ): Promise<HasilAksi> {
+  const g = await gerbang(siteId)
+  if (!g.ok) return g.hasil
+
   if (runAktif(getDb(), siteId)) {
     return { error: 'Situs ini sedang dipindai. Tunggu sampai selesai.' }
   }

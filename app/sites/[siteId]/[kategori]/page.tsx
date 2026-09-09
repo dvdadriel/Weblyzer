@@ -13,6 +13,8 @@ import { TabelTemuan } from '../../../../components/TabelTemuan.tsx'
 import { KeadaanKosong } from '../../../../components/KeadaanKosong.tsx'
 import { TombolScan } from '../../../../components/TombolScan.tsx'
 import { sumberKategori } from '../../../../lib/kategori.ts'
+import { konteks } from '../../../../lib/auth/konteks.ts'
+import { bolehCliHost } from '../../../../lib/auth/pemilik.ts'
 
 export const dynamic = 'force-dynamic'
 
@@ -119,12 +121,22 @@ export default async function Kategori({
 
   const keadaan = keadaanKategori(db(), id, kategori)
   if (keadaan !== 'ada-temuan') {
+    // Keadaan kosong yang KEEMPAT, dan yang paling mudah tertukar dengan
+    // "belum dipindai": GEO dan Audit berjalan dengan CLI Claude di mesin
+    // server, bukan dengan API key pemakai, jadi hanya admin yang bisa
+    // memicunya. Menampilkan "belum pernah dipindai" di sini akan membuat
+    // orang menunggu pemindaian yang tidak akan pernah jalan.
+    const perluAdmin =
+      (kategori === 'geo' || kategori === 'audit') &&
+      keadaan === 'belum-dipindai' &&
+      !bolehCliHost(await konteks())
+
     return (
       <>
         {tombol}
         {keterangan}
         {saringan}
-        <KeadaanKosong keadaan={keadaan} />
+        <KeadaanKosong keadaan={perluAdmin ? 'admin-saja' : keadaan} />
       </>
     )
   }

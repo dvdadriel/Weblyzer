@@ -59,7 +59,7 @@ export async function claudeSeoHandler(job: Job, db: DatabaseSync): Promise<void
       ? promptGeo(site.name, site.base_url, sebelumnya)
       : promptAudit(site.name, site.base_url, site.max_pages, sebelumnya)
 
-  const hasil = await jalankanClaudeSeo(prompt, site.id, BATAS_MS[aspek])
+  const hasil = await jalankanClaudeSeo(prompt, site.user_id, site.id, BATAS_MS[aspek])
   if (!hasil.ok) throw new Error(`claude-seo ${aspek} gagal: ${hasil.galat}`)
 
   // Halaman yang sudah tersimpan dipakai untuk mencocokkan URL dari model ke

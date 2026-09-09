@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { db } from '../lib/ui/db.ts'
 import { ringkasanSitus } from '../lib/ui/queries.ts'
+import { konteks } from '../lib/auth/konteks.ts'
 import { TambahSitus } from '../components/TambahSitus.tsx'
 import { HapusSitus } from '../components/HapusSitus.tsx'
 
@@ -17,8 +18,9 @@ const PENANDA: Record<(typeof URUT)[number], string> = {
   low: '[.]',
 }
 
-export default function Dashboard() {
-  const situs = ringkasanSitus(db())
+export default async function Dashboard() {
+  const ctx = await konteks()
+  const situs = ringkasanSitus(db(), ctx)
 
   const totalSitus = situs.length
   const totalTemuan = situs.reduce((acc, s) => acc + s.totalTerbuka, 0)

@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import { db } from '../../../lib/ui/db.ts'
 import { situs, ringkasanAi, statusAi } from '../../../lib/ui/queries.ts'
+import { konteks } from '../../../lib/auth/konteks.ts'
+import { situsMilik } from '../../../lib/auth/pemilik.ts'
 import { Tab } from '../../../components/Tab.tsx'
 import { Ikon } from '../../../components/Ikon.tsx'
 import { RingkasanAi } from '../../../components/RingkasanAi.tsx'
@@ -14,7 +16,26 @@ export default async function SiteLayout({
   params: Promise<{ siteId: string }>
 }) {
   const { siteId } = await params
-  const s = situs(db(), Number(siteId))
+  const id = Number(siteId)
+
+  // Gerbang kepemilikan untuk SELURUH pohon `/sites/[siteId]/*`.
+  //
+  // Diletakkan di layout, bukan di setiap halaman: layout ini membungkus
+  // ketujuh tab kategori, halaman Lighthouse, dan halaman pengaturan. Menaruh
+  // pemeriksaannya per halaman berarti sembilan tempat yang harus ingat, dan
+  // yang lupa satu di antaranya adalah kebocoran data antar akun.
+  //
+  // `notFound()`, bukan pesan "bukan milik Anda": alasan yang sama dengan
+  // `situsMilik` sendiri — jawaban yang membedakan "ada tapi bukan milikmu"
+  // dari "tidak ada" bisa dipakai untuk mengenumerasi situs di instance ini
+  // dengan mencoba id satu per satu.
+  try {
+    situsMilik(db(), await konteks(), id)
+  } catch {
+    notFound()
+  }
+
+  const s = situs(db(), id)
   if (!s) notFound()
 
   return (

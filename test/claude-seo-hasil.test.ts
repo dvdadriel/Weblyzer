@@ -45,7 +45,7 @@ test('prompt menyuruh menulis ke berkas hasil, dengan namanya', () => {
 test('hasil run sebelumnya dihapus sebelum run baru dimulai', async () => {
   const s = sandbox()
   try {
-    const cwd = direktoriKerja(7)
+    const cwd = direktoriKerja(1, 7)
     const berkas = join(cwd, NAMA_HASIL)
     writeFileSync(berkas, '{"temuan":[{"rule":"basi","severity":"low","title":"kemarin"}]}')
     expect(existsSync(berkas)).toBe(true)
@@ -53,7 +53,7 @@ test('hasil run sebelumnya dihapus sebelum run baru dimulai', async () => {
     // Batas 1 ms: prosesnya dibunuh nyaris seketika, jadi ia tidak mungkin
     // menulis berkas apa pun. Yang diperiksa adalah keadaan berkasnya setelah
     // itu — bukan hasil analisisnya.
-    const h = await jalankanClaudeSeo('abaikan', 7, 1)
+    const h = await jalankanClaudeSeo('abaikan', 1, 7, 1)
 
     expect(existsSync(berkas)).toBe(false)
     // Dan hasilnya gagal, bukan berisi data kemarin.
@@ -69,7 +69,7 @@ test('berkas hasil dibaca sebagai keluaran walau pemanggilannya gagal', async ()
   // menentukan apa pun.
   const s = sandbox()
   try {
-    const cwd = direktoriKerja(8)
+    const cwd = direktoriKerja(1, 8)
     const berkas = join(cwd, NAMA_HASIL)
 
     // Ditulis SETELAH jalankanClaudeSeo menghapusnya, meniru model yang
@@ -79,7 +79,7 @@ test('berkas hasil dibaca sebagai keluaran walau pemanggilannya gagal', async ()
       writeFileSync(berkas, '{"temuan":[{"rule":"nyata","severity":"high","title":"ada"}]}')
     }, 5)
 
-    const h = await jalankanClaudeSeo('abaikan', 8, 200)
+    const h = await jalankanClaudeSeo('abaikan', 1, 8, 200)
     clearTimeout(tulis)
 
     // Berkasnya ada dan itulah yang dipakai — bukan stdout, bukan galat.
@@ -99,13 +99,22 @@ test('berkas hasil kosong diperlakukan sebagai tidak ada', async () => {
   // temuan dan menandai semuanya beres.
   const s = sandbox()
   try {
-    const cwd = direktoriKerja(9)
+    const cwd = direktoriKerja(1, 9)
     const berkas = join(cwd, NAMA_HASIL)
     const tulis = setTimeout(() => writeFileSync(berkas, '   \n'), 5)
-    const h = await jalankanClaudeSeo('abaikan', 9, 200)
+    const h = await jalankanClaudeSeo('abaikan', 1, 9, 200)
     clearTimeout(tulis)
     expect(h.ok).toBe(false)
   } finally {
     s.pulihkan()
   }
 }, 60_000)
+
+test('direktori kerja terpisah per pemilik', () => {
+  // Dua akun boleh memantau situs yang sama; keluaran claude-seo salah satunya
+  // tidak boleh menimpa yang lain.
+  expect(direktoriKerja(1, 5)).not.toBe(direktoriKerja(2, 5))
+  // Situs warisan tanpa pemilik punya tempatnya sendiri, bukan menabrak
+  // direktori user id manapun.
+  expect(direktoriKerja(null, 5)).toContain('bersama')
+})

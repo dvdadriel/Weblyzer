@@ -7,6 +7,8 @@ import { join } from 'node:path'
 import { chromium, type Browser, type Page } from 'playwright'
 import { openDb } from '../lib/db.ts'
 import { createSite } from '../lib/repos/sites.ts'
+import { buatUser } from '../lib/auth/pengguna.ts'
+import { terbitkanSesi, NAMA_COOKIE_SESI } from '../lib/auth/sesi.ts'
 import { createRun, finishRun } from '../lib/repos/runs.ts'
 import { upsertPage } from '../lib/repos/pages.ts'
 import { reconcile } from '../lib/findings.ts'
@@ -37,6 +39,16 @@ let browser: Browser
 let page: Page
 let asal: string
 let siteId: number
+let adminId: number
+
+/**
+ * Rahasia untuk server dev yang di-spawn.
+ *
+ * WAJIB diteruskan: tanpa `WEBLYZER_SECRET` aplikasi menolak start, dan
+ * setiap halaman yang memanggil `konteks()` akan 500. Nilainya tetap supaya
+ * cookie session yang ditandatangani di sini bisa diverifikasi di sana.
+ */
+const RAHASIA_UI = 'uji-'.repeat(8)
 
 /**
  * Batas per test, dan sengaja longgar.
@@ -79,7 +91,23 @@ async function portBebas(): Promise<number> {
 }
 
 function seed(): number {
-  const site = createSite(db, { name: 'Situs Uji', base_url: 'https://uji.test' })
+  // Situsnya dimiliki admin, dan test menjelajah SEBAGAI admin itu.
+  //
+  // Tanpa pemilik, `filterPemilik` untuk pengunjung tanpa akun tidak akan
+  // mencocokkan apa pun dan dashboard-nya kosong — yang benar, tapi bukan
+  // yang sedang diuji di sebagian besar berkas ini. Test khusus guest ada
+  // sendiri di bawah.
+  const admin = buatUser(db, {
+    email: 'admin@uji.test',
+    password: 'rahasia-uji',
+    role: 'admin',
+  })
+  adminId = admin.id
+  const site = createSite(db, {
+    name: 'Situs Uji',
+    base_url: 'https://uji.test',
+    user_id: admin.id,
+  })
   const p = upsertPage(db, site.id, {
     url: 'https://uji.test/rusak',
     statusCode: 500,
@@ -127,7 +155,16 @@ beforeAll(async () => {
     [join(process.cwd(), 'node_modules/next/dist/bin/next'), 'dev', '--port', String(port)],
     {
       cwd: process.cwd(),
-      env: { ...process.env, DB_PATH: join(dir, 'uji.db'), NODE_ENV: 'development' },
+      env: {
+        ...process.env,
+        DB_PATH: join(dir, 'uji.db'),
+        NODE_ENV: 'development',
+        WEBLYZER_SECRET: RAHASIA_UI,
+        // OAuth sengaja TIDAK dikonfigurasi: salah satu test memastikan
+        // tombol Google tidak muncul tanpa kredensial.
+        WEBLYZER_GOOGLE_CLIENT_ID: '',
+        WEBLYZER_GOOGLE_CLIENT_SECRET: '',
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   )
@@ -168,6 +205,8 @@ beforeAll(async () => {
     [
       '/',
       '/model',
+      '/masuk',
+      '/akun',
       `/sites/${siteId}/bugs`,
       `/sites/${siteId}/geo`,
       `/sites/${siteId}/pengaturan`,
@@ -192,7 +231,49 @@ beforeEach(async () => {
   // Batas Playwright sendiri, terpisah dari batas vitest.
   page.setDefaultNavigationTimeout(120_000)
   page.setDefaultTimeout(30_000)
+
+  // Masuk sebagai admin dengan memasang cookie session langsung, bukan lewat
+  // form masuk. Dua alasan: menghemat satu navigasi per test, dan yang diuji
+  // di berkas ini adalah halamannya — form masuknya punya test sendiri. Ini
+  // juga sekaligus membuktikan cookie yang ditandatangani `terbitkanSesi`
+  // benar-benar diterima server.
+  await masukSebagai(adminId)
 })
+
+/** Memasang cookie session yang sah untuk satu user. */
+async function masukSebagai(userId: number) {
+  await page.context().addCookies([
+    {
+      name: NAMA_COOKIE_SESI,
+      value: terbitkanSesi(RAHASIA_UI, userId),
+      domain: 'localhost',
+      path: '/',
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+  ])
+}
+
+/** Membuang cookie session: menjelajah sebagai pengunjung tanpa akun. */
+async function keluar() {
+  await page.context().clearCookies()
+}
+
+/**
+ * `fetch` dengan cookie session, untuk rute yang tidak bisa dibuka browser.
+ *
+ * `page.goto` pada URL unduhan melempar "Download is starting" — Playwright
+ * memperlakukannya sebagai unduhan, bukan navigasi. Dan `fetch` polos tidak
+ * membawa cookie apa pun, jadi sejak rute export punya gerbang kepemilikan ia
+ * akan selalu menjawab 404.
+ */
+function ambil(jalur: string, userId: number | null = adminId) {
+  const kepala: Record<string, string> =
+    userId === null
+      ? {}
+      : { cookie: `${NAMA_COOKIE_SESI}=${terbitkanSesi(RAHASIA_UI, userId)}` }
+  return fetch(`${asal}${jalur}`, { headers: kepala })
+}
 
 afterEach(async () => {
   await page?.close()
@@ -362,7 +443,7 @@ test('nilai di atas batas tidak pernah tersimpan', async () => {
 /* ── ekspor ──────────────────────────────────────────────────────────────── */
 
 test('ekspor mengembalikan xlsx dengan nama berkas yang aman', async () => {
-  const r = await fetch(`${asal}/sites/${siteId}/export`)
+  const r = await ambil(`/sites/${siteId}/export`)
   expect(r.status).toBe(200)
   expect(r.headers.get('content-type')).toContain('spreadsheetml')
   expect(r.headers.get('content-disposition')).toContain('weblyzer-situs-uji-')
@@ -379,11 +460,111 @@ test('ekspor mengembalikan xlsx dengan nama berkas yang aman', async () => {
 
 /* ── halaman model ───────────────────────────────────────────────────────── */
 
-test('halaman model menampilkan penyedia dan tidak menyimpan API key', async () => {
+test('halaman model menawarkan pemilih model dan medan API key', async () => {
   await page.goto(`${asal}/model`)
   await tampil(page.getByRole('heading', { name: 'Model AI' }))
-  await tampil(page.getByText(/tidak ada\s+API key/))
-  await tampil(page.getByText('Claude'))
+  await tampil(page.locator('input[name="apiKey"]'))
+
+  // Diperiksa lewat nilai `select`-nya, bukan `getByText`: `<option>` di dalam
+  // select yang tertutup tidak pernah "visible" bagi Playwright, jadi menunggu
+  // teksnya terlihat akan timeout pada halaman yang sebenarnya benar.
+  const pilih = page.locator('select[name="model"]')
+  await tampil(pilih)
+  expect(await pilih.inputValue()).toBe('claude-opus-5')
+  expect(await pilih.locator('option').count()).toBe(3)
+}, BATAS_TEST)
+
+test('medan API key bertipe password, jadi tidak terbaca di layar', async () => {
+  await page.goto(`${asal}/model`)
+  const medan = page.locator('input[name="apiKey"]')
+  await tampil(medan)
+  expect(await medan.getAttribute('type')).toBe('password')
+}, BATAS_TEST)
+
+test('halaman model tanpa akun menjelaskan sebabnya, bukan 404', async () => {
+  await keluar()
+  await page.goto(`${asal}/model`)
+  await tampil(page.getByRole('heading', { name: 'Model AI' }))
+  await tampil(page.getByText('Butuh akun'))
+  // Keadaan kosong yang mengajarkan antarmuka: ada jalan keluarnya di layar.
+  await tampil(page.getByRole('link', { name: 'Masuk' }))
+}, BATAS_TEST)
+
+/* ── auth ────────────────────────────────────────────────────────────────── */
+
+test('pengunjung tanpa akun tidak melihat situs milik orang lain', async () => {
+  // Isolasi antar pemilik, diuji dari luar: cookie dibuang, lalu dashboard
+  // harus kosong walau databasenya memuat satu situs beserta temuannya.
+  await keluar()
+  await page.goto(asal)
+  await tampil(page.getByRole('heading', { name: 'Situs' }))
+  expect(await jumlah(page.getByText('Situs Uji'))).toBe(0)
+}, BATAS_TEST)
+
+test('situs orang lain 404, bukan terbuka lewat id yang ditebak', async () => {
+  // Kebocoran paling langsung yang bisa ada di aplikasi ini: seluruh pohon
+  // /sites/[siteId]/* dulu tidak memeriksa kepemilikan sama sekali, jadi id
+  // yang ditebak membuka nama situs, alamatnya, temuannya, dan ringkasan
+  // AI-nya. Diuji dari browser, bukan dari fungsinya, karena gerbangnya ada
+  // di layout dan hanya jalur nyata yang membuktikannya terpasang.
+  await keluar()
+  const r = await page.goto(`${asal}/sites/${siteId}/bugs`)
+  expect(r?.status()).toBe(404)
+}, BATAS_TEST)
+
+test('halaman pengaturan situs orang lain juga 404', async () => {
+  // Satu layout membungkus ketujuh tab, Lighthouse, dan pengaturan — test ini
+  // memastikan gerbangnya memang di layout dan bukan cuma di satu halaman.
+  await keluar()
+  const r = await page.goto(`${asal}/sites/${siteId}/pengaturan`)
+  expect(r?.status()).toBe(404)
+}, BATAS_TEST)
+
+test('ekspor Excel tanpa akun 404, tidak mengunduh temuan orang lain', async () => {
+  // Route handler tidak melewati layout, jadi ia punya gerbangnya sendiri.
+  // Tanpa itu, satu id yang ditebak mengunduh SELURUH temuan situs orang lain
+  // dalam satu berkas — termasuk yang sudah beres dan yang diabaikan.
+  const r = await ambil(`/sites/${siteId}/export`, null)
+  expect(r.status).toBe(404)
+  // Dan isinya bukan spreadsheet.
+  expect(r.headers.get('content-type')).not.toContain('spreadsheetml')
+}, BATAS_TEST)
+
+test('pemiliknya sendiri tetap bisa membuka dan mengekspor', async () => {
+  // Sisi lain dari gerbang itu: menutup kebocoran tanpa mengunci pemiliknya
+  // adalah setengah pekerjaan.
+  const r = await page.goto(`${asal}/sites/${siteId}/bugs`)
+  expect(r?.status()).toBe(200)
+  const e = await ambil(`/sites/${siteId}/export`)
+  expect(e.status).toBe(200)
+  expect(e.headers.get('content-disposition')).toContain('.xlsx')
+}, BATAS_TEST)
+
+test('tombol Google tidak muncul tanpa kredensial OAuth', async () => {
+  // Ditampilkan lalu gagal setelah diklik adalah jalan buntu; tidak
+  // ditampilkan sama sekali adalah jawaban yang jujur.
+  await keluar()
+  await page.goto(`${asal}/masuk`)
+  await tampil(page.getByRole('heading', { name: 'Masuk' }))
+  expect(await jumlah(page.getByText(/Google/))).toBe(0)
+}, BATAS_TEST)
+
+test('masuk lewat form membawa ke dashboard dan situsnya terlihat', async () => {
+  await keluar()
+  await page.goto(`${asal}/masuk`)
+  await page.locator('input[name="email"]').fill('admin@uji.test')
+  await page.locator('input[name="password"]').fill('rahasia-uji')
+  await page.getByRole('button', { name: 'Masuk' }).click()
+  await tampil(page.getByText('Situs Uji'))
+}, BATAS_TEST)
+
+test('password salah ditolak tanpa menyebut apakah emailnya ada', async () => {
+  await keluar()
+  await page.goto(`${asal}/masuk`)
+  await page.locator('input[name="email"]').fill('admin@uji.test')
+  await page.locator('input[name="password"]').fill('bukan-passwordnya')
+  await page.getByRole('button', { name: 'Masuk' }).click()
+  await tampil(page.getByText('Email atau password salah.'))
 }, BATAS_TEST)
 
 /* ── keadaan yang tidak boleh tertukar ───────────────────────────────────── */
