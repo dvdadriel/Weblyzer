@@ -5,13 +5,9 @@ import { join } from 'node:path'
 import { revalidatePath } from 'next/cache'
 import { getDb } from '../lib/db.ts'
 import { validasi } from '../lib/pengaturan-situs.ts'
-import { createSite, updateSite } from '../lib/repos/sites.ts'
+import { createSite, updateSite, getSite } from '../lib/repos/sites.ts'
 import { runAktif } from '../lib/ui/queries.ts'
 import { recheck } from '../lib/recheck.ts'
-import { konteks, konteksTulis } from '../lib/auth/konteks.ts'
-import { situsMilik, pasangPemilik, bolehCliHost } from '../lib/auth/pemilik.ts'
-import { bolehTambahSitus, bolehScan } from '../lib/auth/kuota.ts'
-import type { Konteks } from '../lib/auth/pemilik.ts'
 import { tServer } from '../lib/i18n/server.ts'
 
 /**
@@ -45,7 +41,7 @@ export async function ubahStatusTemuan(
  */
 async function gerbangTemuan(
   findingId: number,
-): Promise<{ ok: true; ctx: Konteks; siteId: number } | { ok: false; hasil: HasilAksi }> {
+): Promise<{ ok: true; siteId: number } | { ok: false; hasil: HasilAksi }> {
   const baris = getDb()
     .prepare('SELECT site_id FROM findings WHERE id = ?')
     .get(findingId) as { site_id: number } | undefined
@@ -61,7 +57,7 @@ async function gerbangTemuan(
   if (!g.ok) {
     return { ok: false, hasil: { error: t('umum.temuanTidakDitemukan', { id: findingId }) } }
   }
-  return { ok: true, ctx: g.ctx, siteId: baris.site_id }
+  return { ok: true, siteId: baris.site_id }
 }
 
 /**
@@ -77,33 +73,22 @@ async function gerbangTemuan(
 export type HasilAksi = { error: string; nama?: string; url?: string } | null
 
 /**
- * Gerbang kepemilikan untuk aksi bersitus.
+ * Gerbang untuk aksi bersitus: situsnya ada, atau tidak.
  *
- * Setiap aksi yang menerima `siteId` melewatinya, dan hasilnya dikembalikan
- * sebagai `HasilAksi` alih-alih dilempar: form action yang melempar
- * menghasilkan layar galat Next, sedangkan pesan di panel adalah yang
- * memang sudah dipakai seluruh berkas ini.
+ * Hasilnya dikembalikan sebagai `HasilAksi` alih-alih dilempar: form action
+ * yang melempar menghasilkan layar galat Next, sedangkan pesan di panel adalah
+ * yang memang sudah dipakai seluruh berkas ini.
  *
- * Diletakkan SEBELUM setiap pemeriksaan lain — termasuk `runAktif`. Menjawab
- * "situs ini sedang dipindai" untuk situs orang lain sudah membocorkan bahwa
- * situs itu ada.
+ * Tetap diletakkan SEBELUM setiap pemeriksaan lain — termasuk `runAktif` —
+ * supaya id yang salah selalu dijawab hal yang sama, bukan "sedang dipindai"
+ * untuk situs yang tidak pernah ada.
  */
-async function gerbang(
-  siteId: number,
-): Promise<{ ok: true; ctx: Konteks } | { ok: false; hasil: HasilAksi }> {
-  const ctx = await konteks()
+async function gerbang(siteId: number): Promise<{ ok: true } | { ok: false; hasil: HasilAksi }> {
   const t = await tServer()
-  try {
-    situsMilik(getDb(), ctx, siteId)
-  } catch (err) {
-    // Pesan dari `situsMilik` memuat id-nya, dan id itu masukan pemanggil
-    // sendiri. Diterjemahkan lewat kamus alih-alih diteruskan mentah supaya
-    // pemakai berbahasa Inggris tidak menerima satu kalimat Indonesia di
-    // tengah layar yang seluruhnya Inggris.
-    void err
+  if (!getSite(getDb(), siteId)) {
     return { ok: false, hasil: { error: t('umum.situsTidakDitemukan', { id: siteId }) } }
   }
-  return { ok: true, ctx }
+  return { ok: true }
 }
 
 /**
@@ -120,17 +105,8 @@ export async function tambahSitus(_sebelum: HasilAksi, form: FormData): Promise<
   if (!nama) return { error: t('tambah.namaKosong'), nama, url }
   if (!url) return { error: t('tambah.urlKosong'), nama, url }
 
-  // `konteksTulis`, bukan `konteks`: kalau pemanggilnya guest yang belum punya
-  // cookie, cookie-nya ditulis sekarang. Tanpa itu situsnya dipasangkan ke id
-  // sementara yang menghilang bersama request ini — dan pada klik berikutnya
-  // situs itu menjadi milik tidak seorang pun.
-  const ctx = await konteksTulis()
-
-  const izin = bolehTambahSitus(getDb(), ctx)
-  if (!izin.boleh) return { error: t(izin.alasan, izin.params), nama, url }
-
   try {
-    createSite(getDb(), { name: nama, base_url: url, ...pasangPemilik(ctx) })
+    createSite(getDb(), { name: nama, base_url: url })
   } catch (err) {
     // Pesan aslinya sudah menyebut apa yang salah dan apa yang diterima
     // ("base_url harus diawali http:// atau https:// — diterima: situs.com"),
@@ -167,16 +143,6 @@ export async function jalankanScan(
   const t = await tServer()
   const g = await gerbang(siteId)
   if (!g.ok) return g.hasil
-
-  // GEO dan Audit menjalankan Claude Code dengan Bash di mesin ini, bukan
-  // Messages API dengan kunci pemakai. Itu bukan sesuatu yang boleh dipicu
-  // orang tak dikenal — lihat `bolehCliHost`.
-  if ((kategori === 'geo' || kategori === 'audit') && !bolehCliHost(g.ctx)) {
-    return { error: t('scan.adminSaja') }
-  }
-
-  const izin = bolehScan(getDb(), g.ctx)
-  if (!izin.boleh) return { error: t(izin.alasan, izin.params) }
 
   // Penjaga ganda-klik. Tanpa ini dua Chromium berebut satu situs.
   if (runAktif(getDb(), siteId)) return { error: t('scan.sedangBerjalan') }

@@ -16,8 +16,6 @@ export const en = {
   // ── Navigation and shell ──────────────────────────────────────────────────
   'nav.home': 'Home',
   'nav.model': 'Model',
-  'nav.masuk': 'Sign in',
-  'nav.keluar': 'Sign out',
   'nav.bagianUtama': 'Main sections',
   'nav.tema': 'Theme',
   'nav.semuaSitus': 'All Sites',
@@ -102,12 +100,6 @@ export const en = {
   'kosong.gagal': 'The last scan failed',
   'kosong.gagalTeks':
     'The result is unknown — this does not mean the site is clean. Try scanning again.',
-  'kosong.butuhAkun': 'Needs an account',
-  'kosong.butuhAkunTeks':
-    'This aspect uses your own API key, so it needs somewhere to store it. Every other scan aspect still works without an account.',
-  'kosong.adminSaja': 'Instance owner only',
-  'kosong.adminSajaTeks':
-    'This aspect is run by the Claude CLI on the server rather than by your API key, so only the instance owner can trigger it. Existing findings are still visible below.',
 
   // ── Scanning ──────────────────────────────────────────────────────────────
   'scan.tombol': 'Scan {kategori}',
@@ -115,8 +107,6 @@ export const en = {
   'scan.sedangBerjalan': 'A scan of this site is already running.',
   'scan.gagalJalan': 'The scan failed to start. Check the server log.',
   'scan.tungguSelesai': 'This site is being scanned. Wait for it to finish.',
-  'scan.adminSaja':
-    'This aspect runs on the server with its own CLI, so only the instance owner can trigger it.',
 
   // ── AI summary ────────────────────────────────────────────────────────────
   'ai.judul': 'AI Summary',
@@ -155,92 +145,20 @@ export const en = {
   'atur.tersimpan': 'Saved.',
 
   // ── Sign in ───────────────────────────────────────────────────────────────
-  'masuk.judul': 'Sign in',
-  'masuk.teks':
-    'Without an account every scan aspect still works — the only thing that needs one is the AI summary, because it uses your own API key.',
-  'masuk.email': 'Email',
-  'masuk.password': 'Password',
-  'masuk.tombol': 'Sign in',
-  'masuk.memeriksa': 'Checking…',
-  'masuk.google': 'Sign in with Google',
-  'masuk.tanpaDaftar': 'This instance does not accept self-registration. Accounts are created by its owner.',
-  'masuk.kosong': 'Email and password are both required.',
-  'masuk.salah': 'Wrong email or password.',
-  'masuk.lewatGoogle': 'This account signs in with Google. Use the button below.',
-  'masuk.galatOauthMati': 'Signing in with Google is not configured on this instance.',
-  'masuk.galatState': 'The sign-in request expired or did not match. Start again.',
-  'masuk.galatTukar': 'Google refused to exchange the sign-in code. Try again.',
-  'masuk.galatToken': 'The identity from Google could not be verified.',
-  'masuk.galatTidakTerdaftar':
-    'That Google account is not registered on this instance. This instance does not accept self-registration — ask its owner to create an account.',
 
-  // ── Account ───────────────────────────────────────────────────────────────
-  'akun.judul': 'Account',
-  'akun.masukSebagai': 'Signed in as',
-  'akun.gantiPassword': 'Change password',
-  'akun.passwordSekarang': 'Current password',
-  'akun.passwordBaru': 'New password',
-  'akun.tombolGanti': 'Change Password',
-  'akun.menyimpan': 'Saving…',
-  'akun.tanpaPassword':
-    'This account signs in with Google and has no password yet. Filling this form adds one, so you can sign in either way.',
-  'akun.passwordPendek': 'The new password must be at least {n} characters.',
-  'akun.passwordLamaSalah': 'The current password is wrong.',
-  'akun.passwordDiganti':
-    'Password changed. Sessions already issued on other devices are not revoked.',
-  'akun.peringatanSesi':
-    'Sessions in this project have no table, so changing your password does not sign you out of other devices. If a device is lost, ask the instance owner to delete and recreate the account.',
-  'akun.daftarJudul': 'Accounts on this instance',
-  'akun.kolomEmail': 'Email',
-  'akun.kolomPeran': 'Role',
-  'akun.kolomCaraMasuk': 'Sign-in method',
-  'akun.kolomDibuat': 'Created',
-  'akun.caraGoogle': 'Google only',
-  'akun.caraPassword': 'Password',
-  'akun.buatJudul': 'Create account',
-  'akun.buatTeks':
-    'This instance does not accept self-registration, so accounts are created here. Open registration would mean moderation, email verification, and quota abuse — three problems that do not exist yet.',
-  'akun.passwordAwal': 'Initial password',
-  'akun.jadikanAdmin': 'Make admin',
-  'akun.jadikanAdminTeks': 'can trigger the GEO and Audit aspects',
-  'akun.buatTombol': 'Create Account',
-  'akun.membuat': 'Creating…',
-  'akun.dibuat': 'Account {email} created.',
-  'akun.butuhAkun': 'This action needs an account. Sign in first.',
-  'akun.hanyaAdmin': 'This action is for admins only.',
 
   // ── AI model ──────────────────────────────────────────────────────────────
   'model.judul': 'AI Model',
   'model.teks1':
-    'The AI summary uses your own Anthropic API key, and the bill is yours. The key is stored encrypted and never sent back to the browser — all that is shown here is its last four characters.',
+    'The AI summary is configured through the .env file on this machine, not through this page. The reason: Weblyzer runs on your own computer, so its credentials live where command-line credentials belong — and .env is already ignored by git.',
   'model.teks2':
-    'A new key is checked against Anthropic before it counts as valid, and the AI summary stays off until that check passes. The check spends no tokens.',
-  'model.labelModel': 'Model',
-  'model.labelKunci': 'API key',
-  'model.simpanUji': 'Save & Check',
-  'model.memeriksa': 'Checking…',
-  'model.lupakan': 'Forget key',
-  'model.menghapus': 'Deleting…',
-  'model.gantiPetunjuk': 'Fill this in to replace the stored key',
-  'model.berlaku': 'Key is valid for {model}',
-  'model.berakhiran': 'ending in {ekor}',
-  'model.belumTerbukti':
-    'The key is stored but not proven valid. The AI summary is off until it passes the check.',
-  'model.tersimpanBerlaku': 'Key stored and valid. The AI summary is now active.',
-  'model.labelPenyedia': 'Provider',
-  'model.kunciTakPerlu': 'No API key needed — agy uses the server machine login.',
-  'model.cliBerjalan': 'agy answered. The AI summary now runs through the CLI on the server.',
-  'model.cliBerlaku': 'agy is ready with {model}',
-  'model.cliCatatan':
-    'The agy CLI provider is admin-only, and that is a security boundary rather than a preference: it runs a CLI on the server machine, so the credentials and the bill belong to that machine — the same as the GEO and Audit aspects. This provider also does not run inside a container.',
+    'There is no model list in the code. Put whatever the provider recognises in WEBLYZER_AI_MODEL; a mistyped model is rejected by the provider with its own message, and that message is more useful than a list gone stale.',
+  'model.aktif': 'Active over the {jalur} path with model {model}',
+  'model.catatanNama':
+    'Provider names whose base URL is already known: {daftar}. Any other name works too as long as it speaks the OpenAI protocol — give its base URL in WEBLYZER_AI_BASE_URL. There is no model list in the code, so adding a model means changing one line in .env rather than editing the program.',
   'model.catatanAi':
     'The AI layer only writes a summary of findings that already exist. All seven scan aspects run on their own without AI, and Lighthouse scores are measured rather than guessed by a model.',
-  'model.catatanAdmin':
-    'The GEO and Audit aspects do not use this key. Both run the claude CLI on the server with the claude-seo plugin, so their credentials belong to the machine. That is why only admins can trigger them.',
 
-  // ── Guest quotas ──────────────────────────────────────────────────────────
-  'kuota.situs': 'Without an account you can watch {n} site. Sign in to add more.',
-  'kuota.scan': 'Without an account, {n} scans per {jam} hours. Sign in to scan without a limit.',
 
   // ── Shared ────────────────────────────────────────────────────────────────
   'umum.situsTidakDitemukan': 'Site {id} was not found.',

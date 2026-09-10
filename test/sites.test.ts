@@ -48,15 +48,6 @@ test('base_url duplikat ditolak setelah normalisasi, per pemilik', () => {
   db.close()
 })
 
-test('situs tidak boleh dimiliki user dan guest sekaligus', () => {
-  const db = openDb(':memory:')
-  db.prepare("INSERT INTO users (email) VALUES ('a@x.com')").run()
-  expect(() =>
-    createSite(db, { name: 'A', base_url: 'https://a.test', user_id: 1, guest_id: 'g1' }),
-  ).toThrow(/sekaligus/)
-  db.close()
-})
-
 test('list, get, update, dan delete', () => {
   const db = openDb(':memory:')
   createSite(db, { name: 'A', base_url: 'https://a.test' })

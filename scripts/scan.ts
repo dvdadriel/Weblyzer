@@ -13,7 +13,7 @@ import { listPages } from '../lib/repos/pages.ts'
 import { lighthouseHandler } from '../lib/jobs/lighthouse.ts'
 import { ringkasanHandler } from '../lib/jobs/ringkasan.ts'
 import { claudeSeoHandler, ASPEK, adalahAspek } from '../lib/jobs/claude-seo.ts'
-import { kunciSiap } from '../lib/ai/kunci.ts'
+import { konfigurasiAi } from '../lib/ai/konfigurasi.ts'
 import { skorTerakhir } from '../lib/repos/lighthouse.ts'
 
 const HANDLERS = {
@@ -21,6 +21,23 @@ const HANDLERS = {
   lighthouse: lighthouseHandler,
   ringkasan: ringkasanHandler,
   'claude-seo': claudeSeoHandler,
+}
+
+/**
+ * `.env` dimuat di sini, dan itu wajib.
+ *
+ * Next memuat `.env` untuk dirinya sendiri, tapi berkas ini adalah proses
+ * terpisah: ia di-spawn oleh server action `jalankanScan` dengan `env`
+ * warisannya, dan dijalankan langsung dari terminal oleh cron. Tanpa
+ * pemuatan ini, `WEBLYZER_AI` terlihat kosong justru di jalur pemindaian
+ * tengah malam — satu-satunya jalur yang tidak ada yang menonton.
+ *
+ * Gagal kalau berkasnya tidak ada, dan itu sah: tidak semua orang memakai AI.
+ */
+try {
+  process.loadEnvFile()
+} catch {
+  // Tidak ada .env. Konfigurasi bisa datang dari lingkungan shell.
 }
 
 const PEMICU = pemicuDari(process.env)
@@ -227,16 +244,14 @@ async function main(): Promise<number> {
         payload: kategori === undefined ? { siteId: site.id } : { siteId: site.id, only: kategori },
       })
 
-      // Ringkasan ikut diantrikan hanya bila pemilik situs punya kunci AI
-      // yang sudah terverifikasi. Antrian dikuras berurutan, jadi job ini
-      // pasti jalan setelah pemindaiannya — dan membaca temuan yang baru saja
-      // direkonsiliasi, bukan yang lama.
+      // Ringkasan ikut diantrikan hanya bila AI memang dikonfigurasi. Antrian
+      // dikuras berurutan, jadi job ini pasti jalan setelah pemindaiannya —
+      // dan membaca temuan yang baru saja direkonsiliasi, bukan yang lama.
       //
-      // Situs guest dan situs warisan tanpa pemilik tidak punya kunci, jadi
-      // tidak pernah mengantrikan ringkasan. Mengantrikannya lalu membiarkan
-      // handler menandai `skipped` juga bisa, tapi itu satu baris job per run
-      // yang sudah diketahui tidak akan mengerjakan apa pun.
-      if (site.user_id !== null && kunciSiap(db, site.user_id)) {
+      // Mengantrikannya lalu membiarkan handler menandai `skipped` juga bisa,
+      // tapi itu satu baris job per run yang sudah diketahui tidak akan
+      // mengerjakan apa pun.
+      if (konfigurasiAi().siap) {
         enqueue(db, { runId: run.id, type: 'ringkasan', payload: { siteId: site.id } })
       }
       console.log(`Run ${run.id}: memindai ${site.base_url} ...`)
@@ -288,18 +303,12 @@ async function main(): Promise<number> {
         console.error(`Situs ${args[0]} tidak ditemukan.`)
         return 1
       }
-      if (site.user_id === null) {
-        console.error(
-          `Situs ${site.name} belum punya pemilik, jadi tidak ada API key yang bisa dipakai. ` +
-            `Jalankan \`npm run seed\` atau tetapkan pemiliknya lewat UI.`,
-        )
-        return 1
-      }
-      if (!kunciSiap(db, site.user_id)) {
-        console.error(
-          'Pemilik situs ini belum menyimpan API key yang terverifikasi. ' +
-            'Buka halaman /model dulu.',
-        )
+      // Sebabnya dicetak apa adanya, dan itu yang membuat perintah ini bisa
+      // ditindaklanjuti dari terminal: pesannya menyebut variabel mana yang
+      // kurang, bukan "AI belum dikonfigurasi".
+      const cfg = konfigurasiAi()
+      if (!cfg.siap) {
+        console.error(cfg.sebab)
         return 1
       }
 

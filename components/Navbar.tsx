@@ -19,7 +19,7 @@ const NAV = [
 ] as const satisfies readonly { href: string; kunci: Kunci; ikon: NamaIkon }[]
 
 /**
- * Navbar global: logo di kiri, tab dan identitas di kanan.
+ * Navbar global: logo di kiri, tab dan pemilih tema di kanan.
  *
  * Wordmark teks berdampingan dengan logo, dan `aria-hidden="true"` pada logo
  * sengaja dipasang — logonya duduk di dalam tautan yang teksnya sudah berbunyi
@@ -28,15 +28,7 @@ const NAV = [
  * Tab Home inilah jalan kembali ke index dari halaman situs, dan karena
  * navbarnya ada di setiap halaman, jalan itu tidak pernah hilang.
  */
-export function Navbar({
-  email,
-  tema,
-  locale,
-}: {
-  email: string | null
-  tema: Tema
-  locale: Locale
-}) {
+export function Navbar({ tema, locale }: { tema: Tema; locale: Locale }) {
   const path = usePathname()
   // Penerjemah dibuat di sini, bukan diterima sebagai prop: `T` adalah fungsi,
   // dan fungsi tidak bisa diserialkan dari Server Component ke Client
@@ -70,40 +62,6 @@ export function Navbar({
 
           <PilihTema tema={tema} locale={locale} t={t} />
 
-          {email === null ? (
-            <Link
-              href="/masuk"
-              className="navbar-item"
-              aria-current={path === '/masuk' ? 'page' : undefined}
-            >
-              <Ikon nama="perisai" ukuran={15} />
-              {t('nav.masuk')}
-            </Link>
-          ) : (
-            <>
-              <Link
-                href="/akun"
-                className="navbar-item"
-                aria-current={path === '/akun' ? 'page' : undefined}
-                /* Emailnya yang jadi label, bukan kata "Akun": di instance
-                   yang dipakai beberapa orang, pertanyaan yang muncul lebih
-                   dulu adalah "saya masuk sebagai siapa". */
-                title={email}
-              >
-                <Ikon nama="model" ukuran={15} />
-                {email}
-              </Link>
-
-              {/* Form POST, bukan tautan. Tautan keluar yang bisa dipicu GET
-                  akan dijalankan prefetcher browser, dan orang yang cuma
-                  mengarahkan kursor ke menu mendadak keluar dari akunnya. */}
-              <form action="/keluar" method="post">
-                <button type="submit" className="navbar-item">
-                  {t('nav.keluar')}
-                </button>
-              </form>
-            </>
-          )}
         </nav>
       </div>
     </header>

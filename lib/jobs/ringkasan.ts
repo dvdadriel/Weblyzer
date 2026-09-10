@@ -2,11 +2,11 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { Job } from '../queue.ts'
 import { getSite } from '../repos/sites.ts'
 import { setAiStatus } from '../repos/runs.ts'
-import { bacaRahasia } from '../auth/rahasia.ts'
-import { bacaKunci, kunciSiap, type Kunci } from '../ai/kunci.ts'
+import { konfigurasiAi, type Konfigurasi, type Hasil } from '../ai/konfigurasi.ts'
 import { jalankanAi, BATAS_KELUARAN } from '../ai/jalankan.ts'
 import type { HasilAi } from '../ai/jalankan.ts'
 import { jalankanAgy } from '../ai/agy.ts'
+import { jalankanOpenai } from '../ai/openai.ts'
 import { susunPrompt, type TemuanRingkas } from '../ai/prompt.ts'
 
 /**
@@ -19,29 +19,28 @@ import { susunPrompt, type TemuanRingkas } from '../ai/prompt.ts'
  * pemanggilan nyata butuh beberapa detik, menghabiskan token, dan jawabannya
  * berbeda tiap kali.
  */
-export type PemanggilAi = (kunci: Kunci, prompt: string) => Promise<HasilAi>
+export type PemanggilAi = (cfg: Konfigurasi, prompt: string) => Promise<HasilAi>
 
 /**
- * Menyalurkan prompt ke provider yang dipilih pemilik situs.
+ * Menyalurkan prompt ke jalur yang dipilih di `.env`.
  *
- * Seluruh konfigurasi dibawa dalam satu objek `Kunci`, bukan sebagai
- * `(apiKey, model)` seperti dulu, dan itu bukan kerapian belaka: dengan dua
- * provider, argumen `apiKey` bernilai NULL adalah keadaan yang sah, dan
- * memisahkan "kunci mana" dari "provider mana" berarti keduanya bisa
- * berselisih di jalur pemanggilan. Providernya harus dibaca dari baris yang
- * sama dengan modelnya.
+ * Satu `switch` yang lengkap atas `jalur`, jadi jalur baru tidak bisa
+ * ditambahkan tanpa memutuskan bagaimana ia dipanggil — TypeScript yang
+ * menagihnya lewat `never` di bawah.
  */
-async function panggilBawaan(kunci: Kunci, prompt: string): Promise<HasilAi> {
-  if (kunci.provider === 'agy-cli') {
-    return jalankanAgy(kunci.model, prompt, BATAS_KELUARAN)
+export async function panggilBawaan(cfg: Konfigurasi, prompt: string): Promise<HasilAi> {
+  switch (cfg.jalur) {
+    case 'anthropic':
+      return jalankanAi(cfg.apiKey, cfg.model, prompt)
+    case 'openai':
+      return jalankanOpenai(cfg, prompt, BATAS_KELUARAN)
+    case 'agy':
+      return jalankanAgy(cfg.model, prompt, BATAS_KELUARAN)
+    default: {
+      const belum: never = cfg
+      throw new Error(`Jalur AI tidak tertangani: ${JSON.stringify(belum)}`)
+    }
   }
-  if (kunci.apiKey === null) {
-    // Mustahil selama CHECK di migrasi 003 berlaku, dan tetap diperiksa: ini
-    // jalur job tengah malam, dan gagal di sini harus berupa satu baris
-    // `ai_error` yang bisa dibaca — bukan TypeError tanpa konteks.
-    return { ok: false, galat: `Provider ${kunci.provider} tersimpan tanpa API key.` }
-  }
-  return jalankanAi(kunci.apiKey, kunci.model, prompt)
 }
 
 /**
@@ -64,33 +63,26 @@ export async function ringkasanHandler(
   job: Job,
   db: DatabaseSync,
   panggil: PemanggilAi = panggilBawaan,
+  // Diinjeksikan dengan alasan yang sama dengan `panggil`: kalau dibaca dari
+  // `process.env` di dalam, seluruh jaminan berkas ini ikut bergantung pada
+  // isi `.env` di mesin yang menjalankan test — lolos di laptop yang belum
+  // mengonfigurasi AI, gagal di laptop yang sudah.
+  cfg: Hasil = konfigurasiAi(),
 ): Promise<void> {
   const siteId = Number(job.payload.siteId)
   const site = getSite(db, siteId)
   if (!site) throw new Error(`Situs ${siteId} tidak ditemukan`)
 
-  // Proses pemindaian berjalan lepas dari request dan tidak punya session,
-  // jadi kuncinya diambil dari pemilik situs. Itulah salah satu sebab kunci
-  // disimpan di database dan bukan hanya di memori sesi.
-  const pemilik = site.user_id
-  if (pemilik === null || !kunciSiap(db, pemilik)) {
-    // `skipped`, bukan `failed`. Tidak ada kunci yang siap adalah keadaan yang
-    // sah dan sengaja: situs guest tidak pernah punya, dan user yang belum
-    // mengonfigurasi model memang belum meminta ringkasan. Kegagalan adalah
-    // kunci yang sudah siap lalu tidak menjawab. Menyamakannya membuat lencana
-    // peringatan di dashboard menyala untuk konfigurasi yang benar-benar
-    // diinginkan.
+  // `skipped`, bukan `failed`. AI yang tidak dikonfigurasi adalah keadaan yang
+  // sah dan sengaja: pemindaiannya sendiri tidak butuh AI sama sekali.
+  // Kegagalan adalah konfigurasi yang sudah ada lalu tidak menjawab.
+  // Menyamakan keduanya membuat lencana peringatan di dashboard menyala untuk
+  // pilihan yang memang diinginkan.
+  if (!cfg.siap) {
     setAiStatus(db, job.run_id, 'skipped', null, null)
     return
   }
-
-  const kunci = bacaKunci(db, bacaRahasia(), pemilik)
-  if (!kunci) {
-    // `kunciSiap` sudah lolos tapi barisnya hilang: hanya mungkin kalau ada
-    // yang menghapusnya di antara dua kueri. Bukan kegagalan AI.
-    setAiStatus(db, job.run_id, 'skipped', null, null)
-    return
-  }
+  const konf = cfg.konfigurasi
 
   const temuan = db
     .prepare(
@@ -105,7 +97,7 @@ export async function ringkasanHandler(
     .all(siteId) as unknown as TemuanRingkas[]
 
   const prompt = susunPrompt({ nama: site.name, baseUrl: site.base_url, temuan })
-  const hasil = await panggil(kunci, prompt)
+  const hasil = await panggil(konf, prompt)
 
   if (!hasil.ok) {
     // Pesan galatnya disimpan apa adanya, dan job TIDAK dilempar.
@@ -114,7 +106,7 @@ export async function ringkasanHandler(
     // karena AI-nya gagal akan membuat dashboard menandai seluruh situs
     // "gagal", dan pemakainya menyimpulkan temuannya tidak bisa dipercaya.
     // Yang gagal cuma ringkasannya, dan `ai_status` yang menyampaikan itu.
-    setAiStatus(db, job.run_id, 'failed', kunci.model, hasil.galat)
+    setAiStatus(db, job.run_id, 'failed', konf.model, hasil.galat)
     return
   }
 
@@ -127,7 +119,7 @@ export async function ringkasanHandler(
     // `tokens_est` kasar dan sengaja: empat karakter per token cukup untuk
     // menjawab "apakah prompt ini membengkak", dan tokenizer yang benar
     // berarti dependensi baru untuk angka yang tidak dipakai menghitung apa pun.
-  ).run(job.run_id, hasil.teks, kunci.model, Math.ceil((prompt.length + hasil.teks.length) / 4))
+  ).run(job.run_id, hasil.teks, konf.model, Math.ceil((prompt.length + hasil.teks.length) / 4))
 
-  setAiStatus(db, job.run_id, 'ok', kunci.model, null)
+  setAiStatus(db, job.run_id, 'ok', konf.model, null)
 }

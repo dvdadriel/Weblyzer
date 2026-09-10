@@ -7,8 +7,6 @@ import { join } from 'node:path'
 import { chromium, type Browser, type Page } from 'playwright'
 import { openDb } from '../lib/db.ts'
 import { createSite } from '../lib/repos/sites.ts'
-import { buatUser } from '../lib/auth/pengguna.ts'
-import { terbitkanSesi, NAMA_COOKIE_SESI } from '../lib/auth/sesi.ts'
 import { createRun, finishRun } from '../lib/repos/runs.ts'
 import { upsertPage } from '../lib/repos/pages.ts'
 import { reconcile } from '../lib/findings.ts'
@@ -39,16 +37,6 @@ let browser: Browser
 let page: Page
 let asal: string
 let siteId: number
-let adminId: number
-
-/**
- * Rahasia untuk server dev yang di-spawn.
- *
- * WAJIB diteruskan: tanpa `WEBLYZER_SECRET` aplikasi menolak start, dan
- * setiap halaman yang memanggil `konteks()` akan 500. Nilainya tetap supaya
- * cookie session yang ditandatangani di sini bisa diverifikasi di sana.
- */
-const RAHASIA_UI = 'uji-'.repeat(8)
 
 /**
  * Batas per test, dan sengaja longgar.
@@ -91,23 +79,7 @@ async function portBebas(): Promise<number> {
 }
 
 function seed(): number {
-  // Situsnya dimiliki admin, dan test menjelajah SEBAGAI admin itu.
-  //
-  // Tanpa pemilik, `filterPemilik` untuk pengunjung tanpa akun tidak akan
-  // mencocokkan apa pun dan dashboard-nya kosong — yang benar, tapi bukan
-  // yang sedang diuji di sebagian besar berkas ini. Test khusus guest ada
-  // sendiri di bawah.
-  const admin = buatUser(db, {
-    email: 'admin@uji.test',
-    password: 'rahasia-uji',
-    role: 'admin',
-  })
-  adminId = admin.id
-  const site = createSite(db, {
-    name: 'Situs Uji',
-    base_url: 'https://uji.test',
-    user_id: admin.id,
-  })
+  const site = createSite(db, { name: 'Situs Uji', base_url: 'https://uji.test' })
   const p = upsertPage(db, site.id, {
     url: 'https://uji.test/rusak',
     statusCode: 500,
@@ -159,7 +131,6 @@ beforeAll(async () => {
         ...process.env,
         DB_PATH: join(dir, 'uji.db'),
         NODE_ENV: 'development',
-        WEBLYZER_SECRET: RAHASIA_UI,
         // Direktori build sendiri, DI DALAM proyek dan bernama tetap.
         //
         // Next 16 menolak server dev kedua di satu direktori build, dan
@@ -262,47 +233,16 @@ beforeEach(async () => {
   page.setDefaultNavigationTimeout(120_000)
   page.setDefaultTimeout(30_000)
 
-  // Masuk sebagai admin dengan memasang cookie session langsung, bukan lewat
-  // form masuk. Dua alasan: menghemat satu navigasi per test, dan yang diuji
-  // di berkas ini adalah halamannya — form masuknya punya test sendiri. Ini
-  // juga sekaligus membuktikan cookie yang ditandatangani `terbitkanSesi`
-  // benar-benar diterima server.
-  await masukSebagai(adminId)
 })
 
-/** Memasang cookie session yang sah untuk satu user. */
-async function masukSebagai(userId: number) {
-  await page.context().addCookies([
-    {
-      name: NAMA_COOKIE_SESI,
-      value: terbitkanSesi(RAHASIA_UI, userId),
-      domain: 'localhost',
-      path: '/',
-      httpOnly: true,
-      sameSite: 'Lax',
-    },
-  ])
-}
-
-/** Membuang cookie session: menjelajah sebagai pengunjung tanpa akun. */
-async function keluar() {
-  await page.context().clearCookies()
-}
-
 /**
- * `fetch` dengan cookie session, untuk rute yang tidak bisa dibuka browser.
+ * `fetch`, bukan `page.goto`, untuk rute unduhan.
  *
  * `page.goto` pada URL unduhan melempar "Download is starting" — Playwright
- * memperlakukannya sebagai unduhan, bukan navigasi. Dan `fetch` polos tidak
- * membawa cookie apa pun, jadi sejak rute export punya gerbang kepemilikan ia
- * akan selalu menjawab 404.
+ * memperlakukannya sebagai unduhan, bukan navigasi.
  */
-function ambil(jalur: string, userId: number | null = adminId) {
-  const kepala: Record<string, string> =
-    userId === null
-      ? {}
-      : { cookie: `${NAMA_COOKIE_SESI}=${terbitkanSesi(RAHASIA_UI, userId)}` }
-  return fetch(`${asal}${jalur}`, { headers: kepala })
+function ambil(jalur: string) {
+  return fetch(`${asal}${jalur}`)
 }
 
 afterEach(async () => {
@@ -490,145 +430,78 @@ test('ekspor mengembalikan xlsx dengan nama berkas yang aman', async () => {
 
 /* ── halaman model ───────────────────────────────────────────────────────── */
 
-test('halaman model menawarkan pemilih model dan medan API key', async () => {
+test('halaman model menyebut variabel yang kurang, bukan cuma "tidak aktif"', async () => {
+  // Server uji ini dijalankan tanpa WEBLYZER_AI. Yang diperiksa: halamannya
+  // menyebut variabel mana yang harus diisi — pesan yang tidak menyebutnya
+  // memaksa orang membaca kode untuk memakai fiturnya.
   await page.goto(`${asal}/model`)
   await tampil(page.getByRole('heading', { name: 'Model AI' }))
-  await tampil(page.locator('input[name="apiKey"]'))
-
-  // Diperiksa lewat nilai `select`-nya, bukan `getByText`: `<option>` di dalam
-  // select yang tertutup tidak pernah "visible" bagi Playwright, jadi menunggu
-  // teksnya terlihat akan timeout pada halaman yang sebenarnya benar.
-  const pilih = page.locator('select[name="model"]')
-  await tampil(pilih)
-  expect(await pilih.inputValue()).toBe('claude-opus-5')
-  // Session di berkas ini adalah admin, jadi kedua penyedia muncul —
-  // dikelompokkan, karena pilihannya bukan sekadar model yang berbeda.
-  expect(await pilih.locator('optgroup').count()).toBe(2)
-  expect(await pilih.locator('option').count()).toBe(6)
+  await tampil(page.getByText(/WEBLYZER_AI belum diisi/))
 }, BATAS_TEST)
 
-test('user biasa tidak ditawari penyedia CLI di halaman model', async () => {
-  // Gerbangnya ada di server (`simpanDanUji` menolak model agy dari non-admin),
-  // dan ini memeriksa lapisan keduanya: opsi yang pasti ditolak tidak
-  // seharusnya ditawarkan sama sekali.
-  const biasa = buatUser(db, { email: 'biasa@uji.test', password: 'rahasia-uji' })
-  await masukSebagai(biasa.id)
-  try {
-    await page.goto(`${asal}/model`)
-    const pilih = page.locator('select[name="model"]')
-    await tampil(pilih)
-    expect(await pilih.locator('option').count()).toBe(3)
-    expect(await pilih.locator('optgroup').count()).toBe(1)
-    expect(await pilih.locator('option[value="gemini-3.1-pro-high"]').count()).toBe(0)
-  } finally {
-    await masukSebagai(adminId)
+test('halaman model tidak lagi meminta API key lewat form', async () => {
+  // Konfigurasi pindah ke `.env`, jadi tidak boleh ada lagi medan kunci di
+  // browser. Kalau suatu saat form itu kembali tanpa sengaja, di sinilah ia
+  // tertangkap.
+  await page.goto(`${asal}/model`)
+  await tampil(page.getByRole('heading', { name: 'Model AI' }))
+  expect(await jumlah(page.locator('input[name="apiKey"]'))).toBe(0)
+  expect(await jumlah(page.locator('select[name="model"]'))).toBe(0)
+}, BATAS_TEST)
+
+test('halaman model menunjukkan contoh .env yang bisa ditiru', async () => {
+  // Halaman yang cuma bilang "isi .env" memindahkan pekerjaan ke pembacanya.
+  await page.goto(`${asal}/model`)
+  await tampil(page.getByText(/WEBLYZER_AI_MODEL=/))
+  await tampil(page.getByText(/nvapi-/))
+}, BATAS_TEST)
+
+/* ── tanpa auth ──────────────────────────────────────────────────────────── */
+
+test('navbar tidak lagi menawarkan masuk atau keluar', async () => {
+  // Weblyzer jalan di mesin sendiri; tautan masuk yang tertinggal akan
+  // mengarah ke halaman yang sudah tidak ada.
+  await page.goto(asal)
+  await tampil(page.getByRole('heading', { name: 'Situs' }))
+  expect(await jumlah(page.getByRole('link', { name: 'Masuk' }))).toBe(0)
+  expect(await jumlah(page.getByRole('button', { name: 'Keluar' }))).toBe(0)
+}, BATAS_TEST)
+
+test('rute auth yang sudah dibuang menjawab 404', async () => {
+  // Rute yang dihapus dari `app/` tapi masih dirujuk di suatu tempat adalah
+  // tautan mati; ini yang membuktikan keduanya benar-benar hilang.
+  for (const jalur of ['/masuk', '/akun']) {
+    const r = await ambil(jalur)
+    expect(r.status, jalur).toBe(404)
   }
 }, BATAS_TEST)
 
-test('memilih penyedia CLI menghilangkan medan API key', async () => {
-  // Field mati yang tetap terlihat mengundang orang mencari kunci yang tidak
-  // dibutuhkan, dan `required` pada field yang tersembunyi lewat CSS membuat
-  // form gagal submit tanpa pesan yang bisa dilihat.
-  await page.goto(`${asal}/model`)
-  const pilih = page.locator('select[name="model"]')
-  await tampil(pilih)
-  await pilih.selectOption('gemini-3.1-pro-high')
-  await page.waitForTimeout(300)
-  expect(await jumlah(page.locator('input[name="apiKey"]'))).toBe(0)
-  await tampil(page.getByText(/Tidak perlu API key/))
-}, BATAS_TEST)
-
-test('medan API key bertipe password, jadi tidak terbaca di layar', async () => {
-  await page.goto(`${asal}/model`)
-  const medan = page.locator('input[name="apiKey"]')
-  await tampil(medan)
-  expect(await medan.getAttribute('type')).toBe('password')
-}, BATAS_TEST)
-
-test('halaman model tanpa akun menjelaskan sebabnya, bukan 404', async () => {
-  await keluar()
-  await page.goto(`${asal}/model`)
-  await tampil(page.getByRole('heading', { name: 'Model AI' }))
-  await tampil(page.getByText('Butuh akun'))
-  // Keadaan kosong yang mengajarkan antarmuka: ada jalan keluarnya di layar.
-  await tampil(page.getByRole('link', { name: 'Masuk' }))
-}, BATAS_TEST)
-
-/* ── auth ────────────────────────────────────────────────────────────────── */
-
-test('pengunjung tanpa akun tidak melihat situs milik orang lain', async () => {
-  // Isolasi antar pemilik, diuji dari luar: cookie dibuang, lalu dashboard
-  // harus kosong walau databasenya memuat satu situs beserta temuannya.
-  await keluar()
+test('dashboard terbuka tanpa cookie apa pun', async () => {
+  // Tidak ada sesi, tidak ada cookie guest, dan situsnya tetap terlihat.
+  await page.context().clearCookies()
   await page.goto(asal)
-  await tampil(page.getByRole('heading', { name: 'Situs' }))
-  expect(await jumlah(page.getByText('Situs Uji'))).toBe(0)
-}, BATAS_TEST)
-
-test('situs orang lain 404, bukan terbuka lewat id yang ditebak', async () => {
-  // Kebocoran paling langsung yang bisa ada di aplikasi ini: seluruh pohon
-  // /sites/[siteId]/* dulu tidak memeriksa kepemilikan sama sekali, jadi id
-  // yang ditebak membuka nama situs, alamatnya, temuannya, dan ringkasan
-  // AI-nya. Diuji dari browser, bukan dari fungsinya, karena gerbangnya ada
-  // di layout dan hanya jalur nyata yang membuktikannya terpasang.
-  await keluar()
-  const r = await page.goto(`${asal}/sites/${siteId}/bugs`)
-  expect(r?.status()).toBe(404)
-}, BATAS_TEST)
-
-test('halaman pengaturan situs orang lain juga 404', async () => {
-  // Satu layout membungkus ketujuh tab, Lighthouse, dan pengaturan — test ini
-  // memastikan gerbangnya memang di layout dan bukan cuma di satu halaman.
-  await keluar()
-  const r = await page.goto(`${asal}/sites/${siteId}/pengaturan`)
-  expect(r?.status()).toBe(404)
-}, BATAS_TEST)
-
-test('ekspor Excel tanpa akun 404, tidak mengunduh temuan orang lain', async () => {
-  // Route handler tidak melewati layout, jadi ia punya gerbangnya sendiri.
-  // Tanpa itu, satu id yang ditebak mengunduh SELURUH temuan situs orang lain
-  // dalam satu berkas — termasuk yang sudah beres dan yang diabaikan.
-  const r = await ambil(`/sites/${siteId}/export`, null)
-  expect(r.status).toBe(404)
-  // Dan isinya bukan spreadsheet.
-  expect(r.headers.get('content-type')).not.toContain('spreadsheetml')
-}, BATAS_TEST)
-
-test('pemiliknya sendiri tetap bisa membuka dan mengekspor', async () => {
-  // Sisi lain dari gerbang itu: menutup kebocoran tanpa mengunci pemiliknya
-  // adalah setengah pekerjaan.
-  const r = await page.goto(`${asal}/sites/${siteId}/bugs`)
-  expect(r?.status()).toBe(200)
-  const e = await ambil(`/sites/${siteId}/export`)
-  expect(e.status).toBe(200)
-  expect(e.headers.get('content-disposition')).toContain('.xlsx')
-}, BATAS_TEST)
-
-test('tombol Google tidak muncul tanpa kredensial OAuth', async () => {
-  // Ditampilkan lalu gagal setelah diklik adalah jalan buntu; tidak
-  // ditampilkan sama sekali adalah jawaban yang jujur.
-  await keluar()
-  await page.goto(`${asal}/masuk`)
-  await tampil(page.getByRole('heading', { name: 'Masuk' }))
-  expect(await jumlah(page.getByText(/Google/))).toBe(0)
-}, BATAS_TEST)
-
-test('masuk lewat form membawa ke dashboard dan situsnya terlihat', async () => {
-  await keluar()
-  await page.goto(`${asal}/masuk`)
-  await page.locator('input[name="email"]').fill('admin@uji.test')
-  await page.locator('input[name="password"]').fill('rahasia-uji')
-  await page.getByRole('button', { name: 'Masuk' }).click()
   await tampil(page.getByText('Situs Uji'))
 }, BATAS_TEST)
 
-test('password salah ditolak tanpa menyebut apakah emailnya ada', async () => {
-  await keluar()
-  await page.goto(`${asal}/masuk`)
-  await page.locator('input[name="email"]').fill('admin@uji.test')
-  await page.locator('input[name="password"]').fill('bukan-passwordnya')
-  await page.getByRole('button', { name: 'Masuk' }).click()
-  await tampil(page.getByText('Email atau password salah.'))
+test('situs yang tidak ada 404, bukan kerangka halaman kosong', async () => {
+  // Id yang tidak ada dulu merender kerangka lengkap dengan nama situs kosong,
+  // dan itu terbaca sebagai data yang hilang alih-alih alamat yang salah.
+  const r = await page.goto(`${asal}/sites/999999/bugs`)
+  expect(r?.status()).toBe(404)
+}, BATAS_TEST)
+
+test('halaman pengaturan situs yang tidak ada juga 404', async () => {
+  // Satu layout membungkus ketujuh tab, Lighthouse, dan pengaturan — test ini
+  // memastikan pemeriksaannya memang di layout dan bukan cuma di satu halaman.
+  const r = await page.goto(`${asal}/sites/999999/pengaturan`)
+  expect(r?.status()).toBe(404)
+}, BATAS_TEST)
+
+test('ekspor situs yang tidak ada 404, bukan xlsx berisi nol baris', async () => {
+  // Rute ekspor adalah jalur terpisah dari layout dan harus memeriksanya
+  // sendiri. Berkas Excel kosong terbaca seperti situs yang datanya hilang.
+  const r = await ambil('/sites/999999/export')
+  expect(r.status).toBe(404)
 }, BATAS_TEST)
 
 /* ── keadaan yang tidak boleh tertukar ───────────────────────────────────── */

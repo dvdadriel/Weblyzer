@@ -1,8 +1,7 @@
 import writeXlsx from 'write-excel-file/node'
 import { getDb } from '../../../../lib/db.ts'
 import { susunSheet, namaBerkas } from '../../../../lib/export/excel.ts'
-import { konteks } from '../../../../lib/auth/konteks.ts'
-import { situsMilik } from '../../../../lib/auth/pemilik.ts'
+import { getSite } from '../../../../lib/repos/sites.ts'
 
 /**
  * Mengunduh seluruh temuan satu situs sebagai satu berkas .xlsx.
@@ -22,17 +21,12 @@ export async function GET(
   const db = getDb()
 
   // Route handler TIDAK melewati layout, jadi gerbang di
-  // `app/sites/[siteId]/layout.tsx` tidak berlaku di sini — ini jalur
-  // terpisah yang harus memeriksanya sendiri. Tanpa ini, satu id yang ditebak
-  // mengunduh SELURUH temuan situs orang lain dalam satu berkas, termasuk
-  // yang sudah beres dan diabaikan.
-  //
-  // 404 dengan pesan yang sama untuk situs yang tidak ada dan situs orang
-  // lain, alasan yang sama dengan `situsMilik`.
-  let situs: { name: string }
-  try {
-    situs = situsMilik(db, await konteks(), id)
-  } catch {
+  // `app/sites/[siteId]/layout.tsx` tidak berlaku di sini — ini jalur terpisah
+  // yang harus memeriksanya sendiri. Tanpa ini, id yang tidak ada menghasilkan
+  // berkas Excel berisi nol baris alih-alih 404, dan itu terbaca seperti situs
+  // yang datanya hilang.
+  const situs = getSite(db, id)
+  if (!situs) {
     return new Response('Situs tidak ditemukan', { status: 404 })
   }
 

@@ -87,7 +87,7 @@ describe('terjemah', () => {
 describe('penerjemah', () => {
   it('mengikat locale', () => {
     const t = penerjemah('en')
-    expect(t('nav.keluar')).toBe('Sign out')
+    expect(t('nav.model')).toBe('Model')
   })
 })
 

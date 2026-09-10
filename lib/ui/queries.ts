@@ -1,6 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { Severity } from '../findings.ts'
-import { filterPemilik, type Konteks } from '../auth/pemilik.ts'
 
 /**
  * Tiga keadaan yang mudah tertukar dan wajib dibedakan di setiap layar berdata.
@@ -86,19 +85,17 @@ function runTerakhir(db: DatabaseSync, siteId: number) {
 }
 
 /**
- * Kartu situs untuk dashboard, dibatasi ke milik pemanggil.
+ * Kartu situs untuk dashboard.
  *
- * `ctx` wajib, bukan opsional. Parameter opsional di sini berarti satu
- * pemanggil yang lupa mengirimnya menampilkan situs semua orang — dan itu
- * kebocoran yang tidak akan terlihat di layar pengembang yang kebetulan
- * admin. Penjadwal dan CLI yang memang harus melihat semuanya memakai
- * `listSites` di `lib/repos/sites.ts`.
+ * Tanpa penyaring pemilik, dan itu bukan kelalaian: Weblyzer berjalan di mesin
+ * pemakainya sendiri, jadi seluruh isi database ini memang miliknya. Penyaring
+ * per akun dulu ada di sini sewaktu masih ada akun — riwayatnya di git kalau
+ * suatu saat perlu di-host lagi.
  */
-export function ringkasanSitus(db: DatabaseSync, ctx: Konteks): RingkasanSitus[] {
-  const { klausa, nilai } = filterPemilik(ctx)
+export function ringkasanSitus(db: DatabaseSync): RingkasanSitus[] {
   const situs = db
-    .prepare(`SELECT id, name, base_url FROM sites WHERE ${klausa} ORDER BY id`)
-    .all(...nilai) as { id: number; name: string; base_url: string }[]
+    .prepare('SELECT id, name, base_url FROM sites ORDER BY id')
+    .all() as { id: number; name: string; base_url: string }[]
 
   return situs.map((s) => {
     const hitungan = db

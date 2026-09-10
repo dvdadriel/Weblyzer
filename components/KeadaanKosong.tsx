@@ -4,22 +4,17 @@ import type { NamaIkon } from './Ikon.tsx'
 import type { Kunci, T } from '../lib/i18n/index.ts'
 
 /**
- * Keadaan kosong yang bukan berasal dari data, melainkan dari siapa yang
- * membuka layarnya.
+ * Keadaan kosong, dibedakan menurut sebabnya.
  *
  * `DESIGN.md` mensyaratkan keadaan kosong membedakan "belum dipindai",
  * "bersih", dan "gagal", karena ketiganya menghasilkan nol baris tetapi
- * artinya berlawanan. Multi-user menambahkan dua sebab lagi yang juga
- * menghasilkan nol baris:
+ * artinya berlawanan — dan menyamakannya membuat orang menunggu pemindaian
+ * yang sudah jalan, atau mengabaikan pemindaian yang gagal.
  *
- * - `butuh-akun` — fiturnya ada, pemakainya belum masuk
- * - `admin-saja` — fiturnya ada, tapi berjalan dengan CLI di mesin server
- *   sehingga hanya pemilik instance yang bisa memicunya
- *
- * Menyamakan keduanya dengan "belum dipindai" akan membuat orang menunggu
- * pemindaian yang tidak akan pernah jalan.
+ * Dua jenis lagi (`butuh-akun`, `admin-saja`) hidup di sini sewaktu masih ada
+ * akun. Keduanya ikut hilang bersama auth.
  */
-export type KeadaanKosongJenis = Exclude<Keadaan, 'ada-temuan'> | 'butuh-akun' | 'admin-saja'
+export type KeadaanKosongJenis = Exclude<Keadaan, 'ada-temuan'>
 
 const ISI: Record<
   KeadaanKosongJenis,
@@ -41,16 +36,6 @@ const ISI: Record<
     teks: 'kosong.gagalTeks',
     ikon: 'alert',
     warna: 'var(--sev-critical)',
-  },
-  'butuh-akun': {
-    judul: 'kosong.butuhAkun',
-    teks: 'kosong.butuhAkunTeks',
-    ikon: 'sparkle',
-  },
-  'admin-saja': {
-    judul: 'kosong.adminSaja',
-    teks: 'kosong.adminSajaTeks',
-    ikon: 'perisai',
   },
 }
 

@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { db } from '../lib/ui/db.ts'
 import { ringkasanSitus } from '../lib/ui/queries.ts'
-import { konteks } from '../lib/auth/konteks.ts'
 import { tServer, localeSekarang } from '../lib/i18n/server.ts'
 import { GLIF } from '../lib/glif.ts'
 import { TambahSitus } from '../components/TambahSitus.tsx'
@@ -16,10 +15,9 @@ const URUT = ['critical', 'high', 'medium', 'low'] as const
 
 
 export default async function Dashboard() {
-  const ctx = await konteks()
   const t = await tServer()
   const locale = await localeSekarang()
-  const situs = ringkasanSitus(db(), ctx)
+  const situs = ringkasanSitus(db())
 
   const totalSitus = situs.length
   const totalTemuan = situs.reduce((acc, s) => acc + s.totalTerbuka, 0)

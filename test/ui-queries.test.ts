@@ -6,25 +6,11 @@ import { createRun, finishRun } from '../lib/repos/runs.ts'
 import { upsertPage } from '../lib/repos/pages.ts'
 import { reconcile } from '../lib/findings.ts'
 import { ringkasanSitus, temuanKategori, keadaanKategori } from '../lib/ui/queries.ts'
-import { buatUser } from '../lib/auth/pengguna.ts'
-import type { Konteks } from '../lib/auth/pemilik.ts'
 
 let db: DatabaseSync
-/**
- * Konteks admin: melihat semua situs, termasuk yang belum punya pemilik.
- *
- * Berkas ini menguji perhitungan `ringkasanSitus`, bukan penyaring
- * pemiliknya — penyaringnya punya test sendiri di `test/pemilik.test.ts`, dan
- * satu test isolasi di bawah memastikan keduanya benar-benar tersambung.
- */
-let admin: Konteks
 
 beforeEach(() => {
   db = openDb(':memory:')
-  admin = {
-    jenis: 'user',
-    user: buatUser(db, { email: 'admin@uji.test', password: 'rahasia1', role: 'admin' }),
-  }
 })
 
 function situsDenganTemuan() {
@@ -41,7 +27,7 @@ function situsDenganTemuan() {
 
 test('ringkasan situs menghitung temuan terbuka per severity', () => {
   const { site } = situsDenganTemuan()
-  const [r] = ringkasanSitus(db, admin)
+  const [r] = ringkasanSitus(db)
   expect(r!.id).toBe(site.id)
   expect(r!.terbuka.critical).toBe(1)
   expect(r!.terbuka.low).toBe(1)
@@ -52,13 +38,13 @@ test('temuan yang sudah fixed tidak ikut dihitung terbuka', () => {
   const { site } = situsDenganTemuan()
   const run2 = createRun(db, site.id, 'full')
   reconcile(db, site.id, run2.id, 'bugs', [])
-  const [r] = ringkasanSitus(db, admin)
+  const [r] = ringkasanSitus(db)
   expect(r!.totalTerbuka).toBe(0)
 })
 
 test('situs tanpa run apa pun ditandai belum pernah dipindai', () => {
   createSite(db, { name: 'Baru', base_url: 'https://baru.test' })
-  const [r] = ringkasanSitus(db, admin)
+  const [r] = ringkasanSitus(db)
   expect(r!.keadaan).toBe('belum-dipindai')
 })
 
@@ -69,7 +55,7 @@ test('situs bersih dibedakan dari situs yang pemindaiannya gagal', () => {
   const gagal = createSite(db, { name: 'Gagal', base_url: 'https://gagal.test' })
   finishRun(db, createRun(db, gagal.id, 'full').id, 'failed', 'Situs tidak terjangkau')
 
-  const peta = new Map(ringkasanSitus(db, admin).map((r) => [r.nama, r]))
+  const peta = new Map(ringkasanSitus(db).map((r) => [r.nama, r]))
   expect(peta.get('Bersih')!.keadaan).toBe('bersih')
   expect(peta.get('Gagal')!.keadaan).toBe('gagal')
   expect(peta.get('Gagal')!.pesanGagal).toContain('tidak terjangkau')
@@ -108,7 +94,7 @@ test('keadaan kategori membedakan belum-dipindai, bersih, dan gagal', () => {
 })
 
 test('daftar kosong tidak melempar', () => {
-  expect(ringkasanSitus(db, admin)).toEqual([])
+  expect(ringkasanSitus(db)).toEqual([])
 })
 
 test('situs yang butuh perhatian diurutkan lebih dulu', () => {
@@ -129,7 +115,7 @@ test('situs yang butuh perhatian diurutkan lebih dulu', () => {
   const gagal = createSite(db, { name: 'Gagal', base_url: 'https://gagal.test' })
   finishRun(db, createRun(db, gagal.id, 'full').id, 'failed', 'tidak terjangkau')
 
-  expect(ringkasanSitus(db, admin).map((r) => r.nama)).toEqual(['Gagal', 'Rusak', 'Belum', 'Bersih'])
+  expect(ringkasanSitus(db).map((r) => r.nama)).toEqual(['Gagal', 'Rusak', 'Belum', 'Bersih'])
 })
 
 test('dalam kelompok yang sama, yang paling parah dulu', () => {
@@ -144,7 +130,7 @@ test('dalam kelompok yang sama, yang paling parah dulu', () => {
   buat('Ringan', 'low')
   buat('Parah', 'critical')
 
-  expect(ringkasanSitus(db, admin).map((r) => r.nama)).toEqual(['Parah', 'Ringan'])
+  expect(ringkasanSitus(db).map((r) => r.nama)).toEqual(['Parah', 'Ringan'])
 })
 
 /* ── penanda terjadwal ──────────────────────────────────────────────────── */
@@ -153,18 +139,18 @@ test('kartu situs menandai run terakhir yang dipicu jadwal', () => {
   const site = createSite(db, { name: 'A', base_url: 'https://a.test' })
   const manual = createRun(db, site.id, 'full')
   finishRun(db, manual.id, 'done')
-  expect(ringkasanSitus(db, admin)[0]!.terjadwal).toBe(false)
+  expect(ringkasanSitus(db)[0]!.terjadwal).toBe(false)
 
   const jadwal = createRun(db, site.id, 'full', 'scheduled')
   finishRun(db, jadwal.id, 'done')
-  expect(ringkasanSitus(db, admin)[0]!.terjadwal).toBe(true)
+  expect(ringkasanSitus(db)[0]!.terjadwal).toBe(true)
 
   // Dan kembali false begitu ada yang menekan tombolnya sendiri. Penanda yang
   // lengket akan mengaku "gagal semalam" untuk kegagalan yang baru saja
   // disaksikan orangnya — persis pembedaan yang fitur ini dibangun untuk itu.
   const lagi = createRun(db, site.id, 'full')
   finishRun(db, lagi.id, 'done')
-  expect(ringkasanSitus(db, admin)[0]!.terjadwal).toBe(false)
+  expect(ringkasanSitus(db)[0]!.terjadwal).toBe(false)
 })
 
 test('penanda terjadwal tidak mengubah keadaan kartu', () => {
@@ -174,27 +160,18 @@ test('penanda terjadwal tidak mengubah keadaan kartu', () => {
   const site = createSite(db, { name: 'A', base_url: 'https://a.test' })
   const jadwal = createRun(db, site.id, 'full', 'scheduled')
   finishRun(db, jadwal.id, 'done')
-  const [r] = ringkasanSitus(db, admin)
+  const [r] = ringkasanSitus(db)
   expect(r!.terjadwal).toBe(true)
   expect(r!.keadaan).toBe('bersih')
 })
 
-test('ringkasan situs hanya memuat situs milik pemanggil', () => {
-  // Sambungan antara `ringkasanSitus` dan `filterPemilik`, diuji di sini
-  // karena inilah satu-satunya tempat keduanya bertemu. Kalau penyaringnya
-  // lupa dipasang, kebocorannya tidak akan terlihat di layar pengembang yang
-  // kebetulan admin.
-  const a = buatUser(db, { email: 'a@uji.test', password: 'rahasia1' })
-  const b = buatUser(db, { email: 'b@uji.test', password: 'rahasia1' })
-  createSite(db, { name: 'Milik A', base_url: 'https://a.test', user_id: a.id })
-  createSite(db, { name: 'Milik B', base_url: 'https://b.test', user_id: b.id })
-
-  const ka: Konteks = { jenis: 'user', user: a }
-  expect(ringkasanSitus(db, ka).map((r) => r.nama)).toEqual(['Milik A'])
-
-  const kg: Konteks = { jenis: 'guest', guestId: 'g1' }
-  expect(ringkasanSitus(db, kg)).toEqual([])
-
-  // Admin melihat keduanya.
-  expect(ringkasanSitus(db, admin).map((r) => r.nama)).toEqual(['Milik A', 'Milik B'])
+test('ringkasan situs memuat seluruh situs di database', () => {
+  // Weblyzer jalan di mesin pemakainya sendiri, jadi tidak ada penyaring
+  // pemilik. Test ini yang membuat perubahan itu terlihat kalau suatu saat
+  // penyaring dipasang kembali tanpa sengaja.
+  createSite(db, { name: 'Satu', base_url: 'https://satu.test' })
+  createSite(db, { name: 'Dua', base_url: 'https://dua.test' })
+  // Urutannya menurut `bandingkan` — keadaan dulu, lalu nama — bukan menurut
+  // id. Keduanya belum dipindai, jadi namanya yang menentukan.
+  expect(ringkasanSitus(db).map((r) => r.nama)).toEqual(['Dua', 'Satu'])
 })

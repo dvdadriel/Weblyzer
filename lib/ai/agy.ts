@@ -44,7 +44,7 @@ function argumen(model: string, prompt: string): string[] {
  * dan hasil berbeda tergantung mesin siapa yang menjalankannya.
  */
 export function tafsirkanAgy(
-  err: (Error & { code?: string | number }) | null,
+  err: (Error & { code?: string | number; killed?: boolean }) | null,
   stdout: string,
   stderr: string,
   batasKeluaran: number,
@@ -54,17 +54,36 @@ export function tafsirkanAgy(
       return {
         ok: false,
         galat:
-          'Perintah `agy` tidak ada di PATH server. Provider ini menjalankan CLI di mesin, ' +
-          'jadi ia harus terpasang di sana — bukan di komputer Anda.',
+          'Perintah `agy` tidak ada di PATH. Jalur ini menjalankan CLI di mesin ini, ' +
+          'jadi ia harus terpasang di sini.',
       }
     }
-    if (err.code === 'ETIMEDOUT') {
+
+    // `killed` DAN `ETIMEDOUT`, keduanya.
+    //
+    // Terukur: pada batas waktu yang terlewat, Node di sini melaporkan
+    // `code: 1` dengan `killed: true` — bukan ETIMEDOUT. Versi pertama hanya
+    // memeriksa ETIMEDOUT, jadi setiap timeout jatuh ke cabang umum di bawah
+    // dan tersimpan sebagai "Command failed: agy --model ... -p=<seluruh
+    // prompt>". ETIMEDOUT tetap diperiksa karena Node memakainya pada jalur
+    // lain, dan menghapusnya berarti menukar satu lubang dengan lubang lain.
+    if (err.killed || err.code === 'ETIMEDOUT') {
       return { ok: false, galat: `agy tidak selesai dalam ${BATAS_MS / 1000} detik.` }
     }
-    // stderr lebih dulu: di sanalah CLI menaruh alasannya. Pesan Node
-    // ("Command failed") tidak menyebut apa pun yang berguna.
-    const pesan = (stderr || '').trim() || err.message
-    return { ok: false, galat: pesan.slice(0, 2000) }
+
+    // stderr lebih dulu: di sanalah CLI menaruh alasannya.
+    const kata = (stderr || '').trim() || (stdout || '').trim()
+    if (kata !== '') return { ok: false, galat: kata.slice(0, 2000) }
+
+    // `err.message` TIDAK dipakai, dan ini bukan kelalaian: `execFile`
+    // menyusunnya sebagai "Command failed: " + seluruh baris perintah, dan
+    // baris perintah itu memuat prompt utuh — belasan kilobyte temuan yang
+    // masuk ke `runs.ai_error` lalu terpampang di panel ringkasan. Yang
+    // berguna dari galat itu cuma kode keluarnya.
+    return {
+      ok: false,
+      galat: `agy keluar dengan kode ${err.code ?? '?'} tanpa keluaran maupun pesan galat.`,
+    }
   }
 
   const teks = (stdout || '').trim()

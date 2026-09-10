@@ -2,40 +2,31 @@ import { expect, test } from 'vitest'
 import { openDb } from '../lib/db.ts'
 import { createSite } from '../lib/repos/sites.ts'
 import { createRun } from '../lib/repos/runs.ts'
-import { buatUser } from '../lib/auth/pengguna.ts'
-import { bacaRahasia } from '../lib/auth/rahasia.ts'
-import { simpanKunci, simpanCli, tandaiTerverifikasi } from '../lib/ai/kunci.ts'
 import { reconcile } from '../lib/findings.ts'
-import { ringkasanHandler } from '../lib/jobs/ringkasan.ts'
+import { ringkasanHandler, panggilBawaan } from '../lib/jobs/ringkasan.ts'
 import type { PemanggilAi } from '../lib/jobs/ringkasan.ts'
+import type { Hasil, Konfigurasi } from '../lib/ai/konfigurasi.ts'
 import { ringkasanAi, statusAi } from '../lib/ui/queries.ts'
 
 /**
- * Rahasia yang dipakai untuk menyimpan kunci HARUS yang sama dengan yang akan
- * dibaca `ringkasanHandler` lewat `bacaRahasia()`.
+ * Konfigurasi AI diberikan sebagai nilai, bukan lewat `process.env`.
  *
- * Versi pertama berkas ini memasang rahasianya sendiri dengan `??=` lalu
- * memakai konstanta itu untuk `simpanKunci` — yang lolos di mesin tanpa
- * `WEBLYZER_SECRET` dan gagal dengan galat dekripsi di mesin yang punya.
- * Membacanya dari satu sumber menghapus kopling itu sepenuhnya.
+ * Versi sebelumnya menyimpan kunci di database dan menanam rahasianya di
+ * `process.env`, dan itu membuat berkas ini lolos di mesin tanpa
+ * `WEBLYZER_SECRET` lalu gagal di mesin yang punya. Menyerahkannya sebagai
+ * argumen menghapus kopling itu sepenuhnya: yang diuji di sini adalah
+ * perilaku handler-nya, bukan isi `.env` siapa pun.
  */
-process.env.WEBLYZER_SECRET ??= 'rahasia-uji-'.repeat(3)
-const RAHASIA = bacaRahasia()
+const SIAP: Hasil = {
+  siap: true,
+  konfigurasi: { jalur: 'anthropic', model: 'claude-opus-5', apiKey: 'sk-ant-uji-1234' },
+}
+const BELUM: Hasil = { siap: false, sebab: 'WEBLYZER_AI belum diisi.' }
 
-/**
- * Situs milik seorang user, dengan satu temuan critical.
- *
- * `kunci` memilih keadaan konfigurasi AI pemiliknya, dan ketiganya adalah
- * keadaan yang benar-benar terjadi di produksi:
- * - `siap`     — kunci tersimpan dan sudah lolos validasi
- * - `mentah`   — kunci tersimpan tapi belum diuji (baru diganti, misalnya)
- * - `tanpa`    — belum pernah mengonfigurasi model
- * - `cli`      — admin yang memilih provider agy, jadi tanpa API key sama sekali
- */
-function siap(kunci: 'siap' | 'mentah' | 'tanpa' | 'cli' = 'tanpa') {
+/** Situs dengan satu temuan critical. */
+function siap() {
   const db = openDb(':memory:')
-  const user = buatUser(db, { email: 'a@x.com', password: 'rahasia1' })
-  const site = createSite(db, { name: 'Uji', base_url: 'https://uji.test', user_id: user.id })
+  const site = createSite(db, { name: 'Uji', base_url: 'https://uji.test' })
   const run = createRun(db, site.id, 'bugs')
   reconcile(db, site.id, run.id, 'bugs', [
     {
@@ -47,19 +38,7 @@ function siap(kunci: 'siap' | 'mentah' | 'tanpa' | 'cli' = 'tanpa') {
       detail: {},
     },
   ])
-
-  if (kunci === 'cli') {
-    simpanCli(db, user.id, 'gemini-3.1-pro-high')
-    tandaiTerverifikasi(db, user.id)
-  } else if (kunci !== 'tanpa') {
-    simpanKunci(db, RAHASIA, user.id, {
-      model: 'claude-opus-5',
-      apiKey: 'sk-ant-uji-1234',
-    })
-    if (kunci === 'siap') tandaiTerverifikasi(db, user.id)
-  }
-
-  return { db, siteId: site.id, runId: run.id, userId: user.id }
+  return { db, siteId: site.id, runId: run.id }
 }
 
 const job = (runId: number, siteId: number) =>
@@ -82,64 +61,35 @@ const aiStatus = (db: ReturnType<typeof openDb>, runId: number) =>
 
 /* ── Gerbang: kapan AI tidak jalan, dan itu bukan kegagalan ─────────────── */
 
-test('tanpa kunci sama sekali, statusnya skipped bukan failed', async () => {
-  const { db, siteId, runId } = siap('tanpa')
-  await ringkasanHandler(job(runId, siteId), db)
+test('tanpa konfigurasi, statusnya skipped bukan failed', async () => {
+  // AI yang tidak dikonfigurasi adalah pilihan yang sah: pemindaiannya sendiri
+  // tidak butuh AI sama sekali. Menandainya `failed` membuat lencana
+  // peringatan di dashboard menyala untuk keadaan yang memang diinginkan.
+  const { db, siteId, runId } = siap()
+  await ringkasanHandler(job(runId, siteId), db, berhasil('x'), BELUM)
   expect(statusAi(db, siteId)).toBeNull() // run belum selesai
   expect(aiStatus(db, runId)).toBe('skipped')
 })
 
-test('tanpa kunci, tidak ada laporan yang dibuat', async () => {
-  const { db, siteId, runId } = siap('tanpa')
-  await ringkasanHandler(job(runId, siteId), db)
+test('tanpa konfigurasi, tidak ada laporan yang dibuat', async () => {
+  const { db, siteId, runId } = siap()
+  await ringkasanHandler(job(runId, siteId), db, berhasil('x'), BELUM)
   expect(ringkasanAi(db, siteId)).toBeNull()
 })
 
-test('kunci yang belum terverifikasi tidak pernah dipakai', async () => {
-  // Inilah gerbang "harus konfigurasikan AI modelnya dulu, sudah oke baru
-  // bisa gunakan". Kunci yang ada tapi belum lolos validasi harus diperlakukan
-  // sama dengan tidak ada kunci — bukan dicoba lalu gagal, karena mencobanya
-  // berarti satu permintaan berbayar untuk kunci yang sudah diketahui belum
-  // terbukti.
-  const { db, siteId, runId } = siap('mentah')
+test('tanpa konfigurasi, pemanggil AI tidak pernah disentuh', async () => {
+  const { db, siteId, runId } = siap()
   let dipanggil = false
-  await ringkasanHandler(job(runId, siteId), db, async () => {
-    dipanggil = true
-    return { ok: true, teks: 'tidak seharusnya sampai sini' }
-  })
+  await ringkasanHandler(
+    job(runId, siteId),
+    db,
+    async () => {
+      dipanggil = true
+      return { ok: true, teks: 'tidak seharusnya sampai sini' }
+    },
+    BELUM,
+  )
   expect(dipanggil).toBe(false)
-  expect(aiStatus(db, runId)).toBe('skipped')
-  expect(ringkasanAi(db, siteId)).toBeNull()
-})
-
-test('situs guest tidak pernah memakai AI', async () => {
-  // Guest tidak punya akun, jadi tidak punya kunci — dan `user_id` NULL-nya
-  // yang menyampaikan itu.
-  const db = openDb(':memory:')
-  const site = createSite(db, { name: 'G', base_url: 'https://g.test', guest_id: 'g1' })
-  const run = createRun(db, site.id, 'bugs')
-  let dipanggil = false
-  await ringkasanHandler(job(run.id, site.id), db, async () => {
-    dipanggil = true
-    return { ok: true, teks: 'x' }
-  })
-  expect(dipanggil).toBe(false)
-  expect(aiStatus(db, run.id)).toBe('skipped')
-})
-
-test('kunci user lain tidak dipakai untuk situs ini', async () => {
-  const { db, siteId, runId } = siap('tanpa')
-  const lain = buatUser(db, { email: 'b@x.com', password: 'rahasia1' })
-  simpanKunci(db, RAHASIA, lain.id, { model: 'claude-opus-5', apiKey: 'sk-ant-lain' })
-  tandaiTerverifikasi(db, lain.id)
-
-  let dipanggil = false
-  await ringkasanHandler(job(runId, siteId), db, async () => {
-    dipanggil = true
-    return { ok: true, teks: 'x' }
-  })
-  expect(dipanggil).toBe(false)
-  expect(aiStatus(db, runId)).toBe('skipped')
 })
 
 /* ── Jalur gagal: temuan tidak boleh tergeser sedikit pun ───────────────── */
@@ -150,15 +100,14 @@ test('kunci user lain tidak dipakai untuk situs ini', async () => {
  * berbohong.
  */
 test('AI yang gagal tidak menyentuh satu pun temuan', async () => {
-  const { db, siteId, runId } = siap('siap')
+  const { db, siteId, runId } = siap()
   const sebelum = temuanUtuh(db, siteId)
-  await ringkasanHandler(job(runId, siteId), db, gagal('API key tidak berlaku lagi'))
+  await ringkasanHandler(job(runId, siteId), db, gagal('API key ditolak penyedianya'), SIAP)
 
   const status = db
     .prepare('SELECT ai_status, ai_error, ai_model FROM runs WHERE id = ?')
     .get(runId) as { ai_status: string; ai_error: string | null; ai_model: string | null }
   expect(status.ai_status).toBe('failed')
-  // `ai_model` sekarang memuat id model, bukan nama CLI.
   expect(status.ai_model).toBe('claude-opus-5')
   expect(status.ai_error).toBeTruthy()
 
@@ -166,31 +115,37 @@ test('AI yang gagal tidak menyentuh satu pun temuan', async () => {
 })
 
 test('AI yang gagal tidak melempar, jadi pemindaian tetap dianggap berhasil', async () => {
-  const { db, siteId, runId } = siap('siap')
+  const { db, siteId, runId } = siap()
   await expect(
-    ringkasanHandler(job(runId, siteId), db, gagal('meledak')),
+    ringkasanHandler(job(runId, siteId), db, gagal('meledak'), SIAP),
   ).resolves.toBeUndefined()
 })
 
 test('galat disimpan mentah, bukan diringkas jadi "gagal"', async () => {
-  const { db, siteId, runId } = siap('siap')
+  const { db, siteId, runId } = siap()
   await ringkasanHandler(
     job(runId, siteId),
     db,
-    gagal('API key tidak berlaku lagi. Simpan ulang kuncinya di halaman Model.'),
+    gagal('404: endpoint atau modelnya tidak ada. Periksa WEBLYZER_AI_BASE_URL.'),
+    SIAP,
   )
   const { ai_error } = db.prepare('SELECT ai_error FROM runs WHERE id = ?').get(runId) as {
     ai_error: string
   }
-  expect(ai_error).toMatch(/halaman Model/)
+  expect(ai_error).toMatch(/WEBLYZER_AI_BASE_URL/)
   expect(ai_error).not.toBe('gagal')
 })
 
 /* ── Jalur sukses ───────────────────────────────────────────────────────── */
 
 test('ringkasan berhasil disimpan beserta model dan statusnya', async () => {
-  const { db, siteId, runId } = siap('siap')
-  await ringkasanHandler(job(runId, siteId), db, berhasil('Enam HTTP 500 di satu direktori.'))
+  const { db, siteId, runId } = siap()
+  await ringkasanHandler(
+    job(runId, siteId),
+    db,
+    berhasil('Enam HTTP 500 di satu direktori.'),
+    SIAP,
+  )
 
   const r = ringkasanAi(db, siteId)
   expect(r?.teks).toBe('Enam HTTP 500 di satu direktori.')
@@ -198,85 +153,96 @@ test('ringkasan berhasil disimpan beserta model dan statusnya', async () => {
   expect(aiStatus(db, runId)).toBe('ok')
 })
 
-test('kunci pemiliknya yang diteruskan ke pemanggil, bukan kunci lain', async () => {
-  const { db, siteId, runId } = siap('siap')
-  let terima: { apiKey: string | null; model: string; provider: string } | null = null
-  await ringkasanHandler(job(runId, siteId), db, async (kunci) => {
-    terima = { apiKey: kunci.apiKey, model: kunci.model, provider: kunci.provider }
-    return { ok: true, teks: 'x' }
-  })
-  expect(terima).toEqual({
-    apiKey: 'sk-ant-uji-1234',
-    model: 'claude-opus-5',
-    provider: 'anthropic',
-  })
+test('konfigurasi diteruskan utuh ke pemanggil', async () => {
+  const { db, siteId, runId } = siap()
+  let terima: Konfigurasi | null = null
+  await ringkasanHandler(
+    job(runId, siteId),
+    db,
+    async (cfg) => {
+      terima = cfg
+      return { ok: true, teks: 'x' }
+    },
+    SIAP,
+  )
+  expect(terima).toEqual(SIAP.siap && SIAP.konfigurasi)
+})
+
+test('jalur agy dipakai apa adanya, tanpa API key', async () => {
+  // Yang dijaga di sini: jalurnya ikut sampai ke pemanggil. Kalau hilang,
+  // prompt dikirim ke Messages API tanpa kunci — dan gagalnya baru terlihat
+  // pada pemindaian tengah malam yang tidak ada yang menonton.
+  const { db, siteId, runId } = siap()
+  const cfg: Hasil = { siap: true, konfigurasi: { jalur: 'agy', model: 'gemini-3.1-pro-high' } }
+  let terima: Konfigurasi | null = null
+  await ringkasanHandler(
+    job(runId, siteId),
+    db,
+    async (c) => {
+      terima = c
+      return { ok: true, teks: 'ringkasan dari agy' }
+    },
+    cfg,
+  )
+  expect(terima).toEqual({ jalur: 'agy', model: 'gemini-3.1-pro-high' })
+  expect(ringkasanAi(db, siteId)?.model).toBe('gemini-3.1-pro-high')
+  expect(aiStatus(db, runId)).toBe('ok')
 })
 
 test('ringkasan yang berhasil pun tidak menyentuh temuan', async () => {
-  const { db, siteId, runId } = siap('siap')
+  const { db, siteId, runId } = siap()
   const sebelum = temuanUtuh(db, siteId)
-  await ringkasanHandler(job(runId, siteId), db, berhasil('apa pun'))
+  await ringkasanHandler(job(runId, siteId), db, berhasil('apa pun'), SIAP)
   expect(temuanUtuh(db, siteId)).toEqual(sebelum)
 })
 
 /**
  * Menekan tombol jalankan ulang dua kali harus menyisakan satu ringkasan,
- * bukan dua. Tanpa DELETE sebelum INSERT, panel ringkasan akan menampilkan
- * yang mana pun yang kebetulan terakhir — dan tabelnya tumbuh tiap klik.
+ * bukan dua yang saling bertumpuk.
  */
-test('menjalankan ulang menimpa, tidak menumpuk', async () => {
-  const { db, siteId, runId } = siap('siap')
-  await ringkasanHandler(job(runId, siteId), db, berhasil('versi satu'))
-  await ringkasanHandler(job(runId, siteId), db, berhasil('versi dua'))
+test('menjalankan dua kali menyisakan satu baris laporan', async () => {
+  const { db, siteId, runId } = siap()
+  await ringkasanHandler(job(runId, siteId), db, berhasil('pertama'), SIAP)
+  await ringkasanHandler(job(runId, siteId), db, berhasil('kedua'), SIAP)
 
   const n = db.prepare('SELECT COUNT(*) AS n FROM reports WHERE run_id = ?').get(runId) as {
     n: number
   }
   expect(n.n).toBe(1)
-  expect(ringkasanAi(db, siteId)?.teks).toBe('versi dua')
+  expect(ringkasanAi(db, siteId)?.teks).toBe('kedua')
 })
 
-test('tokens_est tercatat, jadi prompt yang membengkak terlihat', async () => {
-  const { db, siteId, runId } = siap('siap')
-  await ringkasanHandler(job(runId, siteId), db, berhasil('ringkas'))
-  const { tokens_est } = db
-    .prepare('SELECT tokens_est FROM reports WHERE run_id = ?')
-    .get(runId) as { tokens_est: number }
-  expect(tokens_est).toBeGreaterThan(0)
+test('situs yang tidak ada melempar, karena itu memang bug pemanggil', async () => {
+  const { db } = siap()
+  await expect(ringkasanHandler(job(1, 9999), db, berhasil('x'), SIAP)).rejects.toThrow(/9999/)
 })
 
-test('situs yang tidak ada tetap melempar', async () => {
-  const { db, runId } = siap('siap')
-  await expect(ringkasanHandler(job(runId, 999), db)).rejects.toThrow(/tidak ditemukan/)
-})
+/* ── Penyaluran jalur ───────────────────────────────────────────────────── */
 
-/* ── Provider agy CLI ───────────────────────────────────────────────────── */
-
-test('provider CLI diteruskan tanpa API key', async () => {
-  // Yang dijaga di sini adalah bahwa provider ikut sampai ke pemanggil.
-  // Kalau hilang, jalur bawaan akan mengirim prompt ke Messages API dengan
-  // apiKey NULL — dan gagalnya baru terlihat di tengah malam.
-  const { db, siteId, runId } = siap('cli')
-  let terima: { provider: string; model: string; apiKey: string | null } | null = null
-  await ringkasanHandler(job(runId, siteId), db, async (kunci) => {
-    terima = { provider: kunci.provider, model: kunci.model, apiKey: kunci.apiKey }
-    return { ok: true, teks: 'ringkasan dari agy' }
-  })
-
-  expect(terima).toEqual({
-    provider: 'agy-cli',
-    model: 'gemini-3.1-pro-high',
-    apiKey: null,
-  })
-  expect(ringkasanAi(db, siteId)?.model).toBe('gemini-3.1-pro-high')
-  expect(aiStatus(db, runId)).toBe('ok')
-})
-
-test('CLI yang gagal tidak menggagalkan pemindaiannya', async () => {
-  const { db, siteId, runId } = siap('cli')
-  const sebelum = temuanUtuh(db, siteId)
-  await ringkasanHandler(job(runId, siteId), db, gagal('Perintah `agy` tidak ada di PATH server.'))
-
-  expect(aiStatus(db, runId)).toBe('failed')
-  expect(temuanUtuh(db, siteId)).toEqual(sebelum)
+/**
+ * `panggilBawaan` diuji lewat jalur yang TIDAK menyentuh jaringan.
+ *
+ * Ketiga jalur sungguhannya sudah diuji terpisah — `tafsirkanGalat`,
+ * `tafsirkanOpenai`, dan `tafsirkanAgy` masing-masing punya berkasnya sendiri.
+ * Yang tersisa untuk diuji di sini cuma penyalurannya, dan satu-satunya cara
+ * mengujinya tanpa jaringan adalah lewat jalur yang gagal cepat: base URL yang
+ * tidak akan pernah menjawab.
+ */
+test('jalur openai memakai base URL dari konfigurasi', async () => {
+  const hasil = await panggilBawaan(
+    {
+      jalur: 'openai',
+      nama: 'uji',
+      // Port 0 tidak bisa dihubungi; kegagalannya seketika dan tanpa jaringan
+      // keluar.
+      baseUrl: 'http://127.0.0.1:1/v1',
+      apiKey: '',
+      model: 'apa-pun',
+    },
+    'prompt',
+  )
+  expect(hasil.ok).toBe(false)
+  // Alamatnya ikut disebut. Tanpa itu, pesan Node ("fetch failed") tidak
+  // menyebut apa yang gagal dihubungi.
+  expect(hasil.ok === false && hasil.galat).toMatch(/127\.0\.0\.1:1/)
 })

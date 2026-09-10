@@ -14,12 +14,12 @@ export type Site = {
   enabled: number
   created_at: string
   /**
-   * Pemilik situs. Tepat satu dari keduanya terisi pada situs baru.
+   * Sisa dari masa multi-user, dan sekarang selalu NULL.
    *
-   * Keduanya bisa NULL pada situs warisan — yang dibuat sebelum multi-user
-   * ada. `scripts/seed-akun.ts` memberikannya ke admin pertama; sampai itu
-   * jalan, situs itu tidak terlihat oleh siapa pun kecuali admin (lihat
-   * `filterPemilik`).
+   * Kolomnya dibiarkan alih-alih dibuang lewat migrasi keempat: membangun
+   * ulang `sites` berarti memindahkan 555 temuan dan 37 run yang mereferensinya
+   * demi menghapus dua kolom yang tidak dibaca siapa pun. Biayanya nyata,
+   * hasilnya nol.
    */
   user_id: number | null
   guest_id: string | null
@@ -58,15 +58,6 @@ const COLUMNS = `id, name, base_url, sitemap_url, max_pages,
                  user_id, guest_id`
 
 export function createSite(db: DatabaseSync, input: SiteInput): Site {
-  // Dua pemilik sekaligus berarti pemanggil salah memasang konteks, dan
-  // akibatnya situs yang muncul di dua tempat dengan dua aturan kuota.
-  // Ditolak di sini karena SQLite tidak bisa menahannya: baris warisan
-  // punya kedua kolom NULL, jadi CHECK "tepat satu" akan menggagalkan
-  // migrasi 002 sebelum seed sempat jalan.
-  if (input.user_id != null && input.guest_id != null) {
-    throw new Error('Situs tidak boleh dimiliki user dan guest sekaligus.')
-  }
-
   const row = db
     .prepare(
       `INSERT INTO sites (name, base_url, sitemap_url, max_pages,

@@ -22,8 +22,6 @@ export const id = {
   // ── Navigasi dan kerangka ─────────────────────────────────────────────────
   'nav.home': 'Home',
   'nav.model': 'Model',
-  'nav.masuk': 'Masuk',
-  'nav.keluar': 'Keluar',
   'nav.bagianUtama': 'Bagian utama',
   'nav.tema': 'Tema',
   'nav.semuaSitus': 'Semua Situs',
@@ -109,12 +107,6 @@ export const id = {
   'kosong.gagal': 'Pemindaian terakhir gagal',
   'kosong.gagalTeks':
     'Hasilnya tidak diketahui — ini bukan berarti situsnya bersih. Coba pindai lagi.',
-  'kosong.butuhAkun': 'Butuh akun',
-  'kosong.butuhAkunTeks':
-    'Aspek ini memakai API key milik Anda sendiri, jadi ia butuh tempat untuk menyimpannya. Aspek pemindaian lainnya tetap jalan tanpa akun.',
-  'kosong.adminSaja': 'Hanya untuk pemilik instance',
-  'kosong.adminSajaTeks':
-    'Aspek ini dijalankan oleh CLI Claude di mesin server, bukan oleh API key Anda, jadi hanya pemilik instance yang bisa memicunya. Temuan yang sudah ada tetap terlihat di bawah.',
 
   // ── Pemindaian ────────────────────────────────────────────────────────────
   'scan.tombol': 'Scan {kategori}',
@@ -122,8 +114,6 @@ export const id = {
   'scan.sedangBerjalan': 'Pemindaian situs ini sedang berjalan.',
   'scan.gagalJalan': 'Pemindaian gagal dijalankan. Periksa log server.',
   'scan.tungguSelesai': 'Situs ini sedang dipindai. Tunggu sampai selesai.',
-  'scan.adminSaja':
-    'Aspek ini berjalan di server dengan CLI-nya sendiri, jadi hanya pemilik instance yang bisa memicunya.',
 
   // ── Ringkasan AI ──────────────────────────────────────────────────────────
   'ai.judul': 'Ringkasan AI',
@@ -161,93 +151,20 @@ export const id = {
   'atur.simpan': 'Simpan',
   'atur.tersimpan': 'Tersimpan.',
 
-  // ── Masuk ─────────────────────────────────────────────────────────────────
-  'masuk.judul': 'Masuk',
-  'masuk.teks':
-    'Tanpa akun, semua aspek pemindaian tetap bisa dipakai — yang butuh akun hanya ringkasan AI, karena ia memakai API key milik Anda sendiri.',
-  'masuk.email': 'Email',
-  'masuk.password': 'Password',
-  'masuk.tombol': 'Masuk',
-  'masuk.memeriksa': 'Memeriksa…',
-  'masuk.google': 'Masuk dengan Google',
-  'masuk.tanpaDaftar': 'Instance ini tidak menerima pendaftaran mandiri. Akun dibuat oleh pemiliknya.',
-  'masuk.kosong': 'Email dan password harus diisi.',
-  'masuk.salah': 'Email atau password salah.',
-  'masuk.lewatGoogle': 'Akun ini masuk lewat Google. Pakai tombol di bawah.',
-  'masuk.galatOauthMati': 'Masuk lewat Google belum dikonfigurasi di instance ini.',
-  'masuk.galatState': 'Permintaan masuk kedaluwarsa atau tidak cocok. Coba lagi dari awal.',
-  'masuk.galatTukar': 'Google menolak menukar kode masuk. Coba lagi.',
-  'masuk.galatToken': 'Identitas dari Google tidak bisa diverifikasi.',
-  'masuk.galatTidakTerdaftar':
-    'Akun Google itu belum terdaftar di instance ini. Instance ini tidak menerima pendaftaran mandiri — minta pemiliknya membuatkan akun.',
 
-  // ── Akun ──────────────────────────────────────────────────────────────────
-  'akun.judul': 'Akun',
-  'akun.masukSebagai': 'Masuk sebagai',
-  'akun.gantiPassword': 'Ganti password',
-  'akun.passwordSekarang': 'Password sekarang',
-  'akun.passwordBaru': 'Password baru',
-  'akun.tombolGanti': 'Ganti Password',
-  'akun.menyimpan': 'Menyimpan…',
-  'akun.tanpaPassword':
-    'Akun ini masuk lewat Google dan belum punya password. Mengisi form ini menambahkan satu, jadi Anda bisa masuk dengan cara mana pun.',
-  'akun.passwordPendek': 'Password baru minimal {n} karakter.',
-  'akun.passwordLamaSalah': 'Password lama salah.',
-  'akun.passwordDiganti':
-    'Password diganti. Sesi yang sudah terbit di perangkat lain tidak ikut tercabut.',
-  'akun.peringatanSesi':
-    'Sesi di proyek ini tidak punya tabel, jadi mengganti password tidak mengeluarkan Anda dari perangkat lain yang sudah masuk. Kalau ada perangkat yang hilang, hubungi pemilik instance untuk menghapus dan membuat ulang akunnya.',
-  'akun.daftarJudul': 'Akun di instance ini',
-  'akun.kolomEmail': 'Email',
-  'akun.kolomPeran': 'Peran',
-  'akun.kolomCaraMasuk': 'Cara masuk',
-  'akun.kolomDibuat': 'Dibuat',
-  'akun.caraGoogle': 'Google saja',
-  'akun.caraPassword': 'Password',
-  'akun.buatJudul': 'Buat akun',
-  'akun.buatTeks':
-    'Instance ini tidak menerima pendaftaran mandiri, jadi akun dibuat di sini. Pendaftaran terbuka berarti moderasi, verifikasi email, dan penyalahgunaan kuota — tiga masalah yang belum ada.',
-  'akun.passwordAwal': 'Password awal',
-  'akun.jadikanAdmin': 'Jadikan admin',
-  'akun.jadikanAdminTeks': 'bisa memicu aspek GEO dan Audit',
-  'akun.buatTombol': 'Buat Akun',
-  'akun.membuat': 'Membuat…',
-  'akun.dibuat': 'Akun {email} dibuat.',
-  'akun.butuhAkun': 'Aksi ini butuh akun. Masuk dulu.',
-  'akun.hanyaAdmin': 'Aksi ini hanya untuk admin.',
 
   // ── Model AI ──────────────────────────────────────────────────────────────
   'model.judul': 'Model AI',
   'model.teks1':
-    'Ringkasan AI memakai API key Anthropic milik Anda sendiri, dan tagihannya milik Anda. Kuncinya disimpan terenkripsi dan tidak pernah dikirim kembali ke browser — yang ditampilkan di sini hanya empat karakter terakhirnya.',
+    'Ringkasan AI dikonfigurasi lewat berkas .env di mesin ini, bukan lewat halaman ini. Alasannya: Weblyzer berjalan di komputer Anda sendiri, jadi kredensialnya tinggal di tempat kredensial alat baris perintah memang tinggal — dan .env sudah diabaikan git.',
   'model.teks2':
-    'Kunci baru diperiksa dulu terhadap Anthropic sebelum dianggap berlaku, dan ringkasan AI tetap mati sampai pemeriksaan itu lolos. Pemeriksaannya tidak memakai token.',
-  'model.labelModel': 'Model',
-  'model.labelKunci': 'API key',
-  'model.simpanUji': 'Simpan & Periksa',
-  'model.memeriksa': 'Memeriksa…',
-  'model.lupakan': 'Lupakan kunci',
-  'model.menghapus': 'Menghapus…',
-  'model.gantiPetunjuk': 'Isi untuk mengganti kunci yang tersimpan',
-  'model.berlaku': 'Kunci berlaku untuk {model}',
-  'model.berakhiran': 'berakhiran {ekor}',
-  'model.belumTerbukti':
-    'Kunci tersimpan tapi belum terbukti berlaku. Ringkasan AI mati sampai ia lolos pemeriksaan.',
-  'model.tersimpanBerlaku': 'Kunci tersimpan dan berlaku. Ringkasan AI sekarang aktif.',
-  'model.labelPenyedia': 'Penyedia',
-  'model.kunciTakPerlu': 'Tidak perlu API key — agy memakai login mesin server.',
-  'model.cliBerjalan': 'agy menjawab. Ringkasan AI sekarang aktif lewat CLI di server.',
-  'model.cliBerlaku': 'agy siap dengan {model}',
-  'model.cliCatatan':
-    'Penyedia agy CLI hanya untuk admin, dan itu batas keamanan bukan preferensi: ia menjalankan CLI di mesin server, jadi kredensial dan tagihannya milik mesin — sama seperti aspek GEO dan Audit. Penyedia ini juga tidak berjalan di dalam container.',
+    'Tidak ada daftar model di dalam kode. Isi WEBLYZER_AI_MODEL dengan apa pun yang dikenali penyedianya; model yang salah tulis akan ditolak penyedianya dengan pesannya sendiri, dan pesan itu lebih berguna daripada daftar yang ketinggalan zaman.',
+  'model.aktif': 'Aktif lewat jalur {jalur} dengan model {model}',
+  'model.catatanNama':
+    'Nama penyedia yang base URL-nya sudah diketahui: {daftar}. Nama lain tetap bisa dipakai asal ia bicara protokol OpenAI — sebutkan base URL-nya di WEBLYZER_AI_BASE_URL. Tidak ada daftar model di dalam kode, jadi menambah model berarti mengganti satu baris di .env, bukan mengedit program.',
   'model.catatanAi':
     'Lapisan AI hanya menyusun rangkuman dari temuan yang sudah ada. Ketujuh aspek pemindaian berjalan sendiri tanpa AI, dan skor Lighthouse tetap hasil pengukuran — bukan tebakan model.',
-  'model.catatanAdmin':
-    'Aspek GEO dan Audit tidak memakai kunci ini. Keduanya menjalankan CLI claude di mesin server dengan plugin claude-seo, jadi kredensialnya milik mesin. Karena itu keduanya hanya bisa dipicu admin.',
 
-  // ── Kuota guest ───────────────────────────────────────────────────────────
-  'kuota.situs': 'Tanpa akun, hanya {n} situs yang bisa dipantau. Masuk untuk menambah lagi.',
-  'kuota.scan': 'Tanpa akun, {n} pemindaian per {jam} jam. Masuk untuk memindai tanpa batas.',
 
   // ── Umum ──────────────────────────────────────────────────────────────────
   'umum.situsTidakDitemukan': 'Situs {id} tidak ditemukan.',
