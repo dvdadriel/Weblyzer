@@ -184,6 +184,11 @@ export const en = {
   'scan.console': 'Scan Console',
   'scan.security': 'Scan Security',
   'scan.seo': 'Scan SEO',
+  'mobile.stripLabel': 'Rendering compared across screen widths',
+  'mobile.stripCatatan':
+    'Screenshots from the last scan, one row per page. Only the latest is kept — findings in Weblyzer describe the present, and an older screenshot may show a defect that is already fixed. Click one to open it full size.',
+  'mobile.stripAlt': '{lebar} rendering of {url}',
+  'mobile.potonganAlt': 'Screenshot crop of the element: {teks}',
   'scan.mobile': 'Scan Mobile',
   'scan.geo': 'Analyse GEO',
   'scan.audit': 'Full Audit',

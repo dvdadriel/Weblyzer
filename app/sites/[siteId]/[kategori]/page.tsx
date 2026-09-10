@@ -12,6 +12,8 @@ import type { BarisTemuan } from '../../../../lib/ui/queries.ts'
 import { TabelTemuan } from '../../../../components/TabelTemuan.tsx'
 import { KeadaanKosong } from '../../../../components/KeadaanKosong.tsx'
 import { TombolScan } from '../../../../components/TombolScan.tsx'
+import { StripTangkapan } from '../../../../components/StripTangkapan.tsx'
+import { tangkapanSitus } from '../../../../lib/ui/tangkapan.ts'
 import { sumberKategori } from '../../../../lib/kategori.ts'
 import { GLIF } from '../../../../lib/glif.ts'
 import { tServer, localeSekarang } from '../../../../lib/i18n/server.ts'
@@ -113,6 +115,7 @@ export default async function Kategori({
           locale={locale}
             baris={diabaikan}
             baseUrl={baseUrl}
+            siteId={id}
             status="ignored"
             path={path}
             waktuScan={waktuScan}
@@ -122,6 +125,16 @@ export default async function Kategori({
     )
   }
 
+  /**
+   * Strip tangkapan layar, hanya untuk Mobile Parity.
+   *
+   * Dirender walau temuannya NOL, dan itu disengaja: "sudah benar di ketiga
+   * lebar" adalah jawaban yang ingin dilihat orang, dan tabel kosong tidak
+   * menyampaikannya. Aspek lain tidak punya tangkapan, jadi `strip` kosong dan
+   * komponennya tidak merender apa pun.
+   */
+  const strip = kategori === 'mobile' ? tangkapanSitus(db(), id) : []
+
   const keadaan = keadaanKategori(db(), id, kategori)
   if (keadaan !== 'ada-temuan') {
     return (
@@ -130,6 +143,7 @@ export default async function Kategori({
         {keterangan}
         {saringan}
         <KeadaanKosong keadaan={keadaan} t={t} />
+        <StripTangkapan siteId={id} strip={strip} t={t} />
       </>
     )
   }
@@ -143,10 +157,12 @@ export default async function Kategori({
           locale={locale}
         baris={temuanKategori(db(), id, kategori)}
         baseUrl={baseUrl}
+        siteId={id}
         status="open"
         path={path}
         waktuScan={waktuScan}
       />
+      <StripTangkapan siteId={id} strip={strip} t={t} />
     </>
   )
 }

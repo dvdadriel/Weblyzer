@@ -1,4 +1,7 @@
-import { chromium, type Browser } from 'playwright'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { chromium, type Browser, type Page } from 'playwright'
+import { MUTU, TINGGI_POTONGAN, MAKS_POTONGAN, namaTangkapan } from '../tangkapan.ts'
 
 /**
  * Mobile Parity — mengukur, bukan menebak.
@@ -62,6 +65,17 @@ export type Elemen = {
   teks: string
   /** Angka yang membuat ini temuan: kelebihan piksel, ukuran target, dst. */
   angka: number
+  /**
+   * Kotak elemen dalam koordinat DOKUMEN, bukan viewport.
+   *
+   * `+ scrollY` sudah ditambahkan di dalam halaman. Bedanya menentukan: `clip`
+   * milik Playwright memakai koordinat dokumen, jadi kotak relatif-viewport
+   * akan memotong bagian halaman yang salah untuk elemen mana pun yang berada
+   * di bawah lipatan.
+   */
+  kotak?: { x: number; y: number; width: number; height: number }
+  /** Nama berkas potongan, bila elemen ini ikut dipotret. */
+  tangkapan?: string
 }
 
 export type UkuranLebar = {
@@ -97,6 +111,9 @@ export type UkuranLebar = {
   grid: { selektor: string; kolom: number }[]
   /** Elemen yang hanya menyingkap isinya saat hover. */
   hoverSaja: Elemen[]
+  /** Nama berkas tangkapan halaman penuh pada lebar ini. `null` bila tidak
+   *  diminta. */
+  tangkapan: string | null
 }
 
 export type UkuranHalaman = {
@@ -154,6 +171,16 @@ function skrip({ ambangSentuh, toleransi }: { ambangSentuh: number; toleransi: n
 
   const cuplik = (el: Element): string =>
     (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
+
+  // Koordinat DOKUMEN: `clip` milik Playwright memakainya, bukan koordinat
+  // viewport. Tanpa `scrollY`, potongan untuk elemen di bawah lipatan akan
+  // memotret bagian halaman yang sama sekali lain.
+  const kotakDari = (r: DOMRect) => ({
+    x: Math.max(0, Math.round(r.left)),
+    y: Math.max(0, Math.round(r.top + window.scrollY)),
+    width: Math.round(r.width),
+    height: Math.round(r.height),
+  })
 
   // `> 1`, bukan `> 0`.
   //
@@ -234,9 +261,15 @@ function skrip({ ambangSentuh, toleransi }: { ambangSentuh: number; toleransi: n
 
   // Elemen yang melewati tepi, beserta acuannya — acuannya dipakai untuk
   // menyaring induk di bawah, lalu dibuang sebelum hasilnya diserahkan.
-  const kandidatKeluar: { el: Element; selektor: string; teks: string; angka: number }[] = []
-  const terpotong: { selektor: string; teks: string; angka: number }[] = []
-  const targetKecil: { selektor: string; teks: string; angka: number }[] = []
+  type Titik = {
+    selektor: string
+    teks: string
+    angka: number
+    kotak: { x: number; y: number; width: number; height: number }
+  }
+  const kandidatKeluar: (Titik & { el: Element })[] = []
+  const terpotong: Titik[] = []
+  const targetKecil: Titik[] = []
   const grid: { selektor: string; kolom: number }[] = []
   const jarak: number[] = []
 
@@ -272,6 +305,7 @@ function skrip({ ambangSentuh, toleransi }: { ambangSentuh: number; toleransi: n
         selektor: pendek(el),
         teks: cuplik(el),
         angka: Math.round(r.right - viewport),
+        kotak: kotakDari(r),
       })
     }
 
@@ -301,7 +335,12 @@ function skrip({ ambangSentuh, toleransi }: { ambangSentuh: number; toleransi: n
         (klamp !== undefined && klamp !== 'none') ||
         dianimasikan(el, g)
       if (lebih > 4 && !sengaja) {
-        terpotong.push({ selektor: pendek(el), teks: cuplik(el), angka: Math.round(lebih) })
+        terpotong.push({
+          selektor: pendek(el),
+          teks: cuplik(el),
+          angka: Math.round(lebih),
+          kotak: kotakDari(r),
+        })
       }
     }
 
@@ -313,6 +352,7 @@ function skrip({ ambangSentuh, toleransi }: { ambangSentuh: number; toleransi: n
           selektor: pendek(el),
           teks: cuplik(el) || (el.getAttribute('aria-label') ?? ''),
           angka: Math.round(sisi),
+          kotak: kotakDari(r),
         })
       }
     }
@@ -358,7 +398,7 @@ function skrip({ ambangSentuh, toleransi }: { ambangSentuh: number; toleransi: n
   // Stylesheet lintas-origin melempar saat `cssRules` dibaca (CORS), dan itu
   // ditangkap per-stylesheet — bukan sekali di luar — supaya satu stylesheet
   // pihak ketiga tidak membatalkan pembacaan seluruh sisanya.
-  const hoverSaja: { selektor: string; teks: string; angka: number }[] = []
+  const hoverSaja: Titik[] = []
   const PENYINGKAP = /(^|[;{\s])(display|visibility|opacity|max-height|transform)\s*:/i
   for (const lembar of Array.from(document.styleSheets)) {
     let aturan: CSSRuleList
@@ -381,6 +421,7 @@ function skrip({ ambangSentuh, toleransi }: { ambangSentuh: number; toleransi: n
             selektor: dasar.slice(0, 80),
             teks: cuplik(kena[0]!),
             angka: kena.length,
+            kotak: kotakDari(kena[0]!.getBoundingClientRect()),
           })
         }
       } catch {
@@ -408,8 +449,7 @@ function skrip({ ambangSentuh, toleransi }: { ambangSentuh: number; toleransi: n
     }
   }
 
-  const batas = (xs: { selektor: string; teks: string; angka: number }[]) =>
-    xs.sort((a, b) => b.angka - a.angka).slice(0, 20)
+  const batas = (xs: Titik[]) => xs.sort((a, b) => b.angka - a.angka).slice(0, 20)
 
   // Hanya elemen TERDALAM yang dilaporkan.
   //
@@ -419,7 +459,7 @@ function skrip({ ambangSentuh, toleransi }: { ambangSentuh: number; toleransi: n
   // elemen yang benar-benar menentukan lebarnya.
   const keluarViewport = kandidatKeluar
     .filter((a) => !kandidatKeluar.some((b) => b.el !== a.el && a.el.contains(b.el)))
-    .map(({ selektor, teks, angka }) => ({ selektor, teks, angka }))
+    .map(({ selektor, teks, angka, kotak }) => ({ selektor, teks, angka, kotak }))
 
   return {
     viewport,
@@ -446,7 +486,95 @@ function skrip({ ambangSentuh, toleransi }: { ambangSentuh: number; toleransi: n
  * dan keduanya mengubah tata letak (viewport meta baru berlaku pada konteks
  * mobile).
  */
-export async function ukurHalaman(browser: Browser, url: string): Promise<UkuranHalaman> {
+/**
+ * Memotret halaman penuh dan beberapa elemen bermasalah.
+ *
+ * Dilakukan DI SINI, sementara halamannya sudah terbuka pada lebar yang benar.
+ * Membukanya ulang nanti berarti memuat ulang seluruh halaman tiga kali per
+ * halaman — dan hasilnya belum tentu sama, karena situs dengan konten acak
+ * atau lazy-load akan berbeda pada muatan kedua.
+ *
+ * Galat ditelan dengan sengaja: tangkapan layar adalah bukti pendukung, dan
+ * kegagalan memotret tidak boleh membatalkan pengukuran yang angkanya sudah
+ * ada di tangan.
+ */
+async function potret(
+  page: Page,
+  dir: string,
+  url: string,
+  lebar: NamaLebar,
+  hasil: { keluarViewport: Elemen[]; terpotong: Elemen[]; targetKecil: Elemen[] },
+): Promise<string | null> {
+  let penuh: string | null = null
+  try {
+    penuh = namaTangkapan(url, lebar)
+    writeFileSync(
+      join(dir, penuh),
+      await page.screenshot({
+        fullPage: true,
+        type: 'jpeg',
+        quality: MUTU,
+        // `scale: 'css'` — 1x, bukan 3x milik ponsel. Lihat `lib/tangkapan.ts`
+        // untuk angka yang mendasarinya: bedanya 18 kali.
+        scale: 'css',
+      }),
+    )
+  } catch {
+    penuh = null
+  }
+
+  // Potongan hanya untuk cacat yang PUNYA tempat di layar. Rasio tipografi
+  // dan jumlah kolom tidak bisa ditunjuk dengan kotak, jadi tidak dipotret.
+  const calon = [...hasil.keluarViewport, ...hasil.terpotong, ...hasil.targetKecil]
+    .filter((e) => e.kotak && e.kotak.width > 0 && e.kotak.height > 0)
+    .sort((a, b) => b.angka - a.angka)
+    .slice(0, MAKS_POTONGAN)
+
+  const lebarViewport = page.viewportSize()?.width ?? 390
+  for (const [i, e] of calon.entries()) {
+    try {
+      const k = e.kotak!
+      const nama = namaTangkapan(url, lebar, i)
+      writeFileSync(
+        join(dir, nama),
+        await page.screenshot({
+          // Dari tepi kiri, dan selebar 1,5 kali viewport: yang harus terlihat
+          // adalah tepi yang DILEWATI, bukan elemennya saja. Potongan yang
+          // hanya memuat elemennya tidak menunjukkan apa pun tentang batas.
+          clip: {
+            x: 0,
+            y: Math.max(0, k.y - 60),
+            width: Math.round(lebarViewport * 1.5),
+            // Pita minimum 200 piksel, bukan sekadar tinggi elemennya.
+            //
+            // Terukur: potongan untuk pengalih bahasa 16 piksel keluar sebagai
+            // gambar 390×64 — benar secara koordinat dan tidak berguna bagi
+            // mata, karena tidak ada apa pun di sekelilingnya yang bisa
+            // dikenali. Target sentuh yang terlalu kecil justru butuh
+            // konteksnya untuk bisa ditemukan di halaman.
+            height: Math.min(TINGGI_POTONGAN, Math.max(200, k.height + 120)),
+          },
+          type: 'jpeg',
+          quality: MUTU,
+          scale: 'css',
+        }),
+      )
+      e.tangkapan = nama
+    } catch {
+      // Satu potongan yang gagal tidak menggagalkan sisanya.
+    }
+  }
+
+  return penuh
+}
+
+export async function ukurHalaman(
+  browser: Browser,
+  url: string,
+  /** Direktori tangkapan. `null` berarti tidak memotret sama sekali — itu yang
+   *  dipakai test ambang, dan yang menjaga suite tetap cepat. */
+  dir: string | null = null,
+): Promise<UkuranHalaman> {
   const perLebar: UkuranLebar[] = []
   let metaViewport: string | null = null
 
@@ -485,13 +613,16 @@ export async function ukurHalaman(browser: Browser, url: string): Promise<Ukuran
         ambangSentuh: AMBANG_SENTUH,
         toleransi: TOLERANSI,
       })
-      perLebar.push({
+      const ukuran: UkuranLebar = {
         lebar: l.nama,
         ...hasil,
         // Target sentuh tidak berarti apa-apa pada lebar non-sentuh: kursor
         // tetikus tidak punya masalah dengan tombol 16 piksel.
         targetKecil: l.sentuh ? hasil.targetKecil : [],
-      })
+        tangkapan: null,
+      }
+      if (dir !== null) ukuran.tangkapan = await potret(page, dir, url, l.nama, ukuran)
+      perLebar.push(ukuran)
     } finally {
       await konteks.close()
     }
@@ -501,13 +632,16 @@ export async function ukurHalaman(browser: Browser, url: string): Promise<Ukuran
 }
 
 /** Mengukur beberapa halaman dengan satu Chromium. */
-export async function ukurSitus(urls: string[]): Promise<UkuranHalaman[]> {
+export async function ukurSitus(
+  urls: string[],
+  dir: string | null = null,
+): Promise<UkuranHalaman[]> {
   const browser = await chromium.launch()
   try {
     const hasil: UkuranHalaman[] = []
     for (const url of urls) {
       try {
-        hasil.push(await ukurHalaman(browser, url))
+        hasil.push(await ukurHalaman(browser, url, dir))
       } catch (err) {
         // Satu halaman yang gagal dimuat tidak boleh membatalkan pengukuran
         // halaman lain — pola yang sama dengan crawl di `visit.ts`.

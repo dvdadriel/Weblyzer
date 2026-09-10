@@ -1942,3 +1942,80 @@ button.navbar-item {
   cursor: pointer;
 }
 button.navbar-item:hover { color: var(--ink); }
+
+
+/* ── Strip tangkapan Mobile Parity ──────────────────────────────────────── */
+
+.strip {
+  margin-top: var(--s-5);
+  border-top: 1px solid var(--line);
+  padding-top: var(--s-4);
+}
+
+.strip-catatan {
+  font-size: var(--t-mikro);
+  color: var(--ink-2);
+  margin: 0 0 var(--s-4);
+  max-width: 70ch;
+  line-height: 1.6;
+}
+
+.strip-halaman {
+  margin-bottom: var(--s-5);
+}
+
+.strip-url {
+  font-family: var(--font-num), ui-monospace, monospace;
+  font-size: var(--t-mikro);
+  color: var(--ink-2);
+  margin: 0 0 var(--s-2);
+  overflow-wrap: anywhere;
+}
+
+/* Menggulir di dalam kotaknya sendiri, bukan membuat halaman menggulir
+   menyamping — aspek yang menandai gulir menyamping tidak boleh
+   menyebabkannya. */
+.strip-baris {
+  display: flex;
+  gap: var(--s-4);
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: var(--s-2);
+}
+
+.strip-item {
+  margin: 0;
+  flex: none;
+}
+
+.strip-lebar {
+  font-size: var(--t-mikro);
+  color: var(--ink-2);
+  margin-bottom: var(--s-1);
+  font-family: var(--font-num), ui-monospace, monospace;
+}
+
+/* Tinggi dibatasi dan luapannya disembunyikan: tangkapan halaman penuh bisa
+   6000 piksel, dan yang dibutuhkan di sini adalah bagian atasnya. Yang penuh
+   dibuka di tab baru. */
+.strip-gambar {
+  display: block;
+  max-height: 420px;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.detail-potongan {
+  display: block;
+  margin-top: var(--s-3);
+  max-width: 100%;
+}
+
+.detail-potongan img {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}

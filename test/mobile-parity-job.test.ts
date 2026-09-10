@@ -32,6 +32,7 @@ function perLebar(lebar: NamaLebar, ubah: Partial<UkuranLebar> = {}): UkuranLeba
     kolomMaks: lebar === 'mobile' ? 1 : 4,
     grid: [],
     hoverSaja: [],
+    tangkapan: null,
     ...ubah,
   }
 }

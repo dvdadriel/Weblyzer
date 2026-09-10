@@ -30,6 +30,7 @@ function bersih(lebar: NamaLebar, ubah: Partial<UkuranLebar> = {}): UkuranLebar 
     kolomMaks: lebar === 'mobile' ? 1 : 4,
     grid: [],
     hoverSaja: [],
+    tangkapan: null,
     ...ubah,
   }
 }

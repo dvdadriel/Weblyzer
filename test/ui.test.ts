@@ -1,7 +1,7 @@
 import { test, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createServer } from 'node:net'
-import { mkdtempSync, rmSync, createWriteStream, readFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, createWriteStream, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium, type Browser, type Page } from 'playwright'
@@ -10,6 +10,7 @@ import { createSite } from '../lib/repos/sites.ts'
 import { createRun, finishRun } from '../lib/repos/runs.ts'
 import { upsertPage } from '../lib/repos/pages.ts'
 import { reconcile } from '../lib/findings.ts'
+import { namaTangkapan } from '../lib/tangkapan.ts'
 
 /**
  * Test UI end-to-end.
@@ -52,6 +53,31 @@ let siteId: number
  * longgar menutup itu tanpa menyembunyikan kerusakan sungguhan — server yang
  * benar-benar mati tetap gagal, hanya lebih lambat sampai laporannya.
  */
+/**
+ * JPEG yang dibuat OLEH browser yang akan membacanya.
+ *
+ * Versi pertama memakai base64 rakitan tangan. Bytes-nya lolos pemeriksaan
+ * struktur (SOI, SOF 1×1, EOI) dan Chromium tetap menolak mendekodenya —
+ * `naturalWidth` nol, dan testnya gagal pada fitur yang justru bekerja.
+ * JPEG minimal yang sah lebih rewel daripada yang tampak: ia butuh tabel
+ * Huffman dan SOS yang konsisten.
+ *
+ * Membuatnya dengan canvas menghapus seluruh kelas masalah itu: yang menulis
+ * dan yang membaca adalah mesin yang sama.
+ */
+async function jpegSah(p: Page): Promise<Buffer> {
+  const b64 = await p.evaluate(() => {
+    const c = document.createElement('canvas')
+    c.width = 8
+    c.height = 8
+    const g = c.getContext('2d')!
+    g.fillStyle = '#123456'
+    g.fillRect(0, 0, 8, 8)
+    return c.toDataURL('image/jpeg', 0.8).split(',')[1]!
+  })
+  return Buffer.from(b64, 'base64')
+}
+
 const BATAS_TEST = 120_000
 
 /**
@@ -147,10 +173,13 @@ beforeAll(async () => {
         // ter-commit. Nama tetap di dalam proyek membuat entri itu ditulis
         // sekali lalu diam.
         WEBLYZER_DIST_DIR: '.next-uji',
-        // OAuth sengaja TIDAK dikonfigurasi: salah satu test memastikan
-        // tombol Google tidak muncul tanpa kredensial.
-        WEBLYZER_GOOGLE_CLIENT_ID: '',
-        WEBLYZER_GOOGLE_CLIENT_SECRET: '',
+        // AI sengaja TIDAK dikonfigurasi: satu test memeriksa bahwa halaman
+        // /model menyebut kedua cara mengaturnya, bukan diam. Dikosongkan
+        // eksplisit supaya suite tidak berubah arti di mesin yang punya
+        // WEBLYZER_AI di lingkungannya.
+        WEBLYZER_AI: '',
+        // Tangkapan layar Mobile Parity ditulis dan dilayani dari sini.
+        WEBLYZER_SHOT_DIR: join(dir, 'tangkapan'),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
@@ -291,6 +320,84 @@ test('tab Mobile Parity ada, berlabel BETA, dan bisa dibuka', async () => {
 
   await tab.click()
   await tampil(page.getByRole('button', { name: /Scan Mobile/ }))
+}, BATAS_TEST)
+
+test('strip tangkapan tampil dengan ketiga lebar, dan gambarnya benar-benar termuat', async () => {
+  // Tangkapan ditulis langsung, bukan lewat pemindaian: yang diuji di sini
+  // adalah rantai berkas → route → gambar di layar. Pemindaian sungguhannya
+  // sudah dibuktikan terpisah terhadap fixture.
+  const dirShot = join(dir, 'tangkapan', String(siteId))
+  mkdirSync(dirShot, { recursive: true })
+  const jpeg = await jpegSah(page)
+  for (const lebar of ['mobile', 'tablet', 'desktop']) {
+    writeFileSync(join(dirShot, namaTangkapan('https://uji.test', lebar)), jpeg)
+  }
+
+  try {
+    await page.goto(`${asal}/sites/${siteId}/mobile`)
+    const strip = page.locator('.strip')
+    await tampil(strip)
+    expect(await jumlah(strip.locator('img'))).toBe(3)
+
+    // Gambarnya harus BENAR-BENAR termuat, bukan cuma ada di DOM: `<img>` yang
+    // 404 tetap muncul sebagai elemen, dan strip yang penuh gambar rusak
+    // terlihat seperti fitur yang gagal.
+    //
+    // `scrollIntoViewIfNeeded` lebih dulu, dan itu bukan kehati-hatian
+    // berlebihan: strip-nya memakai `loading="lazy"` (perlu, karena satu situs
+    // bisa punya 75 gambar), jadi gambar di bawah lipatan memang BELUM dimuat
+    // saat halamannya selesai. Tanpa menggulir, pemeriksaan ini gagal pada
+    // fitur yang justru bekerja.
+    await strip.locator('img').first().scrollIntoViewIfNeeded()
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('.strip img') as HTMLImageElement | null
+        return !!el && el.complete && el.naturalWidth > 0
+      },
+      undefined,
+      { timeout: 15_000 },
+    )
+
+    // Ketiga lebar disebut namanya, karena inti aspek ini adalah
+    // perbandingannya.
+    for (const lebar of ['mobile', 'tablet', 'desktop']) {
+      await tampil(strip.getByText(new RegExp(lebar)))
+    }
+  } finally {
+    rmSync(join(dir, 'tangkapan'), { recursive: true, force: true })
+  }
+}, BATAS_TEST)
+
+test('route tangkapan menolak nama di luar polanya', async () => {
+  // Allowlist, bukan daftar hitam. Yang diuji bukan daftar bentuk jahat yang
+  // terpikirkan, melainkan bahwa apa pun di luar pola dijawab 404 — termasuk
+  // upaya menjangkau berkas database.
+  for (const nama of [
+    '..%2Fdata.db',
+    '..%2F..%2Fdata.db',
+    'abcd1234-mobile.png',
+    'zzzzzzzz-mobile.jpg',
+    'abcd1234-ponsel.jpg',
+  ]) {
+    const r = await ambil(`/sites/${siteId}/tangkapan/${nama}`)
+    expect(r.status, nama).toBe(404)
+  }
+}, BATAS_TEST)
+
+test('tangkapan situs lain tidak bisa diambil lewat id yang ditebak', async () => {
+  // Berkasnya ada, tapi di direktori situs lain. Route-nya harus mencarinya di
+  // direktori situs yang diminta — bukan di seluruh akar.
+  const dirShot = join(dir, 'tangkapan', String(siteId))
+  mkdirSync(dirShot, { recursive: true })
+  const nama = namaTangkapan('https://uji.test', 'mobile')
+  writeFileSync(join(dirShot, nama), await jpegSah(page))
+
+  try {
+    expect((await ambil(`/sites/${siteId}/tangkapan/${nama}`)).status).toBe(200)
+    expect((await ambil(`/sites/999999/tangkapan/${nama}`)).status).toBe(404)
+  } finally {
+    rmSync(join(dir, 'tangkapan'), { recursive: true, force: true })
+  }
 }, BATAS_TEST)
 
 test('tab Mobile Parity yang belum dipindai mengaku begitu, bukan bersih', async () => {

@@ -1,4 +1,7 @@
 import { test, expect, beforeAll, afterAll } from 'vitest'
+import { mkdtempSync, rmSync, readdirSync, statSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { chromium, type Browser } from 'playwright'
 import { startFixtureServer, type FixtureServer } from './fixture-server.ts'
 import { ukurHalaman, type UkuranHalaman, type NamaLebar } from '../lib/scanners/mobile-parity.ts'
@@ -23,6 +26,7 @@ let rusak: FixtureServer
 let sehat: FixtureServer
 let ukuranRusak: UkuranHalaman
 let ukuranSehat: UkuranHalaman
+let dirTangkapan: string
 
 // Chromium menyala sekali, lalu enam konteks (dua halaman × tiga lebar).
 // Menyalakannya per test berarti tambahan satu detik dikalikan dua belas.
@@ -32,7 +36,10 @@ beforeAll(async () => {
   browser = await chromium.launch()
   rusak = await startFixtureServer('mobile-rusak')
   sehat = await startFixtureServer('mobile-sehat')
-  ukuranRusak = await ukurHalaman(browser, rusak.url)
+  dirTangkapan = mkdtempSync(join(tmpdir(), 'weblyzer-shot-uji-'))
+  // Yang rusak dipotret, yang sehat tidak: itu sekaligus membuktikan
+  // penangkapannya benar-benar opsional.
+  ukuranRusak = await ukurHalaman(browser, rusak.url, dirTangkapan)
   ukuranSehat = await ukurHalaman(browser, sehat.url)
 }, BATAS)
 
@@ -40,6 +47,7 @@ afterAll(async () => {
   await browser?.close()
   await rusak?.close()
   await sehat?.close()
+  if (dirTangkapan) rmSync(dirTangkapan, { recursive: true, force: true })
 })
 
 const pada = (u: UkuranHalaman, lebar: NamaLebar) => u.perLebar.find((p) => p.lebar === lebar)!
@@ -169,4 +177,72 @@ test('setiap temuan membawa URL yang benar-benar diukur', () => {
   for (const t of analisisMobileParity(ukuranRusak)) {
     expect(t.url).toBe(ukuranRusak.url)
   }
+})
+
+/* ── tangkapan layar ──────────────────────────────────────────────────────── */
+
+test('tanpa direktori, tidak ada yang dipotret', () => {
+  // Penangkapan harus opsional: test ambang dan pemakaian dari pustaka tidak
+  // boleh menulis berkas ke mana pun.
+  for (const p of ukuranSehat.perLebar) expect(p.tangkapan, p.lebar).toBeNull()
+})
+
+test('satu tangkapan halaman penuh per lebar', () => {
+  for (const p of ukuranRusak.perLebar) {
+    expect(p.tangkapan, p.lebar).toMatch(new RegExp(`-${p.lebar}\\.jpg$`))
+  }
+  const berkas = readdirSync(dirTangkapan)
+  for (const p of ukuranRusak.perLebar) expect(berkas).toContain(p.tangkapan!)
+})
+
+test('elemen bermasalah dapat potongannya sendiri', () => {
+  // Potongan menunjuk TEPAT ke elemen yang salah, dan itu artefak paling
+  // berguna per bita: tiga puluh kilobita untuk menjawab "yang mana".
+  const m = ukuranRusak.perLebar.find((p) => p.lebar === 'mobile')!
+  const berpotongan = [...m.keluarViewport, ...m.terpotong, ...m.targetKecil].filter(
+    (e) => e.tangkapan,
+  )
+  expect(berpotongan.length).toBeGreaterThan(0)
+  const berkas = readdirSync(dirTangkapan)
+  for (const e of berpotongan) expect(berkas).toContain(e.tangkapan!)
+})
+
+test('potongan dibatasi jumlahnya per lebar', () => {
+  // Tanpa batas, halaman dengan dua puluh elemen bermasalah menulis dua puluh
+  // berkas untuk satu temuan.
+  for (const p of ukuranRusak.perLebar) {
+    const n = [...p.keluarViewport, ...p.terpotong, ...p.targetKecil].filter((e) => e.tangkapan)
+      .length
+    expect(n, p.lebar).toBeLessThanOrEqual(3)
+  }
+})
+
+test('JPEG, bukan PNG — dan ukurannya masuk akal', () => {
+  // Angka yang mendasari pilihan ini terukur pada situs sungguhan: fullPage
+  // PNG pada device scale factor adalah 463 MB untuk 25 halaman, sedangkan
+  // JPEG kualitas 70 pada 1x adalah 26 MB. Test ini menjaga pilihannya tidak
+  // berbalik tanpa disadari.
+  for (const nama of readdirSync(dirTangkapan)) {
+    expect(nama).toMatch(/\.jpg$/)
+    const ukuran = statSync(join(dirTangkapan, nama)).size
+    expect(ukuran, nama).toBeGreaterThan(0)
+    // Fixture-nya halaman kecil; satu megabita berarti ada yang salah pada
+    // pilihan format atau skalanya.
+    expect(ukuran, nama).toBeLessThan(1024 * 1024)
+  }
+})
+
+test('kotak elemen dalam koordinat dokumen, bukan viewport', () => {
+  // Bedanya menentukan: `clip` milik Playwright memakai koordinat dokumen,
+  // jadi kotak relatif-viewport akan memotret bagian halaman yang salah untuk
+  // elemen mana pun di bawah lipatan.
+  const m = ukuranRusak.perLebar.find((p) => p.lebar === 'mobile')!
+  for (const e of m.keluarViewport) {
+    expect(e.kotak).toBeDefined()
+    expect(e.kotak!.y).toBeGreaterThanOrEqual(0)
+  }
+  // Fixture-nya lebih tinggi dari 844 piksel, jadi setidaknya satu elemen
+  // bermasalah berada di bawah lipatan — dan `y`-nya harus melewatinya.
+  const terbawah = Math.max(...m.terpotong.concat(m.targetKecil).map((e) => e.kotak?.y ?? 0))
+  expect(terbawah).toBeGreaterThan(0)
 })

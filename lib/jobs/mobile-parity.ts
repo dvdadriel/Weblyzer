@@ -6,6 +6,7 @@ import { pilihHalaman } from '../lighthouse-budget.ts'
 import { reconcile, type NewFinding } from '../findings.ts'
 import { ukurSitus, type UkuranHalaman } from '../scanners/mobile-parity.ts'
 import { analisisSitus } from '../analyzers/mobile-parity.ts'
+import { siapkanDir } from '../tangkapan.ts'
 
 /**
  * Pengukur bisa ditukar, dan itu untuk pengujian.
@@ -15,7 +16,7 @@ import { analisisSitus } from '../analyzers/mobile-parity.ts'
  * temuan, bukan Chromium-nya. Pengukur sungguhannya diuji terpisah terhadap
  * halaman fixture yang cacatnya sudah diketahui.
  */
-export type Pengukur = (urls: string[]) => Promise<UkuranHalaman[]>
+export type Pengukur = (urls: string[], dir: string | null) => Promise<UkuranHalaman[]>
 
 /**
  * Mobile Parity untuk satu situs.
@@ -48,7 +49,16 @@ export async function mobileParityHandler(
       ? [{ id: null as number | null, url: site.base_url }]
       : pilihHalaman(semua, 'sample').map((h) => ({ id: h.id as number | null, url: h.url }))
 
-  const ukuran = await ukur(halaman.map((h) => h.url))
+  // Direktori disiapkan ULANG setiap run: hanya tangkapan terakhir yang
+  // disimpan. Temuan di Weblyzer adalah keadaan sekarang, dan gambar dari run
+  // sebelumnya menggambarkan cacat yang mungkin sudah diperbaiki — gambar yang
+  // bertentangan dengan temuannya lebih buruk daripada tidak ada gambar.
+  const dir = siapkanDir(siteId)
+
+  const ukuran = await ukur(
+    halaman.map((h) => h.url),
+    dir,
+  )
 
   const idPerUrl = new Map(halaman.map((h) => [h.url, h.id]))
   const temuan: NewFinding[] = analisisSitus(ukuran).map((t) => ({

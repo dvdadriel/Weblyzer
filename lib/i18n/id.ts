@@ -190,6 +190,11 @@ export const id = {
   'scan.console': 'Scan Console',
   'scan.security': 'Scan Security',
   'scan.seo': 'Scan SEO',
+  'mobile.stripLabel': 'Perbandingan tampilan per lebar layar',
+  'mobile.stripCatatan':
+    'Tangkapan layar dari pemindaian terakhir, satu baris per halaman. Hanya yang terakhir disimpan — temuan di Weblyzer adalah keadaan sekarang, dan gambar dari pemindaian sebelumnya bisa menggambarkan cacat yang sudah diperbaiki. Klik untuk membuka ukuran penuh.',
+  'mobile.stripAlt': 'Tampilan {lebar} dari {url}',
+  'mobile.potonganAlt': 'Potongan layar pada elemen: {teks}',
   'scan.mobile': 'Scan Mobile',
   'scan.geo': 'Analisis GEO',
   'scan.audit': 'Audit Full',

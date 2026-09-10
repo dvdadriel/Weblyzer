@@ -56,6 +56,14 @@ Yang diukur per lebar (`lib/scanners/mobile-parity.ts`):
 Kesebelas aturannya ada di `lib/analyzers/mobile-parity.ts`, dengan ambang dan
 alasan setiap angkanya.
 
+Selain angka, setiap pemindaian juga menyimpan **tangkapan layar**: satu
+halaman penuh per lebar, ditambah potongan yang menunjuk tepat ke elemen
+bermasalah. Semuanya JPEG kualitas 70 pada skala 1x — bawaan Playwright
+(PNG pada device scale factor) adalah 463 MB untuk 25 halaman, sedangkan ini
+26 MB. Hanya pemindaian terakhir yang disimpan, karena temuan menggambarkan
+keadaan sekarang dan gambar lama bisa menunjukkan cacat yang sudah
+diperbaiki.
+
 **Semuanya deterministik.** Jawabannya sama setiap run selama situsnya tidak
 berubah, jadi riwayat `open → fixed` di Weblyzer bisa dipercaya penuh. Itu
 sebabnya penilaian model tidak pernah menjadi baris temuan di aspek ini.
@@ -101,7 +109,21 @@ Urutkan menurut siapa yang paling dirugikan, bukan menurut severity mentah:
 4. Target sentuh dan hover-saja — fiturnya ada tapi tidak bisa dipakai.
 5. Tipografi dan jarak — nyata, tapi bisa dijadwalkan.
 
-### 3. Memverifikasi perbaikan
+### 3. Memakai tangkapan layarnya
+
+Kalau Anda bisa melihat gambar, potongan elemen adalah bukti termurah yang
+tersedia: sekitar 30 kilobita untuk menjawab "yang mana". Ia menunjukkan
+elemen bermasalah beserta sekelilingnya, jadi bisa dikenali di halaman.
+
+Kalau Anda TIDAK bisa melihat gambar — model tanpa kemampuan visual, dan itu
+termasuk sebagian model yang bisa dikonfigurasi di Weblyzer — jangan
+berpura-pura. Angkanya sudah cukup untuk menjawab keempat keluhan; tangkapan
+layar adalah bukti pendukung untuk mata manusia, bukan sumber temuan.
+
+Jangan menilai dari tangkapan layar hal yang tidak diukur. "Warnanya kurang
+serasi" bukan Mobile Parity, dan gambar tidak mengubah batas itu.
+
+### 4. Memverifikasi perbaikan
 
 Kalau Anda diminta memastikan sebuah perbaikan berhasil, **jangan menyimpulkan
 dari kode.** Jalankan ulang pengukurannya:

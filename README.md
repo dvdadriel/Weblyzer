@@ -48,6 +48,13 @@ clip their own text, grid columns, the share of bold text weighted by text
 length, the title-to-body size ratio, touch targets under the WCAG 2.2
 minimum, and reveals that only respond to hover.
 
+Every scan also keeps screenshots: one full page per width, plus crops that
+point at the offending element. All JPEG at quality 70 and 1x scale —
+Playwright's default (PNG at device scale factor) measured 463 MB per 25-page
+run against 26 MB this way, and the default is the trap. Only the latest scan
+is kept, since findings describe the present and an older image may show a
+defect that is already fixed.
+
 It is measured rather than judged, so its `open → fixed` history is as
 trustworthy as the deterministic categories. The tab is labelled BETA because
 the eleven thresholds are new, not because a model is guessing. Carousels,

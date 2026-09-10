@@ -33,15 +33,35 @@ function rapikan(detail: string): string {
   }
 }
 
+/**
+ * Nama berkas potongan yang tersimpan di detail temuan.
+ *
+ * Dibaca dengan hati-hati: `detail_json` datang dari pemindai dan tidak
+ * dijamin berbentuk apa pun. Yang diambil hanya `contoh[].tangkapan` yang
+ * berupa string — sisanya diabaikan tanpa melempar.
+ */
+function potongan(detail: string): { nama: string; teks: string }[] {
+  try {
+    const d = JSON.parse(detail) as { contoh?: { tangkapan?: unknown; teks?: unknown }[] }
+    return (d.contoh ?? [])
+      .filter((c): c is { tangkapan: string; teks?: string } => typeof c.tangkapan === 'string')
+      .map((c) => ({ nama: c.tangkapan, teks: typeof c.teks === 'string' ? c.teks : '' }))
+  } catch {
+    return []
+  }
+}
+
 function BarisDetail({
   b,
   status,
   path,
+  siteId,
   lapor,  t,
 }: {
   b: BarisTemuan
   status: 'open' | 'ignored'
   path: string
+  siteId: number
   lapor: (h: { keadaan: string; pesan?: string; error?: string }) => void
   /** Penerjemah diteruskan sebagai prop, bukan diambil dari closure:
    *  komponen ini dideklarasikan di luar `TabelTemuan`, jadi tidak ada
@@ -66,6 +86,27 @@ function BarisDetail({
         <div className="detail-konten">
           <p className="detail-judul">{b.title}</p>
           <pre className="detail-json">{rapikan(b.detail_json)}</pre>
+
+          {/* Potongan gambar yang menunjuk TEPAT ke elemen bermasalah.
+              Ditaruh sesudah JSON-nya, bukan sebelum: angkanya yang menjadi
+              bukti, gambarnya yang membuat angka itu bisa dipercaya dalam
+              sekali lihat. Tiga puluh kilobita per potongan (terukur), jadi
+              biayanya nyata tapi kecil. */}
+          {potongan(b.detail_json).map((p) => (
+            <a
+              key={p.nama}
+              href={`/sites/${siteId}/tangkapan/${p.nama}`}
+              target="_blank"
+              rel="noreferrer"
+              className="detail-potongan"
+            >
+              <img
+                src={`/sites/${siteId}/tangkapan/${p.nama}`}
+                alt={t('mobile.potonganAlt', { teks: p.teks })}
+                loading="lazy"
+              />
+            </a>
+          ))}
 
           <p className="detail-aksi">
             {bisaPeriksa && status === 'open' && (
@@ -113,12 +154,17 @@ function BarisDetail({
 export function TabelTemuan({
   baris,
   baseUrl,
+  siteId,
   status = 'open',
   path,
   waktuScan,  locale,
 }: {
   baris: BarisTemuan[]
   baseUrl: string
+  /** Untuk menyusun URL tangkapan layar. Diteruskan eksplisit alih-alih
+   *  diambil dari `path`: menguraikannya dari string rute akan patah diam-diam
+   *  begitu rutenya berubah. */
+  siteId: number
   status?: 'open' | 'ignored'
   path: string
   waktuScan: ScanKategori | null
@@ -212,6 +258,7 @@ export function TabelTemuan({
                   b={b}
                   status={status}
                   path={path}
+                  siteId={siteId}
                   lapor={(h) => setPeriksaan({ id: b.id, ...h })}
                 />
               ) : null,

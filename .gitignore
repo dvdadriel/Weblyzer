@@ -25,6 +25,10 @@ docs/
 ruvector.db
 .env
 
+# Tangkapan layar Mobile Parity. Ditulis ulang setiap pemindaian, dan satu
+# situs bisa memuat puluhan megabita — artefak runtime, bukan bagian proyek.
+weblyzer-tangkapan/
+
 # Blob biner dari tooling lokal, bukan bagian proyek
 agentdb.rvf
 agentdb.rvf.lock
