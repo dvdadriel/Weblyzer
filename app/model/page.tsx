@@ -56,10 +56,16 @@ export default async function Model() {
 
       <PilihModel
         locale={locale}
+        admin={ctx.user.role === 'admin'}
         info={
           kunci === null
             ? null
-            : { model: kunci.model, ekor: kunci.ekor, terverifikasi: kunci.terverifikasi }
+            : {
+                provider: kunci.provider,
+                model: kunci.model,
+                ekor: kunci.ekor,
+                terverifikasi: kunci.terverifikasi,
+              }
         }
       />
 
@@ -72,10 +78,16 @@ export default async function Model() {
       </div>
 
       {ctx.user.role === 'admin' && (
-        <div className="catatan-sumber" style={{ marginTop: 'var(--s-4)' }}>
-          <Ikon nama="perisai" ukuran={14} />
-          <span>{t('model.catatanAdmin')}</span>
-        </div>
+        <>
+          <div className="catatan-sumber" style={{ marginTop: 'var(--s-4)' }}>
+            <Ikon nama="perisai" ukuran={14} />
+            <span>{t('model.catatanAdmin')}</span>
+          </div>
+          <div className="catatan-sumber" style={{ marginTop: 'var(--s-4)' }}>
+            <Ikon nama="perisai" ukuran={14} />
+            <span>{t('model.cliCatatan')}</span>
+          </div>
+        </>
       )}
     </>
   )

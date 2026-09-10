@@ -4,8 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { getDb } from '../../lib/db.ts'
 import { bacaRahasia } from '../../lib/auth/rahasia.ts'
 import { wajibUser, wajibAdmin } from '../../lib/auth/konteks.ts'
-import { simpanKunci, tandaiTerverifikasi, hapusKunci } from '../../lib/ai/kunci.ts'
+import { simpanKunci, simpanCli, tandaiTerverifikasi, hapusKunci } from '../../lib/ai/kunci.ts'
 import { validasiKunci } from '../../lib/ai/jalankan.ts'
+import { ujiAgy } from '../../lib/ai/agy.ts'
+import { modelDikenal, penyediaDariModel } from '../../lib/ai/penyedia.ts'
 import { gantiPassword, buatUser } from '../../lib/auth/pengguna.ts'
 import { verifikasiPassword } from '../../lib/auth/password.ts'
 import { tServer } from '../../lib/i18n/server.ts'
@@ -27,8 +29,36 @@ const MIN_PASSWORD = 8
  */
 export async function simpanDanUji(_sebelum: HasilForm, form: FormData): Promise<HasilForm> {
   const ctx = await wajibUser()
+  const t = await tServer()
   const apiKey = String(form.get('apiKey') ?? '')
   const model = String(form.get('model') ?? '')
+
+  // Provider dibaca dari modelnya, bukan dari field tersendiri di form. Field
+  // kedua berarti browser bisa mengirim pasangan yang berselisih — provider
+  // `agy-cli` dengan model Anthropic, misalnya — dan yang menentukan mana yang
+  // menang jadi tersebar di dua tempat.
+  if (!modelDikenal(model)) {
+    return { ok: false, pesan: `Model tidak dikenal: ${model}` }
+  }
+
+  if (penyediaDariModel(model) === 'agy-cli') {
+    // Gerbangnya di sini, di server, dan bukan hanya berupa opsi yang
+    // disembunyikan di UI: `agy` menjalankan CLI ber-Bash di mesin server, jadi
+    // satu POST buatan tangan dari user biasa akan cukup kalau pemeriksaannya
+    // hanya di komponen.
+    if (ctx.user.role !== 'admin') {
+      return { ok: false, pesan: t('akun.hanyaAdmin') }
+    }
+    simpanCli(getDb(), ctx.user.id, model)
+    revalidatePath('/model')
+
+    const uji = await ujiAgy(model)
+    if (!uji.ok) return { ok: false, pesan: uji.pesan }
+
+    tandaiTerverifikasi(getDb(), ctx.user.id)
+    revalidatePath('/model')
+    return { ok: true, pesan: t('model.cliBerjalan') }
+  }
 
   try {
     simpanKunci(getDb(), bacaRahasia(), ctx.user.id, { model, apiKey })
@@ -42,7 +72,7 @@ export async function simpanDanUji(_sebelum: HasilForm, form: FormData): Promise
 
   tandaiTerverifikasi(getDb(), ctx.user.id)
   revalidatePath('/model')
-  return { ok: true, pesan: (await tServer())('model.tersimpanBerlaku') }
+  return { ok: true, pesan: t('model.tersimpanBerlaku') }
 }
 
 export async function lupakanKunci(): Promise<void> {

@@ -4,7 +4,7 @@ import { createSite } from '../lib/repos/sites.ts'
 import { createRun } from '../lib/repos/runs.ts'
 import { buatUser } from '../lib/auth/pengguna.ts'
 import { bacaRahasia } from '../lib/auth/rahasia.ts'
-import { simpanKunci, tandaiTerverifikasi } from '../lib/ai/kunci.ts'
+import { simpanKunci, simpanCli, tandaiTerverifikasi } from '../lib/ai/kunci.ts'
 import { reconcile } from '../lib/findings.ts'
 import { ringkasanHandler } from '../lib/jobs/ringkasan.ts'
 import type { PemanggilAi } from '../lib/jobs/ringkasan.ts'
@@ -30,8 +30,9 @@ const RAHASIA = bacaRahasia()
  * - `siap`     — kunci tersimpan dan sudah lolos validasi
  * - `mentah`   — kunci tersimpan tapi belum diuji (baru diganti, misalnya)
  * - `tanpa`    — belum pernah mengonfigurasi model
+ * - `cli`      — admin yang memilih provider agy, jadi tanpa API key sama sekali
  */
-function siap(kunci: 'siap' | 'mentah' | 'tanpa' = 'tanpa') {
+function siap(kunci: 'siap' | 'mentah' | 'tanpa' | 'cli' = 'tanpa') {
   const db = openDb(':memory:')
   const user = buatUser(db, { email: 'a@x.com', password: 'rahasia1' })
   const site = createSite(db, { name: 'Uji', base_url: 'https://uji.test', user_id: user.id })
@@ -47,7 +48,10 @@ function siap(kunci: 'siap' | 'mentah' | 'tanpa' = 'tanpa') {
     },
   ])
 
-  if (kunci !== 'tanpa') {
+  if (kunci === 'cli') {
+    simpanCli(db, user.id, 'gemini-3.1-pro-high')
+    tandaiTerverifikasi(db, user.id)
+  } else if (kunci !== 'tanpa') {
     simpanKunci(db, RAHASIA, user.id, {
       model: 'claude-opus-5',
       apiKey: 'sk-ant-uji-1234',
@@ -196,12 +200,16 @@ test('ringkasan berhasil disimpan beserta model dan statusnya', async () => {
 
 test('kunci pemiliknya yang diteruskan ke pemanggil, bukan kunci lain', async () => {
   const { db, siteId, runId } = siap('siap')
-  let terima: { apiKey: string; model: string } | null = null
-  await ringkasanHandler(job(runId, siteId), db, async (apiKey, model) => {
-    terima = { apiKey, model }
+  let terima: { apiKey: string | null; model: string; provider: string } | null = null
+  await ringkasanHandler(job(runId, siteId), db, async (kunci) => {
+    terima = { apiKey: kunci.apiKey, model: kunci.model, provider: kunci.provider }
     return { ok: true, teks: 'x' }
   })
-  expect(terima).toEqual({ apiKey: 'sk-ant-uji-1234', model: 'claude-opus-5' })
+  expect(terima).toEqual({
+    apiKey: 'sk-ant-uji-1234',
+    model: 'claude-opus-5',
+    provider: 'anthropic',
+  })
 })
 
 test('ringkasan yang berhasil pun tidak menyentuh temuan', async () => {
@@ -240,4 +248,35 @@ test('tokens_est tercatat, jadi prompt yang membengkak terlihat', async () => {
 test('situs yang tidak ada tetap melempar', async () => {
   const { db, runId } = siap('siap')
   await expect(ringkasanHandler(job(runId, 999), db)).rejects.toThrow(/tidak ditemukan/)
+})
+
+/* ── Provider agy CLI ───────────────────────────────────────────────────── */
+
+test('provider CLI diteruskan tanpa API key', async () => {
+  // Yang dijaga di sini adalah bahwa provider ikut sampai ke pemanggil.
+  // Kalau hilang, jalur bawaan akan mengirim prompt ke Messages API dengan
+  // apiKey NULL — dan gagalnya baru terlihat di tengah malam.
+  const { db, siteId, runId } = siap('cli')
+  let terima: { provider: string; model: string; apiKey: string | null } | null = null
+  await ringkasanHandler(job(runId, siteId), db, async (kunci) => {
+    terima = { provider: kunci.provider, model: kunci.model, apiKey: kunci.apiKey }
+    return { ok: true, teks: 'ringkasan dari agy' }
+  })
+
+  expect(terima).toEqual({
+    provider: 'agy-cli',
+    model: 'gemini-3.1-pro-high',
+    apiKey: null,
+  })
+  expect(ringkasanAi(db, siteId)?.model).toBe('gemini-3.1-pro-high')
+  expect(aiStatus(db, runId)).toBe('ok')
+})
+
+test('CLI yang gagal tidak menggagalkan pemindaiannya', async () => {
+  const { db, siteId, runId } = siap('cli')
+  const sebelum = temuanUtuh(db, siteId)
+  await ringkasanHandler(job(runId, siteId), db, gagal('Perintah `agy` tidak ada di PATH server.'))
+
+  expect(aiStatus(db, runId)).toBe('failed')
+  expect(temuanUtuh(db, siteId)).toEqual(sebelum)
 })

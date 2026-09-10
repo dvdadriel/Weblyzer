@@ -3,9 +3,10 @@ import type { Job } from '../queue.ts'
 import { getSite } from '../repos/sites.ts'
 import { setAiStatus } from '../repos/runs.ts'
 import { bacaRahasia } from '../auth/rahasia.ts'
-import { bacaKunci, kunciSiap } from '../ai/kunci.ts'
-import { jalankanAi } from '../ai/jalankan.ts'
+import { bacaKunci, kunciSiap, type Kunci } from '../ai/kunci.ts'
+import { jalankanAi, BATAS_KELUARAN } from '../ai/jalankan.ts'
 import type { HasilAi } from '../ai/jalankan.ts'
+import { jalankanAgy } from '../ai/agy.ts'
 import { susunPrompt, type TemuanRingkas } from '../ai/prompt.ts'
 
 /**
@@ -18,7 +19,30 @@ import { susunPrompt, type TemuanRingkas } from '../ai/prompt.ts'
  * pemanggilan nyata butuh beberapa detik, menghabiskan token, dan jawabannya
  * berbeda tiap kali.
  */
-export type PemanggilAi = (apiKey: string, model: string, prompt: string) => Promise<HasilAi>
+export type PemanggilAi = (kunci: Kunci, prompt: string) => Promise<HasilAi>
+
+/**
+ * Menyalurkan prompt ke provider yang dipilih pemilik situs.
+ *
+ * Seluruh konfigurasi dibawa dalam satu objek `Kunci`, bukan sebagai
+ * `(apiKey, model)` seperti dulu, dan itu bukan kerapian belaka: dengan dua
+ * provider, argumen `apiKey` bernilai NULL adalah keadaan yang sah, dan
+ * memisahkan "kunci mana" dari "provider mana" berarti keduanya bisa
+ * berselisih di jalur pemanggilan. Providernya harus dibaca dari baris yang
+ * sama dengan modelnya.
+ */
+async function panggilBawaan(kunci: Kunci, prompt: string): Promise<HasilAi> {
+  if (kunci.provider === 'agy-cli') {
+    return jalankanAgy(kunci.model, prompt, BATAS_KELUARAN)
+  }
+  if (kunci.apiKey === null) {
+    // Mustahil selama CHECK di migrasi 003 berlaku, dan tetap diperiksa: ini
+    // jalur job tengah malam, dan gagal di sini harus berupa satu baris
+    // `ai_error` yang bisa dibaca — bukan TypeError tanpa konteks.
+    return { ok: false, galat: `Provider ${kunci.provider} tersimpan tanpa API key.` }
+  }
+  return jalankanAi(kunci.apiKey, kunci.model, prompt)
+}
 
 /**
  * Meringkas temuan terbuka satu situs dengan AI, lalu menyimpan hasilnya.
@@ -39,7 +63,7 @@ export type PemanggilAi = (apiKey: string, model: string, prompt: string) => Pro
 export async function ringkasanHandler(
   job: Job,
   db: DatabaseSync,
-  panggil: PemanggilAi = jalankanAi,
+  panggil: PemanggilAi = panggilBawaan,
 ): Promise<void> {
   const siteId = Number(job.payload.siteId)
   const site = getSite(db, siteId)
@@ -81,7 +105,7 @@ export async function ringkasanHandler(
     .all(siteId) as unknown as TemuanRingkas[]
 
   const prompt = susunPrompt({ nama: site.name, baseUrl: site.base_url, temuan })
-  const hasil = await panggil(kunci.apiKey, kunci.model, prompt)
+  const hasil = await panggil(kunci, prompt)
 
   if (!hasil.ok) {
     // Pesan galatnya disimpan apa adanya, dan job TIDAK dilempar.

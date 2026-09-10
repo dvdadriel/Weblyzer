@@ -1,46 +1,97 @@
 /**
- * Model Anthropic yang bisa dipilih pemakai.
+ * Penyedia AI dan model yang bisa dipilih.
  *
  * ============================================================================
- * ASAS YANG DIBALIK, DAN KENAPA
+ * DUA JALUR, ATURAN BERBEDA
  * ============================================================================
- * Berkas ini dulunya mendeteksi CLI yang terpasang di mesin, dan asasnya
- * tertulis di sini: "tanpa API key — tidak ada kunci untuk disimpan, tidak ada
- * tagihan untuk diawasi, dan langganan yang sudah dibayar ikut terpakai."
+ * `anthropic` — API key milik pemakai, disimpan terenkripsi, tagihan orangnya
+ *   sendiri. Boleh dipakai siapa pun yang punya akun.
  *
- * Asas itu benar untuk alat satu orang di mesinnya sendiri, dan salah begitu
- * instance-nya dipakai lebih dari satu orang. Dua sebabnya:
+ * `agy-cli` — CLI `agy` di mesin server, kredensialnya milik mesin, tagihan
+ *   pemilik instance. HANYA ADMIN, dan itu bukan preferensi melainkan batas
+ *   keamanan: `agy` punya tool Bash (bahkan
+ *   `--dangerously-skip-permissions`), jadi membiarkan orang tak dikenal
+ *   memicunya berarti memberi mereka sesi shell di server Anda. Polanya sama
+ *   dengan aspek GEO dan Audit — lihat `bolehCliHost` di
+ *   `lib/auth/pemilik.ts`.
  *
- * 1. Kredensial CLI adalah milik mesin, bukan milik pemakai. Sepuluh orang
- *    yang memakai instance ini akan berbagi satu akun Claude, dan tidak ada
- *    yang bisa membedakan pemakaian siapa.
- * 2. Langganan pemilik instance akan menanggung tagihan semua orang yang
- *    mendaftar. Itu bukan "langganan yang sudah dibayar ikut terpakai", itu
- *    tagihan yang dipindahkan ke orang yang tidak menyetujuinya.
+ * Jalur kedua tidak membatalkan yang pertama. Alasan migrasi 002 memindahkan
+ * AI dari CLI ke API key masih berlaku: kredensial mesin tidak bisa dibagi ke
+ * banyak orang tanpa satu orang menanggung tagihan semuanya. Yang berubah cuma
+ * bahwa pemilik instance boleh memakai langganannya sendiri.
  *
- * Jadi sekarang setiap pemakai membawa kuncinya sendiri, terenkripsi di
- * `ai_kunci` (lihat `lib/ai/kunci.ts`), dan tagihannya sendiri.
+ * `agy-cli` juga TIDAK jalan di container, alasan yang sama dengan GEO dan
+ * Audit: ia butuh login OAuth interaktif, dan itu butuh browser serta terminal
+ * yang tidak ada di dalam container.
+ */
+export const PENYEDIA = [
+  {
+    id: 'anthropic',
+    nama: 'Anthropic API',
+    /** Butuh API key dari pemakainya. */
+    pakaiKunci: true,
+    /** Boleh dipakai user biasa. */
+    adminSaja: false,
+  },
+  {
+    id: 'agy-cli',
+    nama: 'agy CLI (server)',
+    pakaiKunci: false,
+    adminSaja: true,
+  },
+] as const
+
+export type IdPenyedia = (typeof PENYEDIA)[number]['id']
+
+/**
+ * Model per penyedia.
  *
- * YANG TIDAK BERUBAH: kredensial CLI (`claude auth login`) tetap bukan milik
- * aplikasi ini dan tidak pernah disimpannya. Itu masih dipakai tab GEO dan
- * Audit, yang berjalan di mesin host dan hanya untuk admin — lihat
- * `lib/claude-seo/jalankan.ts` dan `bolehCliHost` di `lib/auth/pemilik.ts`.
+ * Daftar `agy-cli` sengaja pendek, bukan seluruh keluaran `agy models` yang
+ * memuat empat belas model. Menawarkan semuanya berarti empat belas baris di
+ * halaman konfigurasi untuk pekerjaan yang cuma meringkas temuan, dan
+ * perbedaan antara `gemini-3.6-flash-low` dan `gemini-3.7-flash-low` tidak
+ * akan pernah terasa di sana. Jalankan `agy models` kalau daftarnya perlu
+ * diperbarui.
  */
 export const MODEL = [
+  // ── Anthropic API ────────────────────────────────────────────────────────
   {
+    penyedia: 'anthropic',
     id: 'claude-opus-5',
     nama: 'Claude Opus 5',
     catatan: 'Paling mampu. Bawaan.',
   },
   {
+    penyedia: 'anthropic',
     id: 'claude-sonnet-5',
     nama: 'Claude Sonnet 5',
     catatan: 'Lebih murah, cukup untuk meringkas temuan.',
   },
   {
+    penyedia: 'anthropic',
     id: 'claude-haiku-4-5',
     nama: 'Claude Haiku 4.5',
     catatan: 'Paling murah dan cepat.',
+  },
+
+  // ── agy CLI ──────────────────────────────────────────────────────────────
+  {
+    penyedia: 'agy-cli',
+    id: 'gemini-3.1-pro-high',
+    nama: 'Gemini 3.1 Pro',
+    catatan: 'Paling mampu di jalur agy.',
+  },
+  {
+    penyedia: 'agy-cli',
+    id: 'gemini-3.8-flash-medium',
+    nama: 'Gemini 3.8 Flash',
+    catatan: 'Cepat, cukup untuk ringkasan.',
+  },
+  {
+    penyedia: 'agy-cli',
+    id: 'claude-opus-4-6-thinking',
+    nama: 'Claude Opus 4.6',
+    catatan: 'Lewat langganan agy, bukan API key.',
   },
 ] as const
 
@@ -50,4 +101,27 @@ export const MODEL_BAWAAN: IdModel = 'claude-opus-5'
 
 export function modelDikenal(id: string): id is IdModel {
   return MODEL.some((m) => m.id === id)
+}
+
+export function penyediaDikenal(id: string): id is IdPenyedia {
+  return PENYEDIA.some((p) => p.id === id)
+}
+
+/** Penyedia yang memiliki model ini. Melempar untuk model tak dikenal. */
+export function penyediaDariModel(id: string): IdPenyedia {
+  const m = MODEL.find((x) => x.id === id)
+  if (!m) throw new Error(`Model tidak dikenal: ${id}`)
+  return m.penyedia
+}
+
+export function pakaiKunci(penyedia: IdPenyedia): boolean {
+  return PENYEDIA.find((p) => p.id === penyedia)!.pakaiKunci
+}
+
+export function adminSaja(penyedia: IdPenyedia): boolean {
+  return PENYEDIA.find((p) => p.id === penyedia)!.adminSaja
+}
+
+export function modelUntuk(penyedia: IdPenyedia): readonly (typeof MODEL)[number][] {
+  return MODEL.filter((m) => m.penyedia === penyedia)
 }

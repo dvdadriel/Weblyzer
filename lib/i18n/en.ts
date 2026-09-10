@@ -227,6 +227,12 @@ export const en = {
   'model.belumTerbukti':
     'The key is stored but not proven valid. The AI summary is off until it passes the check.',
   'model.tersimpanBerlaku': 'Key stored and valid. The AI summary is now active.',
+  'model.labelPenyedia': 'Provider',
+  'model.kunciTakPerlu': 'No API key needed — agy uses the server machine login.',
+  'model.cliBerjalan': 'agy answered. The AI summary now runs through the CLI on the server.',
+  'model.cliBerlaku': 'agy is ready with {model}',
+  'model.cliCatatan':
+    'The agy CLI provider is admin-only, and that is a security boundary rather than a preference: it runs a CLI on the server machine, so the credentials and the bill belong to that machine — the same as the GEO and Audit aspects. This provider also does not run inside a container.',
   'model.catatanAi':
     'The AI layer only writes a summary of findings that already exist. All seven scan aspects run on their own without AI, and Lighthouse scores are measured rather than guessed by a model.',
   'model.catatanAdmin':

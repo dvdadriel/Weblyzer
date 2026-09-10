@@ -234,6 +234,12 @@ export const id = {
   'model.belumTerbukti':
     'Kunci tersimpan tapi belum terbukti berlaku. Ringkasan AI mati sampai ia lolos pemeriksaan.',
   'model.tersimpanBerlaku': 'Kunci tersimpan dan berlaku. Ringkasan AI sekarang aktif.',
+  'model.labelPenyedia': 'Penyedia',
+  'model.kunciTakPerlu': 'Tidak perlu API key — agy memakai login mesin server.',
+  'model.cliBerjalan': 'agy menjawab. Ringkasan AI sekarang aktif lewat CLI di server.',
+  'model.cliBerlaku': 'agy siap dengan {model}',
+  'model.cliCatatan':
+    'Penyedia agy CLI hanya untuk admin, dan itu batas keamanan bukan preferensi: ia menjalankan CLI di mesin server, jadi kredensial dan tagihannya milik mesin — sama seperti aspek GEO dan Audit. Penyedia ini juga tidak berjalan di dalam container.',
   'model.catatanAi':
     'Lapisan AI hanya menyusun rangkuman dari temuan yang sudah ada. Ketujuh aspek pemindaian berjalan sendiri tanpa AI, dan skor Lighthouse tetap hasil pengukuran — bukan tebakan model.',
   'model.catatanAdmin':

@@ -3,6 +3,7 @@ import { openDb } from '../lib/db.ts'
 import { buatUser } from '../lib/auth/pengguna.ts'
 import {
   simpanKunci,
+  simpanCli,
   bacaKunci,
   infoKunci,
   kunciSiap,
@@ -159,5 +160,72 @@ describe('rahasia yang salah', () => {
     const { d, u } = siap()
     simpanKunci(d, RAHASIA, u.id, { model: 'claude-opus-5', apiKey: API_KEY })
     expect(() => bacaKunci(d, 'y'.repeat(32), u.id)).toThrow()
+  })
+})
+
+
+describe('provider agy CLI', () => {
+  it('tersimpan tanpa kunci untuk didekripsi', () => {
+    const { d, u } = siap()
+    simpanCli(d, u.id, 'gemini-3.1-pro-high')
+    const k = bacaKunci(d, RAHASIA, u.id)!
+    expect(k.provider).toBe('agy-cli')
+    expect(k.model).toBe('gemini-3.1-pro-high')
+    // NULL, bukan string kosong: pemanggilnya harus dipaksa membedakan
+    // "tidak ada kunci" dari "kunci kosong", dan itulah yang membuat
+    // percabangan di `panggilBawaan` tidak bisa dilewati diam-diam.
+    expect(k.apiKey).toBeNull()
+    expect(k.ekor).toBe('')
+  })
+
+  it('belum siap sampai diuji', () => {
+    const { d, u } = siap()
+    simpanCli(d, u.id, 'gemini-3.1-pro-high')
+    expect(kunciSiap(d, u.id)).toBe(false)
+    tandaiTerverifikasi(d, u.id)
+    expect(kunciSiap(d, u.id)).toBe(true)
+  })
+
+  it('menolak model milik provider lain', () => {
+    // Satu baris per user berarti label provider yang salah akan mengirim
+    // model Anthropic ke CLI agy, dan gagal dengan pesan yang tidak menyebut
+    // sebabnya.
+    const { d, u } = siap()
+    expect(() => simpanCli(d, u.id, 'claude-opus-5')).toThrow(/bukan model agy/)
+    expect(() =>
+      simpanKunci(d, RAHASIA, u.id, { model: 'gemini-3.1-pro-high', apiKey: API_KEY }),
+    ).toThrow(/bukan model Anthropic/)
+  })
+
+  it('beralih ke agy menghapus kunci yang tersimpan sebelumnya', () => {
+    // API key yang menempel di baris provider CLI berarti kunci itu masih ada
+    // di database untuk provider yang tidak pernah memakainya.
+    const { d, u } = siap()
+    simpanKunci(d, RAHASIA, u.id, { model: 'claude-opus-5', apiKey: API_KEY })
+    tandaiTerverifikasi(d, u.id)
+    simpanCli(d, u.id, 'gemini-3.1-pro-high')
+
+    const baris = d.prepare('SELECT ciphertext, iv, tag FROM ai_kunci WHERE user_id = ?').get(
+      u.id,
+    ) as Record<string, unknown>
+    expect(baris.ciphertext).toBeNull()
+    expect(baris.iv).toBeNull()
+    expect(baris.tag).toBeNull()
+    expect(kunciSiap(d, u.id)).toBe(false)
+  })
+
+  it('beralih kembali ke Anthropic memasang kuncinya lagi', () => {
+    const { d, u } = siap()
+    simpanCli(d, u.id, 'gemini-3.1-pro-high')
+    simpanKunci(d, RAHASIA, u.id, { model: 'claude-opus-5', apiKey: API_KEY })
+    const k = bacaKunci(d, RAHASIA, u.id)!
+    expect(k.provider).toBe('anthropic')
+    expect(k.apiKey).toBe(API_KEY)
+  })
+
+  it('infoKunci menyebut providernya', () => {
+    const { d, u } = siap()
+    simpanCli(d, u.id, 'gemini-3.8-flash-medium')
+    expect(infoKunci(d, u.id)?.provider).toBe('agy-cli')
   })
 })
