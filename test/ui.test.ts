@@ -279,9 +279,39 @@ test('dashboard menampilkan situs beserta hitungan temuannya', async () => {
 
 /* ── tab dan halaman kategori ────────────────────────────────────────────── */
 
-test('ketujuh tab ada dan bisa dibuka', async () => {
+test('tab Mobile Parity ada, berlabel BETA, dan bisa dibuka', async () => {
+  // Labelnya BETA dan bukan AI, dan bedanya nyata: temuannya diukur dan
+  // deterministik, yang masih baru adalah ambangnya. Label AI di sini akan
+  // membuat orang meragukan angka yang justru bisa dipercaya.
   await page.goto(`${asal}/sites/${siteId}/bugs`)
-  for (const label of ['Bug', 'Console', 'Security', 'SEO', 'GEO', 'Audit', 'Lighthouse']) {
+  const tab = page.getByRole('link', { name: /Mobile Parity/ })
+  await tampil(tab)
+  await tampil(tab.getByText('BETA'))
+  expect(await jumlah(tab.getByText('AI'))).toBe(0)
+
+  await tab.click()
+  await tampil(page.getByRole('button', { name: /Scan Mobile/ }))
+}, BATAS_TEST)
+
+test('tab Mobile Parity yang belum dipindai mengaku begitu, bukan bersih', async () => {
+  // Keadaan kosong yang paling mudah tertukar: nol temuan karena belum pernah
+  // diukur, bukan karena tidak ada masalah.
+  await page.goto(`${asal}/sites/${siteId}/mobile`)
+  await tampil(page.getByText('Belum pernah dipindai'))
+}, BATAS_TEST)
+
+test('kedelapan tab ada dan bisa dibuka', async () => {
+  await page.goto(`${asal}/sites/${siteId}/bugs`)
+  for (const label of [
+    'Bug',
+    'Console',
+    'Security',
+    'SEO',
+    'Mobile Parity',
+    'GEO',
+    'Audit',
+    'Lighthouse',
+  ]) {
     await tampil(page.getByRole('link', { name: new RegExp(`^${label}`) }))
   }
 }, BATAS_TEST)

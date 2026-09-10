@@ -18,7 +18,7 @@ import { tServer, localeSekarang } from '../../../../lib/i18n/server.ts'
 
 export const dynamic = 'force-dynamic'
 
-const KATEGORI = ['bugs', 'console', 'security', 'seo', 'geo', 'audit']
+const KATEGORI = ['bugs', 'console', 'security', 'seo', 'mobile', 'geo', 'audit']
 
 /**
  * `node:sqlite` mengembalikan baris berprototipe null, dan React menolak
@@ -92,7 +92,7 @@ export default async function Kategori({
     <TombolScan
       locale={locale}
       siteId={id}
-      kategori={kategori as 'bugs' | 'console' | 'security' | 'seo' | 'geo' | 'audit'}
+      kategori={kategori as 'bugs' | 'console' | 'security' | 'seo' | 'mobile' | 'geo' | 'audit'}
       path={path}
       berjalan={berjalan}
     />

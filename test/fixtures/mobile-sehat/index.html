@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Halaman yang responsif dengan benar</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; font-size: 16px; line-height: 1.6; }
+    .bungkus { padding: 16px; }
+    h2 { font-size: 30px; margin: 0 0 16px; }
+
+    /* Satu kolom di ponsel, empat di layar lebar. Inilah yang membuat halaman
+       ini pembanding yang sah: cacatnya nol, bukan cacatnya sedikit. */
+    .kartu-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .kartu { background: #f2f2f2; padding: 16px; }
+    /* Target sentuh 44 piksel, di atas ambang WCAG 24. */
+    .tombol { display: inline-block; min-width: 44px; min-height: 44px; padding: 12px 16px; }
+
+    /* ── Tiga pola yang SAH dan pernah salah ditandai ─────────────────────
+       Ketiganya ditemukan pada situs sungguhan (isleep.co.id) sebagai temuan
+       palsu. Mereka tinggal di fixture SEHAT supaya perbaikannya tidak bisa
+       hilang tanpa test yang gagal. */
+
+    /* 1. Ticker: isinya sengaja jauh lebih lebar dari layar, dipotong
+          induknya, dan dianimasikan. Tidak ada yang menggulir, tidak ada yang
+          hilang. */
+    .ticker { overflow: hidden; }
+    .ticker-isi { display: flex; width: 3000px; animation: jalan 20s linear infinite; }
+    @keyframes jalan { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+    /* 2. Screen-reader-only: 1 piksel dan isinya terpotong — memang begitu
+          maksudnya. */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+    }
+
+    /* 3. Carousel: kartu di luar viewport, dipotong pembungkusnya. */
+    .carousel { overflow-x: hidden; }
+    /* `transition: transform` adalah tanda jalur carousel yang digerakkan
+       JavaScript — bentuknya saat sedang diam, dan itu yang dilihat pengukur. */
+    .carousel-jalur { display: flex; gap: 16px; transition: transform 0.3s ease; }
+    .carousel-kartu { flex: 0 0 280px; background: #f2f2f2; padding: 16px; }
+
+    @media (min-width: 700px) {
+      body { font-size: 17px; }
+      .bungkus { padding: 32px; }
+      h2 { font-size: 40px; }
+      .kartu-grid { grid-template-columns: 1fr 1fr; gap: 24px; }
+    }
+    @media (min-width: 1100px) {
+      .kartu-grid { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bungkus">
+    <h2>Judul yang jelas lebih besar daripada isinya</h2>
+    <p>Paragraf isi dengan berat huruf biasa, supaya yang tebal benar-benar menonjol.</p>
+    <div class="kartu-grid">
+      <div class="kartu">Kartu satu, isinya muat seluruhnya.</div>
+      <div class="kartu">Kartu dua, isinya muat seluruhnya.</div>
+      <div class="kartu">Kartu tiga, isinya muat seluruhnya.</div>
+      <div class="kartu">Kartu empat, isinya muat seluruhnya.</div>
+    </div>
+    <p><a href="#" class="tombol">Tombol yang cukup besar untuk disentuh</a></p>
+
+    <h1 class="sr-only">Judul untuk pembaca layar, sengaja disembunyikan</h1>
+
+    <div class="ticker">
+      <div class="ticker-isi">
+        <span>Pengumuman yang berjalan terus dan jauh lebih lebar daripada layar mana pun.</span>
+        <span>Pengumuman yang berjalan terus dan jauh lebih lebar daripada layar mana pun.</span>
+      </div>
+    </div>
+
+    <div class="carousel">
+      <div class="carousel-jalur">
+        <div class="carousel-kartu">Kartu carousel satu</div>
+        <div class="carousel-kartu">Kartu carousel dua</div>
+        <div class="carousel-kartu">Kartu carousel tiga</div>
+        <div class="carousel-kartu">Kartu carousel empat</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

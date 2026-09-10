@@ -137,7 +137,7 @@ export async function tambahSitus(_sebelum: HasilAksi, form: FormData): Promise<
  */
 export async function jalankanScan(
   siteId: number,
-  kategori: 'bugs' | 'console' | 'security' | 'seo' | 'geo' | 'audit' | 'lighthouse',
+  kategori: 'bugs' | 'console' | 'security' | 'seo' | 'mobile' | 'geo' | 'audit' | 'lighthouse',
   path: string,
 ): Promise<HasilAksi> {
   const t = await tServer()
@@ -147,11 +147,14 @@ export async function jalankanScan(
   // Penjaga ganda-klik. Tanpa ini dua Chromium berebut satu situs.
   if (runAktif(getDb(), siteId)) return { error: t('scan.sedangBerjalan') }
 
-  // `geo` dan `audit` adalah subcommand-nya sendiri, bukan kategori dari
+  // `geo`, `audit`, dan `mobile` adalah subcommand-nya sendiri, bukan kategori dari
   // `scan`: keduanya tidak menjelajah dengan Chromium melainkan memanggil
   // claude-seo, dan `scanHandler` akan menolaknya sebagai kategori tak dikenal.
   const argumen =
-    kategori === 'lighthouse' || kategori === 'geo' || kategori === 'audit'
+    kategori === 'lighthouse' ||
+    kategori === 'geo' ||
+    kategori === 'audit' ||
+    kategori === 'mobile'
       ? [kategori, String(siteId)]
       : ['scan', String(siteId), kategori]
 

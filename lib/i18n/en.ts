@@ -184,6 +184,7 @@ export const en = {
   'scan.console': 'Scan Console',
   'scan.security': 'Scan Security',
   'scan.seo': 'Scan SEO',
+  'scan.mobile': 'Scan Mobile',
   'scan.geo': 'Analyse GEO',
   'scan.audit': 'Full Audit',
   'scan.lighthouse': 'Scan Lighthouse',

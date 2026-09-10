@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <!-- Cacat 1: zoom dimatikan. Sengaja, dan ini pola nyata yang masih
+       disalin dari template lama. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Halaman dengan cacat mobile yang diketahui</title>
+  <style>
+    /* Tidak ada satu pun media query: ukuran, jarak, dan kolom tetap sama di
+       390 maupun 1440 piksel. Inilah "mobile terabaikan" yang bisa diukur. */
+    body { margin: 0; font-family: system-ui, sans-serif; font-size: 14px; }
+
+    /* Cacat 2: empat kolom tetap. Di 390px tiap kolom jadi ~90 piksel. */
+    .kartu-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px; }
+    .kartu { background: #eee; padding: 4px; }
+
+    /* Cacat 3: kotak yang memotong isinya tanpa elipsis. */
+    .terpotong { height: 18px; overflow: hidden; }
+
+    /* Cacat 4: elemen yang lebih lebar dari layar ponsel. */
+    .tabel-lebar { width: 900px; background: #ddd; }
+
+    /* Cacat 5: hampir semua teks tebal. */
+    .kartu, .isi, h2 { font-weight: 700; }
+
+    /* Cacat 6: judul hampir sama besar dengan isi (14px vs 15px). */
+    h2 { font-size: 15px; margin: 2px 0; }
+
+    /* Cacat 7: target sentuh 16 piksel. */
+    .ikon { display: inline-block; width: 16px; height: 16px; background: #333; }
+
+    /* Cacat 8: isi yang hanya disingkap oleh hover. */
+    .menu-isi { display: none; }
+    .menu:hover .menu-isi { display: block; }
+  </style>
+</head>
+<body>
+  <h2>Judul yang hampir tidak berbeda dari isinya</h2>
+
+  <div class="kartu-grid">
+    <div class="kartu">Kartu satu dengan teks yang cukup panjang supaya membungkus</div>
+    <div class="kartu">Kartu dua dengan teks yang cukup panjang supaya membungkus</div>
+    <div class="kartu">Kartu tiga dengan teks yang cukup panjang supaya membungkus</div>
+    <div class="kartu">Kartu empat dengan teks yang cukup panjang supaya membungkus</div>
+  </div>
+
+  <p class="isi">Paragraf isi yang juga tebal, jadi tidak ada yang menonjol di halaman ini sama sekali.</p>
+
+  <div class="terpotong">
+    Teks ini jauh lebih tinggi daripada kotaknya, jadi bagian bawahnya hilang tanpa
+    elipsis dan tanpa cara apa pun untuk menjangkaunya.
+  </div>
+
+  <table class="tabel-lebar"><tr><td>Tabel selebar sembilan ratus piksel</td></tr></table>
+
+  <p><a href="#" class="ikon" aria-label="Tombol ikon yang terlalu kecil"></a></p>
+
+  <div class="menu">
+    Menu
+    <div class="menu-isi">Isi yang hanya muncul saat kursor lewat.</div>
+  </div>
+</body>
+</html>

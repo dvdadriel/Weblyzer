@@ -12,6 +12,7 @@ export type Kategori =
   | 'console'
   | 'security'
   | 'seo'
+  | 'mobile'
   | 'geo'
   | 'audit'
   | 'lighthouse'
@@ -30,6 +31,7 @@ const LABEL: Record<Kategori, Kunci> = {
   console: 'scan.console',
   security: 'scan.security',
   seo: 'scan.seo',
+  mobile: 'scan.mobile',
   geo: 'scan.geo',
   audit: 'scan.audit',
   lighthouse: 'scan.lighthouse',
@@ -44,6 +46,10 @@ const LABEL: Record<Kategori, Kunci> = {
  * yang biayanya tidak nol.
  */
 const LAMA: Partial<Record<Kategori, string>> = {
+  // Mobile Parity tidak memakai token sama sekali, tapi tetap disebut lamanya:
+  // tiga konteks browser per halaman, dan orang yang menekan tombol tanpa
+  // peringatan akan menyimpulkan tombolnya rusak.
+  mobile: 'beberapa menit, tanpa token',
   geo: 'beberapa menit, memakai token',
   audit: 'bisa puluhan menit, memakai banyak token',
 }
@@ -58,6 +64,7 @@ const NAMA_RUN: Record<string, Kunci> = {
   console: 'scan.console',
   security: 'scan.security',
   seo: 'scan.seo',
+  mobile: 'scan.mobile',
   geo: 'scan.geo',
   audit: 'scan.audit',
   lighthouse: 'scan.lighthouse',

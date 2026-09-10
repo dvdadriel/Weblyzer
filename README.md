@@ -2,8 +2,8 @@
 
 A web audit tool for one person looking after a handful of their own sites.
 
-It crawls each site, then splits what it found across seven tabs: Bug, Console,
-Security, SEO, GEO, Audit, and Lighthouse. It runs on your own machine: no
+It crawls each site, then splits what it found across eight tabs: Bug, Console,
+Security, SEO, Mobile Parity, GEO, Audit, and Lighthouse. It runs on your own machine: no
 accounts and no sign-in. Pick `claude` or `agy` for the AI layer right in the
 web page; API keys for other models live in `.env`.
 
@@ -40,6 +40,20 @@ preference. They run Claude Code with `Bash`, `Task`, and `WebFetch` enabled on
 the server itself, so they cannot be driven by a visitor's API key — and
 letting a stranger trigger them would hand them a shell. Their tab stays
 visible to everyone and says exactly that.
+
+**Mobile Parity** asks a question the others do not: did the decisions made for
+desktop actually reach the phone? It renders every sampled page at 390, 820,
+and 1440 pixels and compares them — elements past the right edge, boxes that
+clip their own text, grid columns, the share of bold text weighted by text
+length, the title-to-body size ratio, touch targets under the WCAG 2.2
+minimum, and reveals that only respond to hover.
+
+It is measured rather than judged, so its `open → fixed` history is as
+trustworthy as the deterministic categories. The tab is labelled BETA because
+the eleven thresholds are new, not because a model is guessing. Carousels,
+tickers, and screen-reader-only text are excluded by construction — all three
+were false positives on a real site before the exclusions existed, and all
+three now live in the healthy fixture so they cannot come back.
 
 Everything else: Excel export with a ready-to-paste fix prompt per problem,
 Lighthouse scores measured locally for both mobile and desktop, per-finding
@@ -171,10 +185,40 @@ Every scan also works from the terminal, and the UI calls the same CLI:
 npm run scan -- add-site "Name" https://example.com
 npm run scan -- scan <id> [bugs|console|security|seo]
 npm run scan -- lighthouse <id>
+npm run scan -- mobile <id>     # Mobile Parity, three widths per page
 npm run scan -- geo <id>        # via claude-seo
 npm run scan -- audit <id>      # via claude-seo, takes tens of minutes
 npm run scan -- jadwal          # every enabled site, for cron
 ```
+
+## Skills, committed
+
+`skills/` holds the aspect guides as plain markdown, in the repository. Anyone
+who clones this gets them: no plugin to install first, no particular
+subscription, and no single vendor named as a requirement.
+
+- `skills/README.md` — the output contract every aspect must satisfy: strict
+  JSON, rule names that stay stable across runs and carry no numbers, one
+  finding per problem, and an empty array as a legitimate answer. Each rule
+  there exists because breaking it already cost this project something.
+- `skills/mobile-parity.md`, `skills/geo.md`, `skills/audit.md` — what each
+  aspect checks, what it must not check, and how to verify a fix.
+
+The GEO and Audit prompts now point at those files by absolute path and tell
+the model to read them first. If the `claude-seo` plugin happens to be
+installed, the skill itself says to use it — so the plugin became an
+accelerator rather than a prerequisite.
+
+**Which model can run what** is not the same question for every aspect:
+
+| Aspect | Needs tools? | Runs on |
+|---|---|---|
+| Mobile Parity | no | **any model**, including a plain API key — Weblyzer collects the evidence itself with Playwright and hands over numbers |
+| GEO, Audit | yes — fetch pages, write files | an agentic CLI only: `claude`, `agy`, or equivalent |
+
+That difference is the reason Mobile Parity was built measurement-first. An
+aspect that gathers its own evidence needs nothing from the model but
+judgment, and judgment is portable.
 
 ## Docker
 

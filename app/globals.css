@@ -906,6 +906,21 @@ a { color: inherit; }
   letter-spacing: 0.03em;
 }
 
+/* BETA, bukan AI: temuan Mobile Parity diukur dan deterministik. Yang masih
+   baru adalah ambangnya. Warnanya karena itu netral — memakai warna severity
+   akan membuatnya terbaca sebagai peringatan, dan DESIGN.md melarang warna
+   severity dipakai untuk hal yang bukan severity. */
+.tab-beta-tag {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
 /* ── Ringkasan AI ───────────────────────────────────────────────────────── */
 
 .ringkas {

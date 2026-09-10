@@ -16,6 +16,10 @@ const TAB = [
   ['console', 'Console'],
   ['security', 'Security'],
   ['seo', 'SEO'],
+  // Mobile Parity berdiri di sisi deterministik bersama keempat di atasnya —
+  // temuannya diukur, bukan dinilai model. Karena itu ia di SINI dan bukan di
+  // sebelah GEO/Audit, walau lencananya BETA.
+  ['mobile', 'Mobile Parity'],
   // GEO dan Audit datang dari claude-seo, bukan dari aturan. Diletakkan
   // BERSEBELAHAN dan setelah SEO, bukan diselipkan di antara yang
   // deterministik: keduanya punya sifat berbeda (§lib/kategori.ts), dan
@@ -42,6 +46,12 @@ export function Tab({ siteId, locale }: { siteId: number; locale: Locale }) {
           >
             <span>{label}</span>
             {(t === 'geo' || t === 'audit') && <span className="tab-ai-tag">AI</span>}
+            {/* BETA, bukan AI: temuannya diukur dan deterministik. Yang masih
+                baru adalah AMBANGNYA — sebelas aturan dengan angka yang baru
+                ditala pada segelintir situs, jadi banjir peringatan atau
+                temuan yang terlewat masih mungkin. Label ini yang mengakui itu
+                di layar, alih-alih membiarkan orang menyimpulkannya sendiri. */}
+            {t === 'mobile' && <span className="tab-beta-tag">BETA</span>}
           </Link>
         )
       })}

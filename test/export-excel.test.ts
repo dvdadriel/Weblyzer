@@ -29,6 +29,7 @@ test('setiap kategori punya sheet-nya, walau tanpa temuan', () => {
     'Console',
     'Security',
     'SEO',
+    'Mobile Parity',
     'GEO',
     'Audit',
     'Lighthouse',

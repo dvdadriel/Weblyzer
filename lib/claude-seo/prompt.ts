@@ -1,4 +1,29 @@
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { NAMA_HASIL } from './jalankan.ts'
+
+/**
+ * Berkas skill yang IKUT TER-COMMIT di repositori ini.
+ *
+ * Sebelumnya prompt di bawah menyebut nama skill dari plugin luar
+ * (`claude-seo:seo-geo`), dan itu punya dua akibat: orang yang meng-clone
+ * proyek ini tanpa plugin itu mendapat aspek yang gagal tanpa penjelasan, dan
+ * pengetahuan tentang APA yang harus diperiksa tinggal di luar proyek —
+ * sehingga tidak bisa dibaca, ditinjau, atau diperbaiki oleh pemakainya.
+ *
+ * Sekarang promptnya menunjuk ke berkas di `skills/`, dan berkas itu sendiri
+ * yang menyuruh memakai plugin bila memang terpasang. Jadi pluginnya menjadi
+ * percepatan, bukan syarat.
+ *
+ * Path-nya diturunkan dari `import.meta.url`, BUKAN dari `process.cwd()`:
+ * `jalankan.ts` menjalankan CLI-nya di direktori kerja lain (`claude-seo-out/`),
+ * jadi path relatif akan menunjuk ke tempat yang salah.
+ */
+const AKAR = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+
+export function berkasSkill(aspek: 'geo' | 'audit' | 'mobile-parity'): string {
+  return join(AKAR, 'skills', `${aspek}.md`)
+}
 
 /**
  * Prompt untuk claude-seo, dijalankan headless.
@@ -120,7 +145,12 @@ export function promptGeo(
   sebelumnya: TemuanSebelumnya[] = [],
 ): string {
   return [
-    `Gunakan skill claude-seo:seo-geo untuk menganalisis situs "${nama}" (${baseUrl}).`,
+    `Analisis situs "${nama}" (${baseUrl}) untuk aspek GEO.`,
+    '',
+    `LANGKAH PERTAMA: baca panduan aspek ini dengan tool Read di`,
+    `\`${berkasSkill('geo')}\`, lalu ikuti. Panduan itu bagian dari proyek ini`,
+    'dan memuat batas serta pengecualian yang berlaku — termasuk perintah',
+    'memakai skill claude-seo:seo-geo kalau plugin itu memang terpasang.',
     '',
     'Fokus pada apa yang tidak bisa diukur aturan deterministik: keterjangkauan',
     'crawler AI, keberadaan llms.txt, seberapa bisa dikutip tiap paragraf,',
@@ -164,18 +194,21 @@ export function promptAudit(
   sebelumnya: TemuanSebelumnya[] = [],
 ): string {
   return [
-    `Gunakan skill claude-seo:seo-audit untuk mengaudit situs "${nama}" (${baseUrl}).`,
+    `Audit situs "${nama}" (${baseUrl}) selengkapnya.`,
     `Batasi crawl pada ${maxPages} halaman.`,
     '',
-    'Jalankan audit selengkapnya sesuai skill itu, termasuk mendeteksi jenis',
-    'bisnisnya dan mendelegasikan ke spesialis yang relevan. Lewati spesialis',
-    'yang butuh kredensial API yang tidak tersedia — jangan gagal karena itu,',
-    'dan jangan menebak datanya.',
+    `LANGKAH PERTAMA: baca panduan aspek ini dengan tool Read di`,
+    `\`${berkasSkill('audit')}\`, lalu ikuti. Panduan itu bagian dari proyek ini`,
+    'dan memuat batas serta pengecualian yang berlaku — termasuk perintah',
+    'memakai skill claude-seo:seo-audit kalau plugin itu memang terpasang,',
+    'beserta perintah melewati spesialis yang kredensial API-nya tidak tersedia',
+    'alih-alih gagal atau menebak datanya.',
     '',
     'Situs ini SUDAH diperiksa oleh pemindai deterministik untuk: status HTTP,',
     'halaman kosong, resource rusak, redirect, exception dan pesan console,',
-    'header keamanan, cookie, mixed content, TLS, 12 aturan SEO on-page, serta',
-    'skor Lighthouse mobile dan desktop. Jangan mengulangi semua itu.',
+    'header keamanan, cookie, mixed content, TLS, 12 aturan SEO on-page, skor',
+    'Lighthouse mobile dan desktop, serta kesejajaran tata letak dan tipografi',
+    'antar-lebar layar (aspek Mobile Parity). Jangan mengulangi semua itu.',
     '',
     'Laporkan yang BELUM tercakup: arsitektur konten dan klaster topik, E-E-A-T,',
     'schema markup, kecocokan jenis halaman dengan intent pencarian, konten',

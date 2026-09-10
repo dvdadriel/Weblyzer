@@ -190,6 +190,7 @@ export const id = {
   'scan.console': 'Scan Console',
   'scan.security': 'Scan Security',
   'scan.seo': 'Scan SEO',
+  'scan.mobile': 'Scan Mobile',
   'scan.geo': 'Analisis GEO',
   'scan.audit': 'Audit Full',
   'scan.lighthouse': 'Scan Lighthouse',

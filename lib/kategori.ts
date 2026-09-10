@@ -6,7 +6,16 @@
  * penambahan `geo` berarti tiga tempat yang bisa lupa.
  */
 
-export const KATEGORI = ['bugs', 'console', 'security', 'seo', 'geo', 'audit', 'lighthouse'] as const
+export const KATEGORI = [
+  'bugs',
+  'console',
+  'security',
+  'seo',
+  'mobile',
+  'geo',
+  'audit',
+  'lighthouse',
+] as const
 export type Kategori = (typeof KATEGORI)[number]
 
 /** Nama yang dibaca manusia. Tunggal dan Inggris, sesuai aturan tulisan di
@@ -16,6 +25,7 @@ export const NAMA: Record<Kategori, string> = {
   console: 'Console',
   security: 'Security',
   seo: 'SEO',
+  mobile: 'Mobile Parity',
   geo: 'GEO',
   audit: 'Audit',
   lighthouse: 'Lighthouse',
@@ -41,6 +51,12 @@ export const SUMBER: Record<Kategori, Sumber> = {
   console: 'aturan',
   security: 'aturan',
   seo: 'aturan',
+  // `aturan`, dan itu keputusan yang membentuk seluruh aspeknya: keempat
+  // keluhan yang melahirkannya bisa diukur dari getComputedStyle dan
+  // getBoundingClientRect, jadi diukur. Penilaian model tetap ada di panel
+  // ringkasan, tapi ia tidak pernah menjadi baris temuan — riwayat
+  // `open → fixed` hanya bisa dipercaya kalau jawabannya sama tiap run.
+  mobile: 'aturan',
   geo: 'claude-seo',
   audit: 'claude-seo',
   lighthouse: 'aturan',
@@ -70,5 +86,8 @@ export function namaKategori(category: string): string {
  *   semua judul), jadi satu halaman tidak cukup.
  * - `geo`, `audit` — dinilai claude-seo atas seluruh situs; memeriksa satu
  *   baris berarti menjalankan ulang seluruh analisisnya.
+ * - `mobile` — temuannya lahir dari MEMBANDINGKAN tiga lebar layar, jadi
+ *   memeriksa satu baris berarti membuka tiga konteks browser lagi. Itu
+ *   seluruh jobnya, bukan pemeriksaan ulang satu temuan.
  */
 export const BISA_RECHECK: ReadonlySet<string> = new Set(['bugs', 'console', 'security'])

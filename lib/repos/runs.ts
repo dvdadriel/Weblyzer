@@ -7,6 +7,7 @@ export type RunType =
   | 'security'
   | 'lighthouse'
   | 'seo'
+  | 'mobile'
   | 'geo'
   | 'audit'
   | 'ringkasan'
