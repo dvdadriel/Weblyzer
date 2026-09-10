@@ -21,8 +21,10 @@
  * bahwa pemilik instance boleh memakai langganannya sendiri.
  *
  * `agy-cli` juga TIDAK jalan di container, alasan yang sama dengan GEO dan
- * Audit: ia butuh login OAuth interaktif, dan itu butuh browser serta terminal
- * yang tidak ada di dalam container.
+ * Audit: ia sama seperti `claude` — punya login sendiri, bukan API key. Di
+ * macOS kredensialnya ada di `~/Library/Application Support/Antigravity`,
+ * dipasang lewat login desktop yang butuh browser. Container tidak punya
+ * keduanya, dan tidak ada variabel lingkungan yang bisa menggantikannya.
  */
 export const PENYEDIA = [
   {
