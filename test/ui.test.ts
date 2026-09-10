@@ -160,14 +160,22 @@ beforeAll(async () => {
         DB_PATH: join(dir, 'uji.db'),
         NODE_ENV: 'development',
         WEBLYZER_SECRET: RAHASIA_UI,
-        // Direktori build sendiri, di dalam folder sementara test ini.
+        // Direktori build sendiri, DI DALAM proyek dan bernama tetap.
         //
         // Next 16 menolak server dev kedua di satu direktori build, dan
         // lock-nya ada di `<distDir>/dev/lock`. Tanpa pemisahan ini, seluruh
         // berkas ini gagal begitu ada `npm run dev` yang sedang jalan — dan
         // pesannya cuma "server dev tidak siap dalam 180 detik", yang tidak
         // menyebut sebabnya sama sekali.
-        WEBLYZER_DIST_DIR: join(dir, '.next-uji'),
+        //
+        // Versi pertama menaruhnya di folder sementara test ini, dan itu
+        // salah dalam dua hal sekaligus: Next membuang garis miring depan
+        // sehingga build-nya sungguhan mendarat di `<proyek>/var/folders/...`,
+        // dan typegen menuliskan path absolut folder itu ke `include` di
+        // `tsconfig.json` — dua baris sampah baru per jalannya suite, ikut
+        // ter-commit. Nama tetap di dalam proyek membuat entri itu ditulis
+        // sekali lalu diam.
+        WEBLYZER_DIST_DIR: '.next-uji',
         // OAuth sengaja TIDAK dikonfigurasi: salah satu test memastikan
         // tombol Google tidak muncul tanpa kredensial.
         WEBLYZER_GOOGLE_CLIENT_ID: '',
@@ -493,7 +501,41 @@ test('halaman model menawarkan pemilih model dan medan API key', async () => {
   const pilih = page.locator('select[name="model"]')
   await tampil(pilih)
   expect(await pilih.inputValue()).toBe('claude-opus-5')
-  expect(await pilih.locator('option').count()).toBe(3)
+  // Session di berkas ini adalah admin, jadi kedua penyedia muncul —
+  // dikelompokkan, karena pilihannya bukan sekadar model yang berbeda.
+  expect(await pilih.locator('optgroup').count()).toBe(2)
+  expect(await pilih.locator('option').count()).toBe(6)
+}, BATAS_TEST)
+
+test('user biasa tidak ditawari penyedia CLI di halaman model', async () => {
+  // Gerbangnya ada di server (`simpanDanUji` menolak model agy dari non-admin),
+  // dan ini memeriksa lapisan keduanya: opsi yang pasti ditolak tidak
+  // seharusnya ditawarkan sama sekali.
+  const biasa = buatUser(db, { email: 'biasa@uji.test', password: 'rahasia-uji' })
+  await masukSebagai(biasa.id)
+  try {
+    await page.goto(`${asal}/model`)
+    const pilih = page.locator('select[name="model"]')
+    await tampil(pilih)
+    expect(await pilih.locator('option').count()).toBe(3)
+    expect(await pilih.locator('optgroup').count()).toBe(1)
+    expect(await pilih.locator('option[value="gemini-3.1-pro-high"]').count()).toBe(0)
+  } finally {
+    await masukSebagai(adminId)
+  }
+}, BATAS_TEST)
+
+test('memilih penyedia CLI menghilangkan medan API key', async () => {
+  // Field mati yang tetap terlihat mengundang orang mencari kunci yang tidak
+  // dibutuhkan, dan `required` pada field yang tersembunyi lewat CSS membuat
+  // form gagal submit tanpa pesan yang bisa dilihat.
+  await page.goto(`${asal}/model`)
+  const pilih = page.locator('select[name="model"]')
+  await tampil(pilih)
+  await pilih.selectOption('gemini-3.1-pro-high')
+  await page.waitForTimeout(300)
+  expect(await jumlah(page.locator('input[name="apiKey"]'))).toBe(0)
+  await tampil(page.getByText(/Tidak perlu API key/))
 }, BATAS_TEST)
 
 test('medan API key bertipe password, jadi tidak terbaca di layar', async () => {

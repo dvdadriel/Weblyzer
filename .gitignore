@@ -1,5 +1,13 @@
 node_modules/
 .next/
+# Direktori build server dev milik test/ui.test.ts.
+#
+# `var/` ikut di sini karena Next membuang garis miring depan dari distDir,
+# jadi path absolut ke folder sementara mendarat sebagai `var/folders/...` di
+# dalam proyek. Test-nya sudah tidak melakukan itu lagi, tapi baris ini yang
+# mencegah 554 berkas build ikut ter-commit untuk kedua kalinya.
+.next-uji/
+var/
 data.db
 data.db-wal
 data.db-shm
