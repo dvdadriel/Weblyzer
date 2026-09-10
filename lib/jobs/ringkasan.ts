@@ -2,10 +2,10 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { Job } from '../queue.ts'
 import { getSite } from '../repos/sites.ts'
 import { setAiStatus } from '../repos/runs.ts'
-import { konfigurasiAi, type Konfigurasi, type Hasil } from '../ai/konfigurasi.ts'
+import { konfigurasiEfektif, type Konfigurasi, type Hasil } from '../ai/konfigurasi.ts'
 import { jalankanAi, BATAS_KELUARAN } from '../ai/jalankan.ts'
 import type { HasilAi } from '../ai/jalankan.ts'
-import { jalankanAgy } from '../ai/agy.ts'
+import { jalankanCli } from '../ai/cli.ts'
 import { jalankanOpenai } from '../ai/openai.ts'
 import { susunPrompt, type TemuanRingkas } from '../ai/prompt.ts'
 
@@ -34,8 +34,8 @@ export async function panggilBawaan(cfg: Konfigurasi, prompt: string): Promise<H
       return jalankanAi(cfg.apiKey, cfg.model, prompt)
     case 'openai':
       return jalankanOpenai(cfg, prompt, BATAS_KELUARAN)
-    case 'agy':
-      return jalankanAgy(cfg.model, prompt, BATAS_KELUARAN)
+    case 'cli':
+      return jalankanCli(cfg.cli, cfg.model, prompt, BATAS_KELUARAN)
     default: {
       const belum: never = cfg
       throw new Error(`Jalur AI tidak tertangani: ${JSON.stringify(belum)}`)
@@ -67,7 +67,7 @@ export async function ringkasanHandler(
   // `process.env` di dalam, seluruh jaminan berkas ini ikut bergantung pada
   // isi `.env` di mesin yang menjalankan test — lolos di laptop yang belum
   // mengonfigurasi AI, gagal di laptop yang sudah.
-  cfg: Hasil = konfigurasiAi(),
+  cfg: Hasil = konfigurasiEfektif(db),
 ): Promise<void> {
   const siteId = Number(job.payload.siteId)
   const site = getSite(db, siteId)

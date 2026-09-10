@@ -13,7 +13,7 @@ import { listPages } from '../lib/repos/pages.ts'
 import { lighthouseHandler } from '../lib/jobs/lighthouse.ts'
 import { ringkasanHandler } from '../lib/jobs/ringkasan.ts'
 import { claudeSeoHandler, ASPEK, adalahAspek } from '../lib/jobs/claude-seo.ts'
-import { konfigurasiAi } from '../lib/ai/konfigurasi.ts'
+import { konfigurasiEfektif } from '../lib/ai/konfigurasi.ts'
 import { skorTerakhir } from '../lib/repos/lighthouse.ts'
 
 const HANDLERS = {
@@ -251,7 +251,15 @@ async function main(): Promise<number> {
       // Mengantrikannya lalu membiarkan handler menandai `skipped` juga bisa,
       // tapi itu satu baris job per run yang sudah diketahui tidak akan
       // mengerjakan apa pun.
-      if (konfigurasiAi().siap) {
+      // `konfigurasiEfektif`, BUKAN `konfigurasiAi`.
+      //
+      // Bedanya nyata dan pernah menggagalkan jalur ini: pilihan CLI yang
+      // dibuat di halaman web tersimpan di tabel `config`, dan versi yang
+      // hanya membaca `.env` tidak melihatnya sama sekali. Akibatnya
+      // ringkasan tidak pernah diantrikan untuk konfigurasi yang jelas-jelas
+      // sudah dipasang — pada pemindaian tengah malam, yang tidak ada yang
+      // menonton.
+      if (konfigurasiEfektif(db).siap) {
         enqueue(db, { runId: run.id, type: 'ringkasan', payload: { siteId: site.id } })
       }
       console.log(`Run ${run.id}: memindai ${site.base_url} ...`)
@@ -306,7 +314,7 @@ async function main(): Promise<number> {
       // Sebabnya dicetak apa adanya, dan itu yang membuat perintah ini bisa
       // ditindaklanjuti dari terminal: pesannya menyebut variabel mana yang
       // kurang, bukan "AI belum dikonfigurasi".
-      const cfg = konfigurasiAi()
+      const cfg = konfigurasiEfektif(db)
       if (!cfg.siap) {
         console.error(cfg.sebab)
         return 1

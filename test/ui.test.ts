@@ -430,24 +430,91 @@ test('ekspor mengembalikan xlsx dengan nama berkas yang aman', async () => {
 
 /* ── halaman model ───────────────────────────────────────────────────────── */
 
-test('halaman model menyebut variabel yang kurang, bukan cuma "tidak aktif"', async () => {
-  // Server uji ini dijalankan tanpa WEBLYZER_AI. Yang diperiksa: halamannya
-  // menyebut variabel mana yang harus diisi — pesan yang tidak menyebutnya
-  // memaksa orang membaca kode untuk memakai fiturnya.
+test('halaman model menyebut kedua cara mengatur, bukan cuma "tidak aktif"', async () => {
+  // Server uji ini dijalankan tanpa WEBLYZER_AI dan tanpa pilihan CLI. Yang
+  // diperiksa: halamannya menyebut kedua jalan keluarnya — pesan yang tidak
+  // menyebutnya memaksa orang membaca kode untuk memakai fiturnya.
   await page.goto(`${asal}/model`)
   await tampil(page.getByRole('heading', { name: 'Model AI' }))
-  await tampil(page.getByText(/WEBLYZER_AI belum diisi/))
+  await tampil(page.getByText(/Pilih claude atau agy/))
 }, BATAS_TEST)
 
-test('halaman model tidak lagi meminta API key lewat form', async () => {
-  // Konfigurasi pindah ke `.env`, jadi tidak boleh ada lagi medan kunci di
-  // browser. Kalau suatu saat form itu kembali tanpa sengaja, di sinilah ia
+test('halaman model tidak pernah meminta API key lewat form', async () => {
+  // Batas yang paling penting di halaman ini: rahasia tidak menyeberang lewat
+  // browser. Jalur CLI boleh dipilih di sini justru karena ia tidak punya
+  // rahasia. Kalau medan kunci muncul suatu saat tanpa sengaja, di sinilah ia
   // tertangkap.
   await page.goto(`${asal}/model`)
   await tampil(page.getByRole('heading', { name: 'Model AI' }))
   expect(await jumlah(page.locator('input[name="apiKey"]'))).toBe(0)
-  expect(await jumlah(page.locator('select[name="model"]'))).toBe(0)
+  expect(await jumlah(page.locator('input[type="password"]'))).toBe(0)
 }, BATAS_TEST)
+
+test('CLI bisa dipilih dari halaman web', async () => {
+  // "claude dan agy gunakan cli, interaktif di web": keduanya harus terlihat
+  // dan bisa dipilih tanpa menyentuh .env sama sekali.
+  await page.goto(`${asal}/model`)
+  await tampil(page.locator('input[name="cli"][value="claude"]'))
+  await tampil(page.locator('input[name="cli"][value="agy"]'))
+  // Medan model bertipe teks, BUKAN select: daftar model kedua CLI berubah
+  // tanpa Weblyzer tahu, dan select akan menolak model yang berfungsi.
+  const medan = page.locator('input[name="model"]')
+  await tampil(medan)
+  expect(await medan.getAttribute('type')).toBe('text')
+}, BATAS_TEST)
+
+test('medan model membawa saran tanpa mengunci pilihan', async () => {
+  await page.goto(`${asal}/model`)
+  const medan = page.locator('input[name="model"]')
+  await tampil(medan)
+  const daftar = await medan.getAttribute('list')
+  expect(daftar).toBeTruthy()
+  // Saran ada, tapi bentuknya datalist — jadi nama lain tetap bisa diketik.
+  expect(await jumlah(page.locator(`datalist#${daftar} option`))).toBeGreaterThan(0)
+}, BATAS_TEST)
+
+test('memilih agy mengganti sarannya, bukan cuma labelnya', async () => {
+  // Saran yang tidak ikut berganti lebih buruk daripada tidak ada saran: ia
+  // menyarankan model claude untuk agy, dan agy menolaknya.
+  await page.goto(`${asal}/model`)
+  await tampil(page.locator('input[name="cli"][value="agy"]'))
+  await page.locator('input[name="cli"][value="agy"]').check()
+  await page.waitForTimeout(300)
+  const daftar = await page.locator('input[name="model"]').getAttribute('list')
+  expect(daftar).toBe('saran-agy')
+  // Dihitung, bukan ditunggu terlihat: isi `<datalist>` tidak pernah "visible"
+  // bagi Playwright — persis alasan yang sama dengan `<option>` di dalam
+  // select yang tertutup.
+  expect(await jumlah(page.locator('datalist#saran-agy option[value="gemini-3.1-pro-high"]'))).toBe(
+    1,
+  )
+  expect(await jumlah(page.locator('datalist#saran-agy option[value="claude-opus-5"]'))).toBe(0)
+}, BATAS_TEST)
+
+test('pilihan CLI tersimpan di database walau CLI-nya gagal dijawab', async () => {
+  // Sengaja: tidak ada lagi keadaan "tersimpan tapi belum terbukti" yang
+  // menahan fitur. CLI yang sedang rusak biasanya pulih tanpa perlu ada yang
+  // menyimpan ulang apa pun, dan keadaan tersembunyi yang menahannya justru
+  // yang basi.
+  await page.goto(`${asal}/model`)
+  await page.locator('input[name="cli"][value="agy"]').check()
+  await page.locator('input[name="model"]').fill('model-yang-tidak-ada')
+  await page.getByRole('button', { name: /Simpan/ }).click()
+
+  // Hasil pemanggilannya ditunggu apa adanya — berhasil atau gagal, keduanya
+  // muncul di layar. Yang diuji di sini adalah tersimpannya.
+  await page.waitForFunction(
+    () => !document.querySelector('button[disabled]'),
+    undefined,
+    { timeout: 200_000 },
+  )
+  const baris = db
+    .prepare("SELECT value FROM config WHERE key = 'ai_cli'")
+    .get() as { value: string } | undefined
+  expect(baris?.value).toBe('agy')
+
+  db.prepare("DELETE FROM config WHERE key LIKE 'ai_cli%'").run()
+}, 240_000)
 
 test('halaman model menunjukkan contoh .env yang bisa ditiru', async () => {
   // Halaman yang cuma bilang "isi .env" memindahkan pekerjaan ke pembacanya.

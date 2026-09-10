@@ -168,12 +168,15 @@ test('konfigurasi diteruskan utuh ke pemanggil', async () => {
   expect(terima).toEqual(SIAP.siap && SIAP.konfigurasi)
 })
 
-test('jalur agy dipakai apa adanya, tanpa API key', async () => {
+test('jalur CLI dipakai apa adanya, tanpa API key', async () => {
   // Yang dijaga di sini: jalurnya ikut sampai ke pemanggil. Kalau hilang,
   // prompt dikirim ke Messages API tanpa kunci — dan gagalnya baru terlihat
   // pada pemindaian tengah malam yang tidak ada yang menonton.
   const { db, siteId, runId } = siap()
-  const cfg: Hasil = { siap: true, konfigurasi: { jalur: 'agy', model: 'gemini-3.1-pro-high' } }
+  const cfg: Hasil = {
+    siap: true,
+    konfigurasi: { jalur: 'cli', cli: 'agy', model: 'gemini-3.1-pro-high' },
+  }
   let terima: Konfigurasi | null = null
   await ringkasanHandler(
     job(runId, siteId),
@@ -184,7 +187,7 @@ test('jalur agy dipakai apa adanya, tanpa API key', async () => {
     },
     cfg,
   )
-  expect(terima).toEqual({ jalur: 'agy', model: 'gemini-3.1-pro-high' })
+  expect(terima).toEqual({ jalur: 'cli', cli: 'agy', model: 'gemini-3.1-pro-high' })
   expect(ringkasanAi(db, siteId)?.model).toBe('gemini-3.1-pro-high')
   expect(aiStatus(db, runId)).toBe('ok')
 })

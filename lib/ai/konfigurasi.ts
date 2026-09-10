@@ -31,6 +31,10 @@
  * tidak.
  */
 
+import type { DatabaseSync } from 'node:sqlite'
+import type { NamaCli } from './cli.ts'
+import { bacaPilihanCli } from '../repos/konfig.ts'
+
 /**
  * Jalur pemanggilan. Bukan "penyedia" — yang penting bukan siapa yang
  * menjualnya, tapi bentuk protokolnya.
@@ -40,10 +44,13 @@
  *                 Groq, OpenRouter, Together, vLLM, dan Ollama. Satu jalur ini
  *                 mencakup semuanya, karena mereka memang bicara protokol yang
  *                 sama.
- * - `agy`       — CLI `agy` di mesin ini, dengan login sendiri seperti
- *                 `claude`. Tidak ada API key.
+ * - `cli`       — `claude` atau `agy` di mesin ini. Keduanya punya loginnya
+ *                 sendiri, jadi tidak ada API key sama sekali. Satu-satunya
+ *                 jalur yang boleh dipilih dari halaman web, karena
+ *                 satu-satunya yang tidak menyimpan rahasia — lihat
+ *                 `lib/repos/konfig.ts`.
  */
-export type Jalur = 'anthropic' | 'openai' | 'agy'
+export type Jalur = 'anthropic' | 'openai' | 'cli'
 
 /**
  * Base URL yang sudah diketahui, supaya `.env` tidak perlu memuat URL yang
@@ -67,7 +74,7 @@ export const BASE_URL: Record<string, string> = {
 export type Konfigurasi =
   | { jalur: 'anthropic'; model: string; apiKey: string }
   | { jalur: 'openai'; model: string; apiKey: string; baseUrl: string; nama: string }
-  | { jalur: 'agy'; model: string }
+  | { jalur: 'cli'; cli: NamaCli; model: string }
 
 /**
  * Kenapa AI belum siap, dalam kalimat yang menyebut variabel yang harus diisi.
@@ -126,9 +133,10 @@ export function konfigurasiAi(env: Record<string, string | undefined> = process.
     return {
       siap: false,
       sebab:
-        'WEBLYZER_AI belum diisi, jadi ringkasan AI mati. Pemindaian sendiri tetap ' +
-        'jalan tanpa AI. Isi salah satu: anthropic, agy, nim, groq, ollama, atau nama ' +
-        'lain yang bicara protokol OpenAI.',
+        'Ringkasan AI belum dikonfigurasi, jadi ia mati. Pemindaian sendiri tetap ' +
+        'jalan tanpa AI. Pilih claude atau agy di halaman ini, atau isi WEBLYZER_AI ' +
+        'di .env — anthropic, nim, groq, ollama, atau nama lain yang bicara protokol ' +
+        'OpenAI.',
     }
   }
 
@@ -150,15 +158,20 @@ export function konfigurasiAi(env: Record<string, string | undefined> = process.
     return { siap: true, konfigurasi: { jalur: 'anthropic', model, apiKey } }
   }
 
-  if (pilihan === 'agy' || pilihan === 'agy-cli') {
+  if (pilihan === 'agy' || pilihan === 'agy-cli' || pilihan === 'claude') {
+    const cli: NamaCli = pilihan === 'claude' ? 'claude' : 'agy'
     const model = env.WEBLYZER_AI_MODEL?.trim()
     if (!model) {
       return {
         siap: false,
-        sebab: 'WEBLYZER_AI_MODEL belum diisi. Jalankan `agy models` untuk daftarnya.',
+        sebab:
+          'WEBLYZER_AI_MODEL belum diisi. ' +
+          (cli === 'agy'
+            ? 'Jalankan `agy models` untuk daftarnya.'
+            : 'Contoh: claude-opus-5, atau alias seperti sonnet.'),
       }
     }
-    return { siap: true, konfigurasi: { jalur: 'agy', model } }
+    return { siap: true, konfigurasi: { jalur: 'cli', cli, model } }
   }
 
   return bacaOpenai(env, pilihan)
@@ -168,6 +181,30 @@ export function konfigurasiAi(env: Record<string, string | undefined> = process.
 export function jalurDari(nama: string): Jalur {
   const n = nama.trim().toLowerCase()
   if (n === 'anthropic') return 'anthropic'
-  if (n === 'agy' || n === 'agy-cli') return 'agy'
+  if (n === 'agy' || n === 'agy-cli' || n === 'claude') return 'cli'
   return 'openai'
+}
+
+/**
+ * Konfigurasi yang benar-benar berlaku: pilihan dari halaman web lebih dulu,
+ * `.env` sebagai dasarnya.
+ *
+ * Urutannya begitu, dan bukan sebaliknya, karena aturan yang bisa dijelaskan
+ * dalam satu kalimat: **yang terakhir Anda sentuh yang menang.** Kalau `.env`
+ * menang, menekan tombol di halaman web tidak akan mengubah apa pun dan tidak
+ * ada di layar yang bisa menjelaskan kenapa — kegagalan paling membingungkan
+ * yang bisa dimiliki sebuah tombol.
+ *
+ * Yang bisa dipilih dari web hanya jalur CLI. Kunci API tetap hanya dari
+ * `.env`; alasannya di `lib/repos/konfig.ts`.
+ */
+export function konfigurasiEfektif(
+  db: DatabaseSync,
+  env: Record<string, string | undefined> = process.env,
+): Hasil {
+  const pilihan = bacaPilihanCli(db)
+  if (pilihan) {
+    return { siap: true, konfigurasi: { jalur: 'cli', ...pilihan } }
+  }
+  return konfigurasiAi(env)
 }

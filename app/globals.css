@@ -1630,11 +1630,100 @@ a { color: inherit; }
   transform: none;
 }
 
-.model-baris input {
+/* Di-scope ke radio dan checkbox, BUKAN ke `input` apa pun.
+   Tanpa selektor tipe ini, medan teks nama model di dalam `.model-baris` ikut
+   dipaksa menjadi kotak 1,1rem — terlihat seperti kotak centang yang tidak
+   bisa diisi, dan tidak ada apa pun di layar yang menjelaskannya. */
+.model-baris input[type='radio'],
+.model-baris input[type='checkbox'] {
   accent-color: var(--ink);
   margin: 0;
   width: 1.1rem;
   height: 1.1rem;
+}
+
+.model-baris input[type='text'] {
+  font: inherit;
+  font-family: var(--font-num), ui-monospace, monospace;
+  font-size: var(--t-data);
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-kontrol);
+  padding: 0.35rem 0.5rem;
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.model-baris input[type='text']:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+  border-color: var(--ink);
+}
+
+/* Pengelompokan radio: tanpa border sendiri, karena tiap barisnya yang
+   berkotak. Fieldset yang ikut berkotak menghasilkan kotak di dalam kotak. */
+.model-grup {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--s-2);
+}
+
+.model-radio {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-kontrol);
+  background: var(--surface-card);
+  font-size: var(--t-data);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--d-cepat) var(--e-out);
+}
+
+.model-radio:hover {
+  border-color: var(--ink);
+  background: var(--surface-card-hover);
+}
+
+.model-radio:has(input:checked) {
+  border-color: var(--ink);
+  background: var(--surface);
+}
+
+.model-radio input[type='radio'] {
+  accent-color: var(--ink);
+  margin: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.model-catatan {
+  color: var(--ink-2);
+  font-size: var(--t-mikro);
+  font-weight: 400;
+  margin-left: auto;
+}
+
+/* Contoh `.env` di halaman Model. Lebar tabelnya nyata, jadi ia menggulir di
+   dalam kotaknya sendiri — bukan membuat seluruh halaman menggulir menyamping. */
+.model-env {
+  margin: var(--s-4) 0 0;
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-kontrol);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: var(--font-num), ui-monospace, monospace;
+  font-size: var(--t-mikro);
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre;
 }
 
 .model-nama {

@@ -184,23 +184,36 @@ describe('jalur openai — NIM dan sekeluarganya', () => {
   })
 })
 
-describe('jalur agy', () => {
+describe('jalur CLI — claude dan agy', () => {
   it('cukup modelnya, tanpa kunci', () => {
     const h = konfigurasiAi(env({ WEBLYZER_AI: 'agy', WEBLYZER_AI_MODEL: 'gemini-3.1-pro-high' }))
     expect(h).toEqual({
       siap: true,
-      konfigurasi: { jalur: 'agy', model: 'gemini-3.1-pro-high' },
+      konfigurasi: { jalur: 'cli', cli: 'agy', model: 'gemini-3.1-pro-high' },
+    })
+  })
+
+  it('claude juga tanpa kunci — loginnya sendiri, sama seperti agy', () => {
+    const h = konfigurasiAi(env({ WEBLYZER_AI: 'claude', WEBLYZER_AI_MODEL: 'claude-opus-5' }))
+    expect(h).toEqual({
+      siap: true,
+      konfigurasi: { jalur: 'cli', cli: 'claude', model: 'claude-opus-5' },
     })
   })
 
   it('menerima ejaan agy-cli dari konfigurasi lama', () => {
     const h = konfigurasiAi(env({ WEBLYZER_AI: 'agy-cli', WEBLYZER_AI_MODEL: 'm' }))
-    expect(h.siap && h.konfigurasi.jalur).toBe('agy')
+    expect(h.siap && h.konfigurasi.jalur === 'cli' && h.konfigurasi.cli).toBe('agy')
   })
 
-  it('tanpa model menyebut cara mencari daftarnya', () => {
-    const h = konfigurasiAi(env({ WEBLYZER_AI: 'agy' }))
-    expect(!h.siap && h.sebab).toMatch(/agy models/)
+  it('tanpa model, petunjuknya menyesuaikan CLI-nya', () => {
+    // Dua CLI, dua cara mencari daftar modelnya. Petunjuk yang sama untuk
+    // keduanya berarti salah satunya menyesatkan.
+    expect(!konfigurasiAi(env({ WEBLYZER_AI: 'agy' })).siap).toBe(true)
+    const a = konfigurasiAi(env({ WEBLYZER_AI: 'agy' }))
+    expect(!a.siap && a.sebab).toMatch(/agy models/)
+    const c = konfigurasiAi(env({ WEBLYZER_AI: 'claude' }))
+    expect(!c.siap && c.sebab).toMatch(/claude-opus-5/)
   })
 })
 
@@ -231,8 +244,9 @@ describe('spasi dan huruf', () => {
 describe('jalurDari', () => {
   it('memetakan nama ke jalurnya', () => {
     expect(jalurDari('anthropic')).toBe('anthropic')
-    expect(jalurDari('agy')).toBe('agy')
-    expect(jalurDari('agy-cli')).toBe('agy')
+    expect(jalurDari('agy')).toBe('cli')
+    expect(jalurDari('agy-cli')).toBe('cli')
+    expect(jalurDari('claude')).toBe('cli')
     expect(jalurDari('nim')).toBe('openai')
     expect(jalurDari('apa pun yang lain')).toBe('openai')
   })

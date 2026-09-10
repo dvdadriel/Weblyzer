@@ -4,8 +4,8 @@ A web audit tool for one person looking after a handful of their own sites.
 
 It crawls each site, then splits what it found across seven tabs: Bug, Console,
 Security, SEO, GEO, Audit, and Lighthouse. It runs on your own machine: no
-accounts, no sign-in, and the AI model is configured in `.env` from the same
-terminal you start it in.
+accounts and no sign-in. Pick `claude` or `agy` for the AI layer right in the
+web page; API keys for other models live in `.env`.
 
 The question its screen answers every morning: **what broke last night, and
 what is already fixed?**
@@ -64,14 +64,39 @@ to drain it. Use the Dockerfile on a host with a volume instead.
 The AI layer is optional. Without it every scan still runs in full; only the
 summary is off.
 
-Copy `.env.example` to `.env` and pick one path:
+There are two ways to configure it, split by one rule: **whether a secret is
+involved.**
+
+### The CLI paths — chosen in the web page
+
+`claude` and `agy` both have their own login on this machine, the same way
+`claude` does for the GEO and Audit tabs. Choosing one stores two words — a CLI
+name and a model name — and nothing in between is dangerous if read. So they are
+picked on `/model`, with a radio button and a text field, and the choice takes
+effect immediately with no restart.
+
+Pressing Save also calls the CLI once and shows what came back. The choice is
+kept either way: there is no hidden "saved but unproven" state holding the
+feature back, because a CLI that is momentarily broken usually recovers without
+anyone re-saving anything.
+
+The model field is a text input with suggestions, not a dropdown. Both CLIs
+change their model lists without Weblyzer knowing — `agy models` currently
+lists fourteen — and a hardcoded dropdown would reject a model that works.
+
+### The API-key paths — `.env` only
+
+An API key never goes through a form. Sending one from the browser means a
+secret crossing the page, landing in an unencrypted database file, and showing
+up on the screen of whoever opens that page. So keys are read from `.env` and
+nowhere else.
 
 | `WEBLYZER_AI` | What it uses | Needs a key |
 |---|---|---|
 | `anthropic` | Messages API | yes |
 | `nim`, `groq`, `openrouter`, `together`, `openai` | that provider's OpenAI-compatible endpoint | yes |
 | `ollama`, `vllm`, any `localhost` base URL | a model running on this machine | no |
-| `agy` | the `agy` CLI, which has its own login like `claude` | no |
+| `claude`, `agy` | the CLI's own login (usually chosen in the page instead) | no |
 | anything else | whatever `WEBLYZER_AI_BASE_URL` points at, over the OpenAI protocol | yes |
 
 ```bash
@@ -91,13 +116,17 @@ caller. Only the base URL differs, and that comes from `.env`. A provider whose
 name is not in the preset table still works — give it a
 `WEBLYZER_AI_BASE_URL`.
 
-If someone else runs Weblyzer, they write their own `.env` on their own
-machine. There is nothing shared: no accounts, no shared key, no bill moving
-from one person to another.
+### Which one wins
 
-The `/model` page **reads** this configuration and names the variable that is
-missing. It does not write it. A browser that writes files on your machine is
-code that has to be exactly right, and it would save one trip to an editor.
+A choice made in the page beats `.env`, so the rule fits in one sentence: **the
+last thing you touched wins.** If `.env` won instead, pressing the button would
+change nothing with nothing on screen to explain why — the most confusing
+failure a button can have. The page names which source is in force, and
+"Release, use .env" clears the choice.
+
+If someone else runs Weblyzer, they write their own `.env` on their own
+machine and click their own buttons. There is nothing shared: no accounts, no
+shared key, no bill moving from one person to another.
 
 ## Requirements
 

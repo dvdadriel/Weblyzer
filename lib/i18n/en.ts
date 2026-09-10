@@ -150,9 +150,24 @@ export const en = {
   // ── AI model ──────────────────────────────────────────────────────────────
   'model.judul': 'AI Model',
   'model.teks1':
-    'The AI summary is configured through the .env file on this machine, not through this page. The reason: Weblyzer runs on your own computer, so its credentials live where command-line credentials belong — and .env is already ignored by git.',
+    'claude and agy are chosen here — both have their own login on this machine, so there is no API key to store. The choice takes effect immediately, with no server restart.',
   'model.teks2':
-    'There is no model list in the code. Put whatever the provider recognises in WEBLYZER_AI_MODEL; a mistyped model is rejected by the provider with its own message, and that message is more useful than a list gone stale.',
+    'Models that use an API key are configured through .env, and only from there. There is no model list in the code: put whatever the provider recognises in WEBLYZER_AI_MODEL, and a mistyped model is rejected by the provider with its own message.',
+  'model.labelCli': 'CLI on this machine',
+  'model.labelModel': 'Model',
+  'model.cli.claude': 'Your Claude subscription',
+  'model.cli.agy': 'Your agy subscription',
+  'model.simpanUji': 'Save & Check',
+  'model.memeriksa': 'Calling the CLI…',
+  'model.pakaiEnv': 'Release, use .env',
+  'model.melepas': 'Releasing…',
+  'model.cliJawab': '{cli} answered: {jawab}',
+  'model.cliGagal': '{cli} was saved, but failed when called: {galat}',
+  'model.cliTakDikenal': 'Unknown CLI: {cli}',
+  'model.sumberWeb': 'chosen on this page',
+  'model.sumberEnv': 'from .env',
+  'model.catatanKunci':
+    'Only the CLI path can be chosen here, and that is a deliberate boundary: claude and agy use their own login on this machine, so all that gets stored is a CLI name and a model name. An API key never goes through a form — it is only read from .env, so no secret crosses the browser and none is stored in an unencrypted database file.',
   'model.aktif': 'Active over the {jalur} path with model {model}',
   'model.catatanNama':
     'Provider names whose base URL is already known: {daftar}. Any other name works too as long as it speaks the OpenAI protocol — give its base URL in WEBLYZER_AI_BASE_URL. There is no model list in the code, so adding a model means changing one line in .env rather than editing the program.',

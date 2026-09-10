@@ -156,9 +156,24 @@ export const id = {
   // ── Model AI ──────────────────────────────────────────────────────────────
   'model.judul': 'Model AI',
   'model.teks1':
-    'Ringkasan AI dikonfigurasi lewat berkas .env di mesin ini, bukan lewat halaman ini. Alasannya: Weblyzer berjalan di komputer Anda sendiri, jadi kredensialnya tinggal di tempat kredensial alat baris perintah memang tinggal — dan .env sudah diabaikan git.',
+    'claude dan agy dipilih di sini — keduanya punya login sendiri di mesin ini, jadi tidak ada API key yang perlu disimpan. Pilihannya berlaku seketika, tanpa jalan ulang server.',
   'model.teks2':
-    'Tidak ada daftar model di dalam kode. Isi WEBLYZER_AI_MODEL dengan apa pun yang dikenali penyedianya; model yang salah tulis akan ditolak penyedianya dengan pesannya sendiri, dan pesan itu lebih berguna daripada daftar yang ketinggalan zaman.',
+    'Model yang memakai API key dikonfigurasi lewat .env, dan hanya dari sana. Tidak ada daftar model di dalam kode: isi WEBLYZER_AI_MODEL dengan apa pun yang dikenali penyedianya, dan model yang salah tulis akan ditolak penyedianya dengan pesannya sendiri.',
+  'model.labelCli': 'CLI di mesin ini',
+  'model.labelModel': 'Model',
+  'model.cli.claude': 'Langganan Claude Anda',
+  'model.cli.agy': 'Langganan agy Anda',
+  'model.simpanUji': 'Simpan & Periksa',
+  'model.memeriksa': 'Memanggil CLI…',
+  'model.pakaiEnv': 'Lepaskan, pakai .env',
+  'model.melepas': 'Melepaskan…',
+  'model.cliJawab': '{cli} menjawab: {jawab}',
+  'model.cliGagal': '{cli} tersimpan, tapi gagal saat dipanggil: {galat}',
+  'model.cliTakDikenal': 'CLI tidak dikenal: {cli}',
+  'model.sumberWeb': 'dipilih di halaman ini',
+  'model.sumberEnv': 'dari .env',
+  'model.catatanKunci':
+    'Hanya jalur CLI yang bisa dipilih di sini, dan itu batas yang disengaja: claude dan agy memakai loginnya sendiri di mesin ini, jadi yang tersimpan cuma nama CLI dan nama model. API key tidak pernah lewat form — ia hanya dibaca dari .env, supaya rahasia tidak menyeberang lewat browser dan tidak tersimpan di berkas database yang tidak terenkripsi.',
   'model.aktif': 'Aktif lewat jalur {jalur} dengan model {model}',
   'model.catatanNama':
     'Nama penyedia yang base URL-nya sudah diketahui: {daftar}. Nama lain tetap bisa dipakai asal ia bicara protokol OpenAI — sebutkan base URL-nya di WEBLYZER_AI_BASE_URL. Tidak ada daftar model di dalam kode, jadi menambah model berarti mengganti satu baris di .env, bukan mengedit program.',
