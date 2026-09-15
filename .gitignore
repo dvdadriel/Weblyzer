@@ -26,7 +26,10 @@ next-env.d.ts
 # tidak akan pernah berlaku kalau direktorinya sendiri yang diabaikan.
 docs/*
 # Kecuali rekaman tutorial, yang ditunjuk README dan harus ikut ke GitHub.
+# GIF-nya ikut karena hanya itu yang benar-benar tampil di README: mp4 dari
+# repo disajikan GitHub sebagai octet-stream, jadi ia hanya bisa jadi tautan.
 !docs/tutorial.mp4
+!docs/tutorial.gif
 ruvector.db
 .env
 

@@ -72,7 +72,10 @@ A 53-second walkthrough of the whole loop: add a site, scan Bug and SEO, open a
 finding, download the Excel. The two waits are sped up 8×, not cut — the scans
 really do take minutes.
 
-https://github.com/dvdadriel/Weblyzer/raw/main/docs/tutorial.mp4
+![Weblyzer: add a site, scan Bug and SEO, open a finding, download the Excel](docs/tutorial.gif)
+
+[The same recording as mp4](docs/tutorial.mp4) — same 53 seconds, sharper, with
+a scrub bar.
 
 A read-only demo page at `/demo` ships with the repository, backed by a bundled
 `demo.db` of two real scans: Weblyzer pointed at itself, and apple.com as a
