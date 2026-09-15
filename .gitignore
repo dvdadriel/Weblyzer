@@ -21,7 +21,12 @@ next-env.d.ts
 # Lokal, tidak diversikan
 .claude/
 .claude-flow/
-docs/
+# `docs/*`, bukan `docs/`: git tidak bisa membatalkan pengecualian berkas yang
+# direktori induknya sudah dikecualikan, jadi pengecualian tutorial di bawah
+# tidak akan pernah berlaku kalau direktorinya sendiri yang diabaikan.
+docs/*
+# Kecuali rekaman tutorial, yang ditunjuk README dan harus ikut ke GitHub.
+!docs/tutorial.mp4
 ruvector.db
 .env
 

@@ -68,6 +68,12 @@ recheck without recrawling the site, and optional AI summaries.
 
 ## Demo
 
+A 53-second walkthrough of the whole loop: add a site, scan Bug and SEO, open a
+finding, download the Excel. The two waits are sped up 8×, not cut — the scans
+really do take minutes.
+
+https://github.com/dvdadriel/Weblyzer/raw/main/docs/tutorial.mp4
+
 A read-only demo page at `/demo` ships with the repository, backed by a bundled
 `demo.db` of two real scans: Weblyzer pointed at itself, and apple.com as a
 public comparison. Deployable to Vercel — the page opens its own read-only
