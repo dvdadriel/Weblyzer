@@ -161,8 +161,11 @@ export const id = {
     'Model yang memakai API key dikonfigurasi lewat .env, dan hanya dari sana. Tidak ada daftar model di dalam kode: isi WEBLYZER_AI_MODEL dengan apa pun yang dikenali penyedianya, dan model yang salah tulis akan ditolak penyedianya dengan pesannya sendiri.',
   'model.labelCli': 'CLI di mesin ini',
   'model.labelModel': 'Model',
-  'model.cli.claude': 'Langganan Claude Anda',
-  'model.cli.agy': 'Langganan agy Anda',
+  'model.masuk': 'Sudah masuk sebagai {akun}',
+  'model.akunTanpaNama': 'akun di mesin ini',
+  'model.belumMasuk': 'Belum masuk — jalankan `{perintah}`',
+  'model.loginDulu':
+    '{cli} belum login di mesin ini. Buka terminal, jalankan `{perintah}`, lalu muat ulang halaman ini.',
   'model.simpanUji': 'Simpan & Periksa',
   'model.memeriksa': 'Memanggil CLI…',
   'model.pakaiEnv': 'Lepaskan, pakai .env',

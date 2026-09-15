@@ -155,8 +155,11 @@ export const en = {
     'Models that use an API key are configured through .env, and only from there. There is no model list in the code: put whatever the provider recognises in WEBLYZER_AI_MODEL, and a mistyped model is rejected by the provider with its own message.',
   'model.labelCli': 'CLI on this machine',
   'model.labelModel': 'Model',
-  'model.cli.claude': 'Your Claude subscription',
-  'model.cli.agy': 'Your agy subscription',
+  'model.masuk': 'Signed in as {akun}',
+  'model.akunTanpaNama': 'the account on this machine',
+  'model.belumMasuk': 'Not signed in — run `{perintah}`',
+  'model.loginDulu':
+    '{cli} is not signed in on this machine. Open a terminal, run `{perintah}`, then reload this page.',
   'model.simpanUji': 'Save & Check',
   'model.memeriksa': 'Calling the CLI…',
   'model.pakaiEnv': 'Release, use .env',

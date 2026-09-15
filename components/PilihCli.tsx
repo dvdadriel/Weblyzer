@@ -3,31 +3,9 @@
 import { useActionState, useState, useTransition } from 'react'
 import { pilihCli, pakaiEnv } from '../app/model/aksi.ts'
 import type { PilihanCli } from '../lib/repos/konfig.ts'
+import type { StatusCli } from '../lib/ai/cli.ts'
 import { Ikon } from './Ikon.tsx'
-import { penerjemah, type Locale, type Kunci } from '../lib/i18n/index.ts'
-
-/**
- * Model yang disarankan per CLI — SARAN, bukan batas.
- *
- * Dipasang lewat `<datalist>`, jadi medannya tetap medan teks biasa: nama apa
- * pun boleh diketik. Itu penting, karena daftar model kedua CLI ini berubah
- * tanpa Weblyzer tahu — `agy models` hari ini memuat empat belas nama, dan
- * daftar yang di-hardcode sebagai `<select>` akan menolak model yang
- * sebenarnya berfungsi.
- *
- * Menjalankan `agy models` saat halaman dimuat memang bisa, dan sengaja tidak:
- * itu men-spawn proses pada setiap render untuk mengisi daftar yang jarang
- * berubah, dan halamannya akan macet setiap kali CLI-nya sedang rusak.
- */
-const KETERANGAN = {
-  claude: 'model.cli.claude',
-  agy: 'model.cli.agy',
-} as const satisfies Record<string, Kunci>
-
-const SARAN: Record<string, string[]> = {
-  claude: ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5', 'opus', 'sonnet', 'haiku'],
-  agy: ['gemini-3.1-pro-high', 'gemini-3.8-flash-medium', 'claude-opus-4-6-thinking'],
-}
+import { penerjemah, type Locale } from '../lib/i18n/index.ts'
 
 /**
  * Memilih CLI dan modelnya, dari halaman web.
@@ -36,18 +14,25 @@ const SARAN: Record<string, string[]> = {
  * `claude` dan `agy` memakai loginnya sendiri di mesin ini, jadi yang tersimpan
  * cuma dua kata dan tidak ada rahasia yang menyeberang lewat form. API key
  * tetap hanya dari `.env` — lihat `lib/repos/konfig.ts`.
+ *
+ * Daftar modelnya datang dari CLI-nya sendiri (lihat `statusCli`), bukan dari
+ * daftar di dalam kode: yang di-hardcode akan menolak model yang sebenarnya
+ * berfungsi pada hari penyedianya menambah satu.
  */
 export function PilihCli({
   pilihan,
+  status,
   locale,
 }: {
   pilihan: PilihanCli | null
+  status: StatusCli[]
   locale: Locale
 }) {
   const [hasil, kirim, menunggu] = useActionState(pilihCli, null)
   const [melepas, mulaiLepas] = useTransition()
   const t = penerjemah(locale)
-  const [cli, setCli] = useState<string>(pilihan?.cli ?? 'claude')
+  const [cli, setCli] = useState<string>(pilihan?.cli ?? status[0]?.nama ?? 'claude')
+  const terpilih = status.find((s) => s.nama === cli)
 
   return (
     <div className="model">
@@ -56,17 +41,26 @@ export function PilihCli({
           <legend className="model-legend">{t('model.labelCli')}</legend>
           {/* Radio, bukan select: dua pilihan yang keduanya harus terlihat
               sekaligus supaya bedanya bisa dibaca tanpa membukanya dulu. */}
-          {(['claude', 'agy'] as const).map((n) => (
-            <label key={n} className="model-radio">
+          {status.map((s) => (
+            <label key={s.nama} className="model-radio">
               <input
                 type="radio"
                 name="cli"
-                value={n}
-                checked={cli === n}
-                onChange={() => setCli(n)}
+                value={s.nama}
+                checked={cli === s.nama}
+                onChange={() => setCli(s.nama)}
               />
-              <span>{n}</span>
-              <span className="model-catatan">{t(KETERANGAN[n])}</span>
+              <span>{s.nama}</span>
+              {/* Keadaan loginnya di samping namanya, bukan di tempat lain:
+                  memilih CLI yang belum login adalah satu-satunya cara form
+                  ini gagal, dan sebabnya harus terbaca sebelum diklik. */}
+              <span className="model-catatan">
+                {s.galat
+                  ? s.galat
+                  : s.masuk
+                    ? t('model.masuk', { akun: s.akun ?? t('model.akunTanpaNama') })
+                    : t('model.belumMasuk', { perintah: s.login })}
+              </span>
             </label>
           ))}
         </fieldset>
@@ -80,14 +74,15 @@ export function PilihCli({
             required
             disabled={menunggu}
             defaultValue={pilihan?.model ?? ''}
-            placeholder={SARAN[cli]?.[0] ?? ''}
+            placeholder={terpilih?.model[0] ?? ''}
             autoComplete="off"
             spellCheck={false}
           />
-          {/* Medan teks dengan saran, bukan select: daftar model berubah tanpa
-              Weblyzer tahu, dan select akan menolak model yang berfungsi. */}
+          {/* Medan teks dengan saran, bukan select: daftarnya diambil dari CLI
+              yang sedang hidup, dan select akan menolak nama yang berfungsi
+              kalau pemeriksaannya sendiri yang gagal. */}
           <datalist id={`saran-${cli}`}>
-            {(SARAN[cli] ?? []).map((m) => (
+            {(terpilih?.model ?? []).map((m) => (
               <option key={m} value={m} />
             ))}
           </datalist>
@@ -97,6 +92,13 @@ export function PilihCli({
           {menunggu ? t('model.memeriksa') : t('model.simpanUji')}
         </button>
       </form>
+
+      {terpilih && !terpilih.masuk && (
+        <p className="model-hasil gagal" role="status">
+          <Ikon nama="alert" ukuran={13} />{' '}
+          {t('model.loginDulu', { cli: terpilih.nama, perintah: terpilih.login })}
+        </p>
+      )}
 
       {/* Hasilnya ditulis mentah, termasuk saat gagal. Inilah bedanya antara
           "gagal" dan "error: interrupted" — yang pertama tidak bisa

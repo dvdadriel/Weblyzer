@@ -53,7 +53,31 @@ type Bentuk = {
    * ditampilkan sebagai hasil analisis.
    */
   bantuan: RegExp
+  /**
+   * Perintah yang menjawab dua pertanyaan sekaligus: sudah login belum, dan
+   * model apa saja yang boleh dipakai.
+   *
+   * Satu perintah untuk dua pertanyaan karena kedua CLI ini memang
+   * menjawabnya begitu — `agy models` hanya berhasil kalau sudah login, dan
+   * `claude auth status` mencetak akunnya. Memanggil dua perintah per CLI
+   * berarti empat proses untuk memuat satu halaman.
+   */
+  periksa: string[]
+  /** Menafsirkan keluaran `periksa`. */
+  baca: (stdout: string) => { masuk: boolean; akun?: string; model: string[] }
+  /** Yang harus diketik di terminal kalau belum masuk. */
+  login: string
 }
+
+/**
+ * Alias model `claude`, karena CLI-nya tidak punya perintah yang mendaftarnya.
+ *
+ * Alias, bukan nama versi penuh, dan itu yang membuatnya tidak pernah basi:
+ * `opus` selalu menunjuk Opus terbaru yang bisa dipakai akun ini, sedangkan
+ * `claude-opus-5` akan salah pada hari model berikutnya keluar. Medannya tetap
+ * medan teks, jadi nama penuh tetap boleh diketik.
+ */
+const ALIAS_CLAUDE = ['opus', 'sonnet', 'haiku']
 
 export const CLI: Record<NamaCli, Bentuk> = {
   claude: {
@@ -65,11 +89,30 @@ export const CLI: Record<NamaCli, Bentuk> = {
 
     stdin: true,
     bantuan: /^Usage: claude/m,
+    periksa: ['auth', 'status'],
+    baca: (stdout) => {
+      const j = JSON.parse(stdout) as { loggedIn?: boolean; email?: string }
+      return { masuk: j.loggedIn === true, akun: j.email, model: ALIAS_CLAUDE }
+    },
+    login: 'claude auth login',
   },
   agy: {
     argumen: (model, prompt) => ['--model', model, `-p=${prompt}`],
     stdin: false,
     bantuan: /Available subcommands:|Usage of agy:/,
+    periksa: ['models'],
+    // Satu model per baris, "id<TAB>label". Barisnya disaring dengan TAB dan
+    // bukan dengan nomor baris karena `agy models` mencetak "Fetching
+    // available models..." lebih dulu — baris yang tidak punya TAB.
+    baca: (stdout) => {
+      const model = stdout
+        .split('\n')
+        .filter((b) => b.includes('\t'))
+        .map((b) => b.split('\t')[0]!.trim())
+        .filter((id) => id !== '')
+      return { masuk: model.length > 0, model }
+    },
+    login: 'agy',
   },
 }
 
@@ -198,4 +241,60 @@ const PROMPT_UJI = 'Balas dengan tepat satu kata: SIAP'
  */
 export async function ujiCli(nama: NamaCli, model: string): Promise<HasilAi> {
   return jalankanCli(nama, model, PROMPT_UJI, 200)
+}
+
+/**
+ * Keadaan satu CLI di mesin ini: terpasang, sudah login, dan model apa saja
+ * yang ia tawarkan.
+ *
+ * `galat` diisi hanya kalau ada sesuatu yang bisa ditindaklanjuti — perintah
+ * yang tidak ada di PATH, atau keluaran yang tidak bisa dibaca. Belum login
+ * bukan galat; itu keadaan biasa yang jawabannya `login`.
+ */
+export type StatusCli = {
+  nama: NamaCli
+  masuk: boolean
+  akun?: string
+  model: string[]
+  /** Perintah yang harus diketik di terminal untuk masuk. */
+  login: string
+  galat?: string
+}
+
+/** Batas pemeriksaan. `agy models` memanggil jaringan — terukur ~4 detik. */
+const BATAS_PERIKSA_MS = 20_000
+
+/**
+ * Menanyai CLI-nya sendiri, alih-alih menyimpan daftar model di dalam kode.
+ *
+ * Daftar yang di-hardcode selalu salah: `agy models` hari ini memuat empat
+ * belas nama, dan itu berubah tanpa Weblyzer tahu. Yang tidak berubah adalah
+ * cara bertanyanya, jadi itu yang disimpan di sini.
+ */
+export function statusCli(nama: NamaCli): Promise<StatusCli> {
+  const bentuk = CLI[nama]
+  const dasar = { nama, masuk: false, model: [] as string[], login: bentuk.login }
+
+  return new Promise((resolve) => {
+    execFile(
+      nama,
+      bentuk.periksa,
+      { timeout: BATAS_PERIKSA_MS, maxBuffer: 1024 * 1024 },
+      (err, stdout, stderr) => {
+        if (err) {
+          if ((err as { code?: string | number }).code === 'ENOENT') {
+            return resolve({ ...dasar, galat: `\`${nama}\` tidak ada di PATH.` })
+          }
+          // Keluar dengan kode bukan-nol pada perintah ini hampir selalu
+          // berarti belum login — itu yang `login` jawab, jadi bukan galat.
+          return resolve({ ...dasar, galat: (stderr || '').trim().slice(0, 300) || undefined })
+        }
+        try {
+          resolve({ ...dasar, ...bentuk.baca(stdout) })
+        } catch {
+          resolve({ ...dasar, galat: `Keluaran \`${nama} ${bentuk.periksa.join(' ')}\` tidak terbaca.` })
+        }
+      },
+    )
+  })
 }

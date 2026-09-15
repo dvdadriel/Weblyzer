@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tafsirkanCli } from '../lib/ai/cli.ts'
+import { tafsirkanCli, CLI } from '../lib/ai/cli.ts'
 
 const galat = (code: string | number, message = 'Command failed') =>
   Object.assign(new Error(message), { code })
@@ -82,5 +82,32 @@ describe('tafsirkanCli — agy', () => {
   it('membuang spasi di ujung jawaban', () => {
     const h = tafsirkanCli('agy', null, '\n  SIAP  \n', '', 100)
     expect(h.ok && h.teks).toBe('SIAP')
+  })
+})
+
+describe('CLI.baca — login dan daftar model', () => {
+  it('agy: mengabaikan baris "Fetching…" dan mengambil kolom pertama', () => {
+    // Keluaran nyata `agy models`: satu baris pembuka tanpa TAB, lalu
+    // "id<TAB>label" per model.
+    const s = CLI.agy.baca(
+      'Fetching available models...\ngemini-3.1-pro-high\tGemini 3.1 Pro (High)\nclaude-opus-4-6-thinking\tClaude Opus 4.6 (Thinking)\n',
+    )
+    expect(s.masuk).toBe(true)
+    expect(s.model).toEqual(['gemini-3.1-pro-high', 'claude-opus-4-6-thinking'])
+  })
+
+  it('agy: tanpa satu pun baris model berarti belum login', () => {
+    expect(CLI.agy.baca('Fetching available models...\n').masuk).toBe(false)
+  })
+
+  it('claude: membaca loggedIn dan email dari JSON-nya', () => {
+    const s = CLI.claude.baca('{"loggedIn":true,"email":"a@b.test","authMethod":"claude.ai"}')
+    expect(s.masuk).toBe(true)
+    expect(s.akun).toBe('a@b.test')
+    expect(s.model.length).toBeGreaterThan(0)
+  })
+
+  it('claude: loggedIn false berarti belum login', () => {
+    expect(CLI.claude.baca('{"loggedIn":false}').masuk).toBe(false)
   })
 })

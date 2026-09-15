@@ -1,6 +1,7 @@
 import { db } from '../../lib/ui/db.ts'
 import { konfigurasiEfektif, BASE_URL } from '../../lib/ai/konfigurasi.ts'
 import { bacaPilihanCli } from '../../lib/repos/konfig.ts'
+import { statusCli } from '../../lib/ai/cli.ts'
 import { PilihCli } from '../../components/PilihCli.tsx'
 import { Ikon } from '../../components/Ikon.tsx'
 import { tServer, localeSekarang } from '../../lib/i18n/server.ts'
@@ -25,6 +26,9 @@ export default async function Model() {
   const locale = await localeSekarang()
   const pilihan = bacaPilihanCli(db())
   const cfg = konfigurasiEfektif(db())
+  // Paralel, bukan berurutan: `agy models` memanggil jaringan dan memakan
+  // beberapa detik sendirian. Berurutan berarti waktunya dijumlah.
+  const status = await Promise.all([statusCli('claude'), statusCli('agy')])
 
   return (
     <>
@@ -60,7 +64,7 @@ export default async function Model() {
         )}
       </p>
 
-      <PilihCli pilihan={pilihan} locale={locale} />
+      <PilihCli pilihan={pilihan} status={status} locale={locale} />
 
       <div
         className="catatan-sumber"
